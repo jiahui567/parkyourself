@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "park-yourself",
+    "name": "Park Yourself",
     "slug": "park-yourself",
     "version": "1.0.0",
+    "scheme": "parkyourself",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,6 +11,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.parkyourself.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -19,6 +21,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-sqlite",
+        {
+          "customBuildFlags": "-DSQLITE_DEFAULT_FOREIGN_KEYS=1"
+        }
+      ],
+      "expo-sharing",
+      "./plugins/withCmakeVersion"
+    ]
   }
 }

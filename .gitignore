@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# database copies pulled from the phone (npm run db:pull)
+db-snapshot/
+
 # generated native folders
 /ios
 /android
