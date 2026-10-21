@@ -11,6 +11,7 @@ All data stays on the phone. No account, no server. An optional cloud sync is pl
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
+| Built ahead | **M2 fee logic** (`src/fees/`): day type, fee per day, whole-stay fee with overnight estimate and borrowed rates; money and date formatters (`src/lib/`). Covered by Jest tests, including every row of the PLAN.md fee table. The M2 screens are not built yet |
 | Next | **M1**: vehicles, Park and Find screens, history |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
@@ -43,8 +44,10 @@ The home screen is currently a temporary M0 status screen (database info and sel
 | Drawing | `react-native-svg` |
 | Build | Expo development build (`expo-dev-client`), built locally with Android Studio's SDK. Expo Go is not supported |
 | Lint | ESLint 9 with `eslint-config-expo` |
+| Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js` |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
 
-Added at the milestone that needs them: Jest (M2), an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5), `react-native-gifted-charts` (M6).
+Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5), `react-native-gifted-charts` (M6).
 
 ## Project structure
 
@@ -54,6 +57,12 @@ park-yourself/
 │   ├── app/                 Screens (Expo Router): every file is a screen
 │   │   ├── _layout.js       Root layout, opens the database
 │   │   └── index.js         Home screen (temporary M0 status screen)
+│   ├── fees/                Fee rules: pure functions, no database or React
+│   │   ├── calcFee.js       Fee per day and per stay (overnight estimate, borrowed rates)
+│   │   └── dayType.js       Weekday, weekend or public holiday
+│   ├── lib/                 Shared helpers
+│   │   ├── money.js         formatRM ("RM 3.00") and parseRM (typed text to sen)
+│   │   └── time.js          Local date key, next midnight, time/date/duration text
 │   └── db/                  Data layer: the only code that runs SQL
 │       ├── index.js         What screens import
 │       ├── core.js          Insert, update, soft delete, transactions, UUIDs
@@ -66,7 +75,9 @@ park-yourself/
 ├── scripts/
 │   └── pull-db.js           Copies the phone's database to db-snapshot/
 ├── assets/                  App icons and splash image
+├── .github/workflows/ci.yml GitHub Actions: lint and tests on push and pull request
 ├── app.json                 Expo config: name, Android package, plugins
+├── jest.config.js           Jest setup (jest-expo preset, Malaysia time zone)
 ├── PLAN.md                  Full build plan
 ├── AGENTS.md                Rules for AI coding agents
 └── CLAUDE.md                Points Claude Code at AGENTS.md
@@ -121,6 +132,7 @@ The first build takes a while. After that:
 | `npm start` | Starts the Expo dev server |
 | `npm run android` | Builds and installs the development build on the connected phone |
 | `npm run lint` | Runs ESLint |
+| `npm test` | Runs the Jest tests (fee rules, formatters). No phone needed |
 | `npm run db:pull` | Copies the database (and its `-wal` file) from the phone into `db-snapshot/` |
 
 `npm run ios` and `npm run web` come from the Expo template and are not used yet.

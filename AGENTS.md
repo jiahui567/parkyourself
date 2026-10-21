@@ -22,6 +22,7 @@ npx expo install <package>  # always use instead of npm install: resolves SDK-co
 npx expo start              # start the dev server
 npx expo run:android        # build and install the development build on the phone
 npm run lint                # lint
+npm test                    # Jest tests (time zone pinned to Asia/Kuala_Lumpur in jest.config.js)
 npm run db:pull             # copy the phone's database into db-snapshot/
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
@@ -46,8 +47,10 @@ npx expo install --fix      # fix incompatible package versions
 
 ## Fees
 
-- Fee logic lives in pure functions in one module (for example `src/fees/`), with no database or React code.
-- Every row of the fee test table in PLAN.md is a Jest test. Change the table and the tests together.
+- Fee logic lives in pure functions in `src/fees/`, with no database or React code. Screens call `calcStayFee` and `dayTypeOf` from `src/fees/index.js`; they never compute fees themselves.
+- Rates passed to the fee functions are `place_rate` rows (snake_case columns), the same shape stored in `rate_snapshot`.
+- Every row of the fee test table in PLAN.md is a Jest test in `src/fees/calcFee.test.js`. Change the table and the tests together.
+- Tests build times in local phone time; a test about local versus UTC dates uses an explicit UTC instant (`Date.parse('...Z')`).
 
 ## Privacy (local-first)
 
@@ -67,14 +70,14 @@ npx expo install --fix      # fix incompatible package versions
 
 - Function components and hooks. Styles with `StyleSheet`. No UI library without asking.
 - One screen per file in `src/app/`.
-- One shared formatter for money ("RM 3.00") and one for dates; never format inline.
+- Format money with `formatRM` / read typed amounts with `parseRM` (`src/lib/money.js`), and dates and durations with `src/lib/time.js`; never format inline.
 - No empty `catch` blocks: show the user an error or rethrow.
 - Comments explain why, not what.
 - UI text is English.
 
 ## Finishing a task
 
-- Run `npm run lint`, and the Jest tests once they exist. If the database changed, the self-test must pass on the phone. Say clearly what was not run on a device.
+- Run `npm run lint` and `npm test`. If the database changed, the self-test must pass on the phone. Say clearly what was not run on a device.
 - Stay inside the task: no unrelated refactors or renames.
 - Update README.md when setup or commands change, and tick the milestone in PLAN.md when it is done.
 - Never commit, push or force-push unless asked.
