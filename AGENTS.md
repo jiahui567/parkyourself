@@ -31,6 +31,7 @@ npx expo install --fix      # fix incompatible package versions
 ## Navigation
 
 - Expo Router for all navigation. Routes live in `src/app/`: every file there is a screen, and `_layout.js` files define navigators.
+- Main sections are bottom tabs in `src/app/(tabs)/` (Home, History, Spending, Settings), listed in `(tabs)/_layout.js`. Detail screens (Park, Find, Cars, Add a car) live outside `(tabs)` and open above the tab bar from the root stack.
 - Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/`, OCR parsing in `src/ocr/`.
 - Screens stay thin: rules and text live in the tested modules above; a screen only loads, shows and saves. Load data with `useFocusedLoad` so it refreshes when the user comes back to the screen.
 - Import `Link`, `router` and `useLocalSearchParams` from `expo-router`.
@@ -71,6 +72,7 @@ npx expo install --fix      # fix incompatible package versions
 ## Code style
 
 - Function components and hooks. Styles with `StyleSheet`. No UI library without asking.
+- The app has a dark theme (default) and a light theme. Build styles from the active theme with a module-level `createStyles = (c) => StyleSheet.create(...)` and `useThemedStyles(createStyles)`; take colours only from the tokens in `src/components/theme.js`, never a hex in a screen; give every `Text` a colour. The design standard is in the `add-screen` skill.
 - One screen per file in `src/app/`.
 - Format money with `formatRM` / read typed amounts with `parseRM` (`src/lib/money.js`), and dates and durations with `src/lib/time.js`; never format inline.
 - No empty `catch` blocks: show the user an error or rethrow.

@@ -1,10 +1,12 @@
 import {
   feeText,
   googleMapsUrl,
+  levelBayText,
   notificationText,
   routeBackText,
   shareMessage,
   spotText,
+  zoneSinceText,
 } from './sessionText';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
@@ -28,6 +30,30 @@ describe('spotText', () => {
 
   it('skips what was not recorded', () => {
     expect(spotText({ level: 'B2' })).toBe('B2');
+  });
+});
+
+describe('levelBayText', () => {
+  it('joins level and bay with a dot', () => {
+    expect(levelBayText(FULL)).toBe('B2 · C14');
+  });
+
+  it('shows whichever one was recorded', () => {
+    expect(levelBayText({ bay: 'C14' })).toBe('C14');
+  });
+
+  it('is null when neither was recorded', () => {
+    expect(levelBayText({ level: '', bay: null })).toBeNull();
+  });
+});
+
+describe('zoneSinceText', () => {
+  it('gives the zone colour and the local start time', () => {
+    expect(zoneSinceText(FULL)).toBe('Blue zone · Since 2:15 PM');
+  });
+
+  it('leaves out the zone when none was picked', () => {
+    expect(zoneSinceText({ ...FULL, zone_colour_name: null })).toBe('Since 2:15 PM');
   });
 });
 

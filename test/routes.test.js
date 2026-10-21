@@ -3,10 +3,13 @@
 // phone. This file lives outside src/app because every file there is a route.
 const ROUTES = [
   '_layout',
-  'index',
+  '(tabs)/_layout',
+  '(tabs)/index',
+  '(tabs)/history',
+  '(tabs)/spending',
+  '(tabs)/settings',
   'park',
   'session/[id]',
-  'history',
   'vehicles/index',
   'vehicles/new',
   'debug',

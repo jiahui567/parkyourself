@@ -1,32 +1,38 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { colours } from './theme';
+import { radius } from './theme';
+import { useAppTheme, useThemedStyles } from './ThemeProvider';
 
 // A labelled text input. Other props go to TextInput.
 export function Field({ label, ...inputProps }) {
+  const { colours } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={[styles.input, inputProps.multiline && styles.multiline]}
         placeholderTextColor={colours.muted}
+        selectionColor={colours.accent}
         {...inputProps}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  field: { gap: 4 },
-  label: { fontWeight: '600', color: colours.text },
-  input: {
-    borderWidth: 1,
-    borderColor: colours.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colours.text,
-  },
-  multiline: { minHeight: 72, textAlignVertical: 'top' },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    field: { gap: 6 },
+    label: { fontWeight: '600', color: c.text },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderRadius: radius.control,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: c.text,
+    },
+    multiline: { minHeight: 80, textAlignVertical: 'top' },
+  });

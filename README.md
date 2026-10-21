@@ -11,12 +11,12 @@ All data stays on the phone. No account, no server. An optional cloud sync is pl
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| M1 drafted | Screens: Home (a card per car), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive). Data functions for cars and sessions are tested in CI. **Not yet run on a phone**, and the pillar photo (camera) is still to add |
+| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive), Settings, and a Spending preview, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build; the pillar photo (camera) is still to add |
 | Built ahead | **M2 fee logic** (`src/fees/`) with money and date formatters (`src/lib/`); **M4 logic**: zone colour names (`src/zone/`) and the OCR text parser (`src/ocr/`); text for the way back, the notification and the share message (`src/text/`). All covered by Jest tests. Their screens are not built yet |
 | Next | Run the M1 screens on the phone and fix what shows up; add the pillar photo to Park |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
-The M0 status screen (database facts and the self-test) is now **Database check**, linked from Home in development builds.
+The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
 
 ## Features (version 1)
 
@@ -28,6 +28,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Share:** the spot as a WhatsApp message with the photo, or as a QR code.
 - **Monthly spending:** totals by month, place and car.
 - **Several cars**, optional one-shot GPS, works fully offline.
+- **Look:** clean and minimal, dark mode by default with a Light option in Settings, and a bottom tab bar for Home, History, Spending and Settings.
 
 ## Tech stack
 
@@ -42,7 +43,8 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Notifications | `expo-notifications` |
 | Location (optional) | `expo-location` |
 | Sharing and export | `expo-sharing` |
-| Drawing | `react-native-svg` |
+| Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
+| Theme | Own dark and light colour sets in `src/components/theme.js`; the choice is saved in the `setting` table. Design rules in the `add-screen` skill |
 | Build | Expo development build (`expo-dev-client`), built locally with Android Studio's SDK. Expo Go is not supported |
 | Lint | ESLint 9 with `eslint-config-expo` |
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
@@ -56,14 +58,19 @@ Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-
 park-yourself/
 ├── src/
 │   ├── app/                 Screens (Expo Router): every file is a screen
-│   │   ├── _layout.js       Root layout, opens the database
-│   │   ├── index.js         Home: a card per car, parked spot or Park button
+│   │   ├── _layout.js       Root layout: opens the database, loads the theme, root stack
+│   │   ├── (tabs)/          The bottom tab bar (the folder name is not part of the URL)
+│   │   │   ├── _layout.js   Tabs: Home, History, Spending, Settings
+│   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
+│   │   │   ├── history.js   Finished parking, newest first
+│   │   │   ├── spending.js  Monthly spending (a "Coming soon" preview until M6)
+│   │   │   └── settings.js  Dark/Light, Cars, planned settings, Database check
 │   │   ├── park.js          Park: record level, bay, zone colour, way out, first shop, note
 │   │   ├── session/[id].js  Find: the spot, the way back, Found my car / Delete
-│   │   ├── history.js       Finished parking, newest first
 │   │   ├── vehicles/        Cars list (default, archive) and Add a car
 │   │   └── debug.js         Database check (development builds)
-│   ├── components/          Button, ChipGroup, Field, ErrorText, theme colours
+│   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
+│   │                        SegmentedControl, Field, ErrorText, icons, CarLogo
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time)
 │   ├── text/                Way back, notification and share message text
 │   ├── zone/                Zone colour chips and hex-to-name rules

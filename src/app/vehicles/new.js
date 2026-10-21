@@ -5,12 +5,14 @@ import { ScrollView, StyleSheet, Text } from 'react-native';
 import { Button } from '../../components/Button';
 import { ErrorText } from '../../components/ErrorText';
 import { Field } from '../../components/Field';
-import { colours, space } from '../../components/theme';
+import { space } from '../../components/theme';
+import { useThemedStyles } from '../../components/ThemeProvider';
 import { useDatabase, vehicles } from '../../db';
 
 // Add a car. Home sends you here on first run, when there are no cars yet.
 export default function AddCar() {
   const db = useDatabase();
+  const styles = useThemedStyles(createStyles);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -39,7 +41,8 @@ export default function AddCar() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: space },
-  intro: { color: colours.muted },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    container: { padding: 16, gap: space },
+    intro: { color: c.muted },
+  });

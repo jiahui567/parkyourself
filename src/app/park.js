@@ -6,7 +6,8 @@ import { Button } from '../components/Button';
 import { ChipGroup } from '../components/ChipGroup';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
-import { colours, space } from '../components/theme';
+import { space } from '../components/theme';
+import { useThemedStyles } from '../components/ThemeProvider';
 import { sessions, useDatabase, vehicles } from '../db';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
 import { ZONE_COLOURS } from '../zone/zoneColour';
@@ -24,6 +25,7 @@ const EMPTY_FORM = { level: '', bay: '', zone_colour_name: null, access_type: nu
 // Park: record where a car is. Opened with ?vehicleId=<id>.
 export default function Park() {
   const db = useDatabase();
+  const styles = useThemedStyles(createStyles);
   const { vehicleId } = useLocalSearchParams();
   const loadCar = useCallback(() => vehicles.get(db, vehicleId), [db, vehicleId]);
   const { data: car, error: loadError, loading } = useFocusedLoad(loadCar);
@@ -81,9 +83,10 @@ export default function Park() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: space },
-  row: { flexDirection: 'row', gap: space },
-  half: { flex: 1 },
-  label: { fontWeight: '600', color: colours.text },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    container: { padding: 16, gap: space },
+    row: { flexDirection: 'row', gap: space },
+    half: { flex: 1 },
+    label: { fontWeight: '600', color: c.text },
+  });

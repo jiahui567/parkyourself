@@ -1,30 +1,45 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colours } from './theme';
+import { radius } from './theme';
+import { useAppTheme, useThemedStyles } from './ThemeProvider';
 
-// variant: 'primary' (filled), 'secondary' (outlined) or 'danger' (outlined red).
-export function Button({ title, onPress, variant = 'primary', disabled = false }) {
+// The colour token for the title and icon of each variant.
+const CONTENT_COLOUR = { primary: 'onPrimary', secondary: 'text', tonal: 'accent', danger: 'danger' };
+
+// variant: 'primary' (filled emerald), 'secondary' (filled grey), 'tonal'
+// (soft emerald) or 'danger' (outlined red).
+// size: 'large' fills the width, for a screen's one main action; 'small' is a
+// pill sized to its label, for side actions in lists.
+// icon: an icon component from icons.js, drawn before the title.
+export function Button({ title, onPress, variant = 'primary', size = 'large', icon: Icon, disabled = false }) {
+  const { colours } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const contentColour = colours[CONTENT_COLOUR[variant]];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [styles.base, styles[variant], (pressed || disabled) && styles.dimmed]}
+      style={({ pressed }) => [styles.base, styles[size], styles[variant], (pressed || disabled) && styles.dimmed]}
     >
-      <Text style={[styles.text, styles[`${variant}Text`]]}>{title}</Text>
+      {Icon && <Icon size={size === 'small' ? 16 : 20} color={contentColour} />}
+      <Text style={[styles.text, styles[`${size}Text`], { color: contentColour }]}>{title}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  base: { borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', borderWidth: 1 },
-  primary: { backgroundColor: colours.primary, borderColor: colours.primary },
-  secondary: { backgroundColor: colours.background, borderColor: colours.primary },
-  danger: { backgroundColor: colours.background, borderColor: colours.danger },
-  dimmed: { opacity: 0.6 },
-  text: { fontWeight: '600', fontSize: 16 },
-  primaryText: { color: '#FFFFFF' },
-  secondaryText: { color: colours.primary },
-  dangerText: { color: colours.danger },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    base: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1 },
+    large: { borderRadius: radius.control, paddingVertical: 14, paddingHorizontal: 16 },
+    small: { alignSelf: 'center', borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 14 },
+    primary: { backgroundColor: c.primary, borderColor: c.primary },
+    secondary: { backgroundColor: c.surface, borderColor: c.surface },
+    tonal: { backgroundColor: c.accentSoft, borderColor: c.accentSoft },
+    danger: { backgroundColor: 'transparent', borderColor: c.danger },
+    dimmed: { opacity: 0.6 },
+    text: { fontWeight: '600' },
+    largeText: { fontSize: 16 },
+    smallText: { fontSize: 14 },
+  });

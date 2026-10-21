@@ -1,7 +1,10 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Button } from '../components/Button';
+import { radius } from '../components/theme';
+import { useThemedStyles } from '../components/ThemeProvider';
 import { DATABASE_NAME, useDatabase } from '../db';
 import { readDatabaseInfo } from '../db/debug';
 import { runSelfTest } from '../db/selfTest';
@@ -17,6 +20,7 @@ async function selfTestAndLog() {
 // self-test, which checks what only the real phone driver can show.
 export default function DatabaseCheck() {
   const db = useDatabase();
+  const styles = useThemedStyles(createStyles);
   const [info, setInfo] = useState(null);
   const [results, setResults] = useState(null);
 
@@ -40,13 +44,13 @@ export default function DatabaseCheck() {
       <Text style={styles.heading}>Database</Text>
       {info && (
         <View style={styles.card}>
-          <Text>File: {DATABASE_NAME}</Text>
-          <Text>Schema version: v{info.user_version}</Text>
-          <Text>Foreign keys: {info.foreign_keys ? 'on' : 'OFF'}</Text>
-          <Text>Journal mode: {info.journal_mode}</Text>
+          <Text style={styles.body}>File: {DATABASE_NAME}</Text>
+          <Text style={styles.body}>Schema version: v{info.user_version}</Text>
+          <Text style={styles.body}>Foreign keys: {info.foreign_keys ? 'on' : 'OFF'}</Text>
+          <Text style={styles.body}>Journal mode: {info.journal_mode}</Text>
           <Text style={styles.subheading}>Tables</Text>
           {info.tables.map((t) => (
-            <Text key={t.name}>
+            <Text key={t.name} style={styles.body}>
               {t.name} ({t.rows} rows)
             </Text>
           ))}
@@ -55,7 +59,7 @@ export default function DatabaseCheck() {
 
       <Text style={styles.heading}>Data layer self-test</Text>
       <View style={styles.card}>
-        {!results && <Text>Running…</Text>}
+        {!results && <Text style={styles.body}>Running…</Text>}
         {results?.map((r) => (
           <Text key={r.name} style={r.ok ? styles.pass : styles.fail}>
             {r.ok ? 'PASS' : 'FAIL'} {r.name}
@@ -63,20 +67,18 @@ export default function DatabaseCheck() {
           </Text>
         ))}
       </View>
-      <Pressable style={styles.button} onPress={rerun}>
-        <Text style={styles.buttonText}>Run self-test again</Text>
-      </Pressable>
+      <Button title="Run self-test again" onPress={rerun} />
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: 8 },
-  heading: { fontSize: 18, fontWeight: '600', marginTop: 8 },
-  subheading: { fontWeight: '600', marginTop: 8 },
-  card: { backgroundColor: '#f2f2f2', borderRadius: 8, padding: 12, gap: 2 },
-  pass: { color: '#1b7f3b' },
-  fail: { color: '#c62828' },
-  button: { backgroundColor: '#1E5BD8', borderRadius: 8, padding: 12, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '600' },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    container: { padding: 16, gap: 8 },
+    heading: { fontSize: 18, fontWeight: '600', marginTop: 8, color: c.text },
+    subheading: { fontWeight: '600', marginTop: 8, color: c.text },
+    card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 2, boxShadow: c.shadow },
+    body: { color: c.text },
+    pass: { color: c.accent },
+    fail: { color: c.danger },
+  });

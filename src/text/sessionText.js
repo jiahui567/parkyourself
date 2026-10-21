@@ -11,6 +11,17 @@ export function spotText(session) {
   return [session.level, session.bay, session.zone_colour_name].filter(Boolean).join(' ');
 }
 
+// 'B2 · C14' for the Home card, or null when neither was recorded.
+export function levelBayText(session) {
+  return [session.level, session.bay].filter(Boolean).join(' · ') || null;
+}
+
+// 'Blue zone · Since 2:15 PM', the line under levelBayText on Home.
+export function zoneSinceText(session) {
+  const zone = session.zone_colour_name ? `${session.zone_colour_name} zone` : null;
+  return [zone, `Since ${formatTime(session.started_at)}`].filter(Boolean).join(' · ');
+}
+
 // 'Find Starbucks → take the escalator beside it → B2 → blue zone, pillar C14',
 // or null when nothing was recorded.
 export function routeBackText(session) {

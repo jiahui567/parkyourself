@@ -1,6 +1,6 @@
 # Park Yourself: build plan
 
-Last updated: 2026-10-20. Status: planning, no code yet. Working name in earlier drafts: Parking Saver.
+Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. Working name in earlier drafts: Parking Saver.
 
 An Android app (iPhone later) that remembers where you parked: a photo of the pillar sign, the level, bay number and zone colour read from that photo, the first shop you saw after leaving the lift or escalator, and a note. It remembers each car park's rates (weekday, weekend, and an optional fixed public holiday amount), calculates the fee, reminds you before paid parking runs out, lets you share your spot with someone, and shows your monthly parking spend. It supports several cars. All data stays on the phone.
 
@@ -21,6 +21,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Platform | Android first. Keep code cross-platform so an iPhone build is possible later |
 | Language | React Native (Expo) with plain JavaScript, no TypeScript. Flutter was considered and not chosen (previous experience with Flutter + SQLite was not enjoyable) |
 | Currency and app language | RM only, English only |
+| Look and theme | Decided 2026-10-22. Clean, minimal look in the style of Apple Health and the Tesla app: charcoal and white, emerald only for the main action and positive states such as Parked. Dark mode by default; Light can be picked in Settings and is saved on the phone. Bottom tab bar: Home, History, Spending, Settings. Colours, type and components are in `.claude/skills/add-screen/SKILL.md` |
 | Data | Version 1: stored only on the phone (SQLite). No account, no server. Version 2 adds optional cloud sync and sharing (see "Version 2: Park Yourself Cloud") |
 | Database IDs and deletes | Prepared for version 2 from day one: every row has a UUID text id made on the phone, an `updated_at` time, and is soft-deleted (`deleted_at`) instead of removed, so sync can be added later without rewriting the data layer |
 | GPS | Optional, off by default. One reading when you park, only if you switch it on for that session. No continuous or background tracking |
@@ -47,7 +48,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 1. Add your first car: a name such as "My Myvi". It becomes the default car.
 
 **Parking**
-1. Open the app and tap **Park** on the vehicle's card. The default vehicle is preselected; tap to switch.
+1. Open the app and tap the round **Park** button on Home. The default vehicle shows first; with several vehicles, tap another one's chip at the top to switch.
 2. Pick the place: recent places are listed first, or search ("bukit" finds Pavilion Bukit Jalil), or type a new name.
    - **Saved place with a rate for today's day type:** the rate fills in.
    - **New place, or no rate yet for today's day type:** enter the rate. It is saved to the place automatically. Tick **Same rate every day** to save it for weekday and weekend at once.
@@ -78,14 +79,15 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 
 | Screen | Contents |
 |---|---|
-| Home | One card per vehicle: either a **Park** button or the active session (place, level/bay, elapsed time, fee so far) |
+| Tab bar | Home, History, Spending and Settings, at the bottom of every main screen. Park, Find, Vehicles and the other detail screens open above it |
+| Home | One vehicle at a time: a drawing of a car at the top (glowing emerald when parked), the vehicle's name, and a **Parked** or **Not parked** status. When parked, a card with the level and bay on the zone colour, the start time, the way back and (from M2) the fee so far. A round **Park** button at the bottom centre, which becomes **Find** when that vehicle is parked. With several vehicles, chips at the top switch between them and a green dot marks each parked one |
 | Park | Vehicle, place picker with rate, public holiday toggle, camera, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), access type, first shop, note, timer, GPS switch |
 | Find | Photo (tap to zoom), level and bay on the zone colour swatch, reverse route, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
 | History | Past sessions with date, vehicle, place, level/bay, duration, amount paid. Filter by vehicle, place and month. Tap to view details and photo. Delete photo or session |
-| Spending | Monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart |
+| Spending | Monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart. Until M6, the tab shows a "Coming soon" preview |
 | Places | Saved places with visit count. Tap to edit the weekday rate, weekend rate and public holiday amount, rename or delete |
 | Vehicles | Add, edit, set default, archive (archived vehicles keep their history) |
-| Settings | Reminder lead time, Extend amount, GPS default, public holiday dates, export database |
+| Settings | Appearance (Dark or Light), link to Vehicles, reminder lead time, Extend amount, GPS default, public holiday dates, export database. Settings not built yet are listed as "Soon"; development builds also link to Database check |
 
 ## Saved places and rates
 
@@ -175,7 +177,7 @@ Write these as Jest tests before the fee screens.
 
 - Cars only. Fields: name, colour (optional), default flag.
 - One active session per car, enforced in the database (see the unique index in the data model).
-- Each parked car has its own Home card and its own ongoing notification.
+- Each parked car shows on Home (with several cars, a green dot on its chip) and has its own ongoing notification.
 - A car with history is archived, not deleted, so history and monthly totals stay correct.
 
 ## Share your spot
@@ -259,7 +261,7 @@ Basement lighting (yellow or dim lights) shifts colours, which is why you always
 - Permissions: Android 13+ needs the notification permission at first use.
 
 Android behaviour to test on your phone:
-- Since Android 14, users can swipe away most ongoing notifications. The Home screen must still show every active session.
+- Since Android 14, users can swipe away most ongoing notifications. The Home screen must still show every active session (the green dot on each parked car's chip).
 - Android limits exact alarms for most apps, so a reminder can arrive a few minutes late. The lead-time reminder covers this.
 - Battery savers on some brands (Xiaomi, Oppo, Vivo, Samsung) can delay or block scheduled notifications. Settings could show a hint to exclude the app from battery optimisation.
 - Compare `expo-notifications` with Notifee at M3. Notifee has more Android control (ongoing style, chronometer, exact triggers). Check that it is still maintained before picking it.
@@ -560,14 +562,14 @@ Notes:
 Version 1 is finished when M0 to M8 are done.
 
 - [ ] **M0 Setup**: Expo project (JavaScript), dev build running on the phone, SQLite with the `user_version` migration list and `foreign_keys` on, `db/` data layer following the data layer rules (UUIDs, `updated_at`, soft delete), tables visible in Android Studio Database Inspector
-- [ ] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, Home cards per vehicle, Park screen with photo, level/bay typed by hand, access type, first shop, note; Find screen with reverse route; Found my car; History with delete
+- [ ] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, bottom tab bar, Home (one vehicle at a time with the round Park button), Park screen with photo, level/bay typed by hand, access type, first shop, note; Find screen with reverse route; Found my car; History with delete
 - [ ] **M2 Places, rates and fees**: place picker with search and recent places, weekday and weekend rates saved per place, optional fixed public holiday amount, update-rate prompt, public holiday list and toggle, overnight stays shown as Estimate, amount paid, Jest tests for every row of the fee test table
 - [ ] **M3 Notifications**: ongoing notification per parked vehicle with Navigate and Extend timer, timer reminders, permission prompts, tested with the screen locked
 - [ ] **M4 OCR and zone colour**: pillar photo → level and bay chips, raw OCR text saved; colour suggestion, tap-to-pick, colour chips, Jest tests for the hex-to-name table
 - [ ] **M5 Share spot**: share message with photo through the share sheet, QR code screen
 - [ ] **M6 Monthly spending**: Spending screen, breakdown by place and vehicle, 12-month chart, tap through to sessions
 - [ ] **M7 Optional GPS**: per-session switch, one-shot reading, Open in Google Maps, map link in the share message
-- [ ] **M8 Polish**: Settings, export database, app icon, dark mode, signed APK for your phone
+- [ ] **M8 Polish**: Settings, export database, app icon, signed APK for your phone. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
 
 ## Version 2: Park Yourself Cloud (future)
 

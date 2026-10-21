@@ -4,7 +4,8 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { ErrorText } from '../../components/ErrorText';
-import { colours, space } from '../../components/theme';
+import { radius, space } from '../../components/theme';
+import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { sessions, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
@@ -18,6 +19,8 @@ const goHome = () => (router.canGoBack() ? router.back() : router.replace('/'));
 // "Found my car"; an ended one (opened from History) can be deleted.
 export default function SessionScreen() {
   const db = useDatabase();
+  const { colours } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams();
   const load = useCallback(() => sessions.getDetails(db, id), [db, id]);
   const { data: session, error, loading } = useFocusedLoad(load);
@@ -79,12 +82,12 @@ export default function SessionScreen() {
 
       <View style={styles.card}>
         {session.place_name && <Text style={styles.label}>{session.place_name}</Text>}
-        <Text>
+        <Text style={styles.body}>
           {formatDate(session.started_at)}, {formatTime(session.started_at)}
           {!active && ` to ${formatTime(session.ended_at)}`}
         </Text>
         <Text style={styles.muted}>{active ? 'Parked for ' : 'Parked '}{formatDuration(durationMs)}</Text>
-        {session.note && <Text>{session.note}</Text>}
+        {session.note && <Text style={styles.body}>{session.note}</Text>}
       </View>
 
       <ErrorText error={actionError} />
@@ -97,13 +100,15 @@ export default function SessionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 16, gap: space },
-  spot: { borderRadius: 12, padding: 24, alignItems: 'center', gap: 4 },
-  level: { fontSize: 56, fontWeight: '800' },
-  bay: { fontSize: 28, fontWeight: '700' },
-  card: { backgroundColor: colours.card, borderRadius: 12, padding: 16, gap: 6 },
-  label: { fontWeight: '600', color: colours.text },
-  route: { fontSize: 17, lineHeight: 24, color: colours.text },
-  muted: { color: colours.muted },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    container: { padding: 16, gap: space },
+    spot: { borderRadius: radius.card, padding: 24, alignItems: 'center', gap: 4, boxShadow: c.shadow },
+    level: { fontSize: 56, fontWeight: '800' },
+    bay: { fontSize: 28, fontWeight: '700' },
+    card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 6, boxShadow: c.shadow },
+    label: { fontWeight: '600', color: c.text },
+    route: { fontSize: 17, lineHeight: 24, color: c.text },
+    body: { color: c.text },
+    muted: { color: c.muted },
+  });

@@ -1,9 +1,10 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { colours } from './theme';
+import { useThemedStyles } from './ThemeProvider';
 
 // Shows an error's message, or nothing when there is no error.
 export function ErrorText({ error }) {
+  const styles = useThemedStyles(createStyles);
   if (!error) return null;
   return (
     <Text accessibilityRole="alert" style={styles.error}>
@@ -12,6 +13,7 @@ export function ErrorText({ error }) {
   );
 }
 
-const styles = StyleSheet.create({
-  error: { color: colours.danger, padding: 4 },
-});
+const createStyles = (c) =>
+  StyleSheet.create({
+    error: { color: c.danger, padding: 4 },
+  });
