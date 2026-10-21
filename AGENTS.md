@@ -31,7 +31,8 @@ npx expo install --fix      # fix incompatible package versions
 ## Navigation
 
 - Expo Router for all navigation. Routes live in `src/app/`: every file there is a screen, and `_layout.js` files define navigators.
-- Keep non-route code outside `src/app/`: shared components in `src/components/`, data access in `src/db/`.
+- Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/`, OCR parsing in `src/ocr/`.
+- Screens stay thin: rules and text live in the tested modules above; a screen only loads, shows and saves. Load data with `useFocusedLoad` so it refreshes when the user comes back to the screen.
 - Import `Link`, `router` and `useLocalSearchParams` from `expo-router`.
 
 ## Data
@@ -42,6 +43,7 @@ npx expo install --fix      # fix incompatible package versions
 - A schema change is a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. Add a `src/db/selfTest.js` check for every new data rule.
 - Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`.
 - Always bind values with `?`. Never build SQL text from user input.
+- Test data functions in Jest with `openMigratedTestDatabase()` from `test/testDatabase.js` (Node's built-in SQLite). `src/db/selfTest.js` stays for behaviour only the phone's driver shows.
 - Money is integer sen (RM 3.00 = `300`). Never use floats for money.
 - Times are stored as UTC epoch milliseconds. Convert to local time only for display and for deciding weekday, weekend or public holiday.
 
@@ -78,6 +80,7 @@ npx expo install --fix      # fix incompatible package versions
 ## Finishing a task
 
 - Run `npm run lint` and `npm test`. If the database changed, the self-test must pass on the phone. Say clearly what was not run on a device.
+- Add every new screen to the `ROUTES` list in `test/routes.test.js`.
 - Stay inside the task: no unrelated refactors or renames.
 - Update README.md when setup or commands change, and tick the milestone in PLAN.md when it is done.
 - Never commit, push or force-push unless asked.

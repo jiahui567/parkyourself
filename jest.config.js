@@ -5,4 +5,9 @@ process.env.TZ = 'Asia/Kuala_Lumpur';
 
 module.exports = {
   preset: 'jest-expo',
+  setupFiles: ['<rootDir>/test/setup.js'],
+  // npm installs some Expo packages (such as expo-asset, used by expo-sqlite)
+  // inside node_modules/expo. The app's bundler finds them there; Jest needs
+  // to be told.
+  modulePaths: ['<rootDir>/node_modules/expo/node_modules'],
 };

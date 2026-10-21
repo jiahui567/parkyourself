@@ -1,80 +1,88 @@
-import { useEffect, useState } from 'react';
+import { Link, Redirect, router } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DATABASE_NAME, useDatabase } from '../db';
-import { readDatabaseInfo } from '../db/debug';
-import { runSelfTest } from '../db/selfTest';
+import { Button } from '../components/Button';
+import { ErrorText } from '../components/ErrorText';
+import { colours, space } from '../components/theme';
+import { sessions, useDatabase, vehicles } from '../db';
+import { useFocusedLoad } from '../hooks/useFocusedLoad';
+import { useNow } from '../hooks/useNow';
+import { formatDuration, formatTime } from '../lib/time';
+import { spotText } from '../text/sessionText';
+import { swatchFor } from '../zone/zoneColour';
 
-async function selfTestAndLog() {
-  const results = await runSelfTest();
-  const failed = results.filter((r) => !r.ok).length;
-  console.log(`[selftest] ${results.length - failed}/${results.length} passed`, JSON.stringify(results));
-  return results;
-}
-
-// M0 status screen: shows the database is set up. Replaced by the real Home
-// screen in M1.
-export default function M0Status() {
+// Home: one card per car, showing where it is parked or a Park button.
+export default function Home() {
   const db = useDatabase();
-  const [info, setInfo] = useState(null);
-  const [results, setResults] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    readDatabaseInfo(db).then((i) => !cancelled && setInfo(i));
-    if (__DEV__) selfTestAndLog().then((r) => !cancelled && setResults(r));
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    const [cars, active] = await Promise.all([vehicles.list(db), sessions.listActive(db)]);
+    return { cars, active };
   }, [db]);
+  const { data, error } = useFocusedLoad(load);
+  const now = useNow();
 
-  const rerun = async () => {
-    setResults(null);
-    setResults(await selfTestAndLog());
-  };
+  if (error) return <ErrorText error={error} />;
+  if (!data) return null;
+  if (data.cars.length === 0) return <Redirect href="/vehicles/new" />;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heading}>Database</Text>
-      {info && (
-        <View style={styles.card}>
-          <Text>File: {DATABASE_NAME}</Text>
-          <Text>Schema version: v{info.user_version}</Text>
-          <Text>Foreign keys: {info.foreign_keys ? 'on' : 'OFF'}</Text>
-          <Text>Journal mode: {info.journal_mode}</Text>
-          <Text style={styles.subheading}>Tables</Text>
-          {info.tables.map((t) => (
-            <Text key={t.name}>
-              {t.name} ({t.rows} rows)
+      {data.cars.map((car) => {
+        const session = data.active.find((s) => s.vehicle_id === car.id);
+        if (!session) {
+          return (
+            <View key={car.id} style={styles.card}>
+              <Text style={styles.carName}>{car.name}</Text>
+              <Button title="Park" onPress={() => router.push({ pathname: '/park', params: { vehicleId: car.id } })} />
+            </View>
+          );
+        }
+        const swatch = swatchFor(session.zone_colour_name);
+        return (
+          <Pressable
+            key={car.id}
+            accessibilityRole="button"
+            style={styles.card}
+            onPress={() => router.push(`/session/${session.id}`)}
+          >
+            <Text style={styles.carName}>{car.name}</Text>
+            <View style={styles.spotRow}>
+              {swatch && <View style={[styles.swatch, { backgroundColor: swatch }]} />}
+              <Text style={styles.spot}>{spotText(session) || 'Parked'}</Text>
+            </View>
+            <Text style={styles.muted}>
+              Since {formatTime(session.started_at)} · {formatDuration(Math.max(0, now - session.started_at))}
             </Text>
-          ))}
-        </View>
-      )}
+          </Pressable>
+        );
+      })}
 
-      <Text style={styles.heading}>Data layer self-test</Text>
-      <View style={styles.card}>
-        {!results && <Text>Running…</Text>}
-        {results?.map((r) => (
-          <Text key={r.name} style={r.ok ? styles.pass : styles.fail}>
-            {r.ok ? 'PASS' : 'FAIL'} {r.name}
-            {!r.ok && `: ${r.detail}`}
-          </Text>
-        ))}
+      <View style={styles.links}>
+        <Link href="/history" style={styles.link}>
+          History
+        </Link>
+        <Link href="/vehicles" style={styles.link}>
+          Cars
+        </Link>
+        {__DEV__ && (
+          <Link href="/debug" style={styles.link}>
+            Database check
+          </Link>
+        )}
       </View>
-      <Pressable style={styles.button} onPress={rerun}>
-        <Text style={styles.buttonText}>Run self-test again</Text>
-      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 8 },
-  heading: { fontSize: 18, fontWeight: '600', marginTop: 8 },
-  subheading: { fontWeight: '600', marginTop: 8 },
-  card: { backgroundColor: '#f2f2f2', borderRadius: 8, padding: 12, gap: 2 },
-  pass: { color: '#1b7f3b' },
-  fail: { color: '#c62828' },
-  button: { backgroundColor: '#1E5BD8', borderRadius: 8, padding: 12, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  container: { padding: 16, gap: space },
+  card: { backgroundColor: colours.card, borderRadius: 12, padding: 16, gap: 8 },
+  carName: { fontSize: 18, fontWeight: '600', color: colours.text },
+  spotRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  swatch: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colours.border },
+  spot: { fontSize: 24, fontWeight: '700', color: colours.text },
+  muted: { color: colours.muted },
+  links: { flexDirection: 'row', gap: 24, justifyContent: 'center', marginTop: 8 },
+  link: { color: colours.primary, fontSize: 16, paddingVertical: 8 },
 });

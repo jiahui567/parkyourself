@@ -9,7 +9,7 @@ module.exports = defineConfig([
   },
   {
     // Jest provides these in test files without an import.
-    files: ['**/*.test.js'],
+    files: ['**/*.test.js', 'test/**/*.js'],
     languageOptions: {
       globals: {
         afterAll: 'readonly',

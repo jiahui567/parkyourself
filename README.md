@@ -11,11 +11,12 @@ All data stays on the phone. No account, no server. An optional cloud sync is pl
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| Built ahead | **M2 fee logic** (`src/fees/`): day type, fee per day, whole-stay fee with overnight estimate and borrowed rates; money and date formatters (`src/lib/`). Covered by Jest tests, including every row of the PLAN.md fee table. The M2 screens are not built yet |
-| Next | **M1**: vehicles, Park and Find screens, history |
+| M1 drafted | Screens: Home (a card per car), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive). Data functions for cars and sessions are tested in CI. **Not yet run on a phone**, and the pillar photo (camera) is still to add |
+| Built ahead | **M2 fee logic** (`src/fees/`) with money and date formatters (`src/lib/`); **M4 logic**: zone colour names (`src/zone/`) and the OCR text parser (`src/ocr/`); text for the way back, the notification and the share message (`src/text/`). All covered by Jest tests. Their screens are not built yet |
+| Next | Run the M1 screens on the phone and fix what shows up; add the pillar photo to Park |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
-The home screen is currently a temporary M0 status screen (database info and self-test results). M1 replaces it.
+The M0 status screen (database facts and the self-test) is now **Database check**, linked from Home in development builds.
 
 ## Features (version 1)
 
@@ -44,7 +45,7 @@ The home screen is currently a temporary M0 status screen (database info and sel
 | Drawing | `react-native-svg` |
 | Build | Expo development build (`expo-dev-client`), built locally with Android Studio's SDK. Expo Go is not supported |
 | Lint | ESLint 9 with `eslint-config-expo` |
-| Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js` |
+| Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
 
 Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5), `react-native-gifted-charts` (M6).
@@ -56,7 +57,17 @@ park-yourself/
 ├── src/
 │   ├── app/                 Screens (Expo Router): every file is a screen
 │   │   ├── _layout.js       Root layout, opens the database
-│   │   └── index.js         Home screen (temporary M0 status screen)
+│   │   ├── index.js         Home: a card per car, parked spot or Park button
+│   │   ├── park.js          Park: record level, bay, zone colour, way out, first shop, note
+│   │   ├── session/[id].js  Find: the spot, the way back, Found my car / Delete
+│   │   ├── history.js       Finished parking, newest first
+│   │   ├── vehicles/        Cars list (default, archive) and Add a car
+│   │   └── debug.js         Database check (development builds)
+│   ├── components/          Button, ChipGroup, Field, ErrorText, theme colours
+│   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time)
+│   ├── text/                Way back, notification and share message text
+│   ├── zone/                Zone colour chips and hex-to-name rules
+│   ├── ocr/                 Level and bay suggestions from pillar sign text
 │   ├── fees/                Fee rules: pure functions, no database or React
 │   │   ├── calcFee.js       Fee per day and per stay (overnight estimate, borrowed rates)
 │   │   └── dayType.js       Weekday, weekend or public holiday
@@ -70,6 +81,7 @@ park-yourself/
 │       ├── migrate.js       Applies migrations on app start
 │       ├── selfTest.js      Checks the data layer rules (development builds)
 │       └── vehicles.js, places.js, sessions.js, photos.js, holidays.js, settings.js
+├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
 ├── plugins/
 │   └── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
 ├── scripts/
@@ -160,7 +172,9 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 **Changing the schema:** add a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. The app refuses to open a database whose schema is newer than it knows, so install the newer app rather than downgrading.
 
-**Self-test:** in development builds, the M0 screen runs `src/db/selfTest.js` against a throwaway database and shows PASS or FAIL for each rule.
+**Self-test:** in development builds, the Database check screen runs `src/db/selfTest.js` against a throwaway database and shows PASS or FAIL for each rule, including what only the phone's driver can show (WAL mode, the second connection used by transactions).
+
+**Tests in CI:** `npm test` also runs the migrations and the car and session functions against Node's built-in SQLite through `test/testDatabase.js`, so a broken migration or query fails on GitHub before it reaches the phone.
 
 ## Checking the data from your laptop
 
