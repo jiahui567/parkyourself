@@ -21,7 +21,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 npx expo install <package>  # always use instead of npm install: resolves SDK-compatible versions
 npx expo start              # start the dev server
 npx expo run:android        # build and install the development build on the phone
-npm run lint                # lint
+npm run lint                # lint src/ and test/ (add -- --no-cache if a result looks stale)
 npm test                    # Jest tests (time zone pinned to Asia/Kuala_Lumpur in jest.config.js)
 npm run db:pull             # copy the phone's database into db-snapshot/
 npx expo-doctor             # diagnose dependency and config issues
@@ -82,6 +82,23 @@ npx expo install --fix      # fix incompatible package versions
 - Run `npm run lint` and `npm test`. If the database changed, the self-test must pass on the phone. Say clearly what was not run on a device.
 - Add every new screen to the `ROUTES` list in `test/routes.test.js`.
 - Stay inside the task: no unrelated refactors or renames.
-- Update README.md when setup or commands change, and tick the milestone in PLAN.md when it is done.
+- Ask the `reviewer` subagent to review the change, and fix what it finds, before saying the work is done.
+- Update README.md when setup or commands change. Tick a milestone in PLAN.md only after the user confirms it works on the phone.
 - Never commit, push or force-push unless asked.
 - When PLAN.md does not answer a question, ask instead of guessing.
+
+## Skills, subagents and hooks
+
+- Skills in `.claude/skills/`, loaded before that kind of work: `add-screen` (steps and the design standard), `add-migration`, `next-milestone`, `capture-lesson`.
+- Subagents in `.claude/agents/`: `reviewer` (read-only review of uncommitted changes) and `test-writer` (writes and runs Jest tests).
+- Hooks in `.claude/settings.json`: edits to `android/`, `ios/`, `db-snapshot/` and `node_modules/` are blocked; a reminder appears when the user's message looks like a correction; lint and tests run before Claude finishes if code changed since the last passing check.
+
+## Corrections become lessons
+
+When the user corrects your work or states a lasting rule for this project, run the `capture-lesson` skill before continuing. It writes the rule into the matching skill or subagent, or into Lessons below, so later sessions do not repeat the mistake.
+
+## Lessons
+
+Added by `capture-lesson`, newest last: one or two lines each, the rule then the reason, with the date.
+
+(none yet)

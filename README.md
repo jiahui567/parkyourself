@@ -82,6 +82,7 @@ park-yourself/
 │       ├── selfTest.js      Checks the data layer rules (development builds)
 │       └── vehicles.js, places.js, sessions.js, photos.js, holidays.js, settings.js
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
+├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
 │   └── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
 ├── scripts/
@@ -143,7 +144,7 @@ The first build takes a while. After that:
 |---|---|
 | `npm start` | Starts the Expo dev server |
 | `npm run android` | Builds and installs the development build on the connected phone |
-| `npm run lint` | Runs ESLint |
+| `npm run lint` | Runs ESLint on `src/` and `test/`. Add `-- --no-cache` if a result looks stale |
 | `npm test` | Runs the Jest tests (fee rules, formatters). No phone needed |
 | `npm run db:pull` | Copies the database (and its `-wal` file) from the phone into `db-snapshot/` |
 
@@ -201,9 +202,31 @@ Rules the data layer enforces (see `src/db/core.js`):
 ## Working with Claude Code
 
 - `AGENTS.md` holds the project rules every AI agent follows: JavaScript only, PLAN.md as the source of truth, the data layer and migration rules, money in sen, UTC times, local-first privacy, dependency rules, code style and what to check before finishing.
-- `CLAUDE.md` contains only `@AGENTS.md`, so Claude Code reads the same rules as other tools. Add new rules to `AGENTS.md`, ideally each time you correct an agent's mistake.
-- `.claude/settings.json` turns on the Expo plugin for Claude Code.
+- `CLAUDE.md` contains only `@AGENTS.md`, so Claude Code reads the same rules as other tools.
 - Decisions live in `PLAN.md`. Update it when a decision changes.
+
+**Skills** (`.claude/skills/`) are recipes Claude loads when a task matches; you can also type `/name`:
+
+| Skill | Use |
+|---|---|
+| `add-screen` | Steps for a new screen, and the design standard: theme colours, spacing, shapes, type sizes, components, wording |
+| `add-migration` | Changing the database schema safely, with the tests to update |
+| `next-milestone` | Working through a PLAN.md milestone from plan to phone check |
+| `capture-lesson` | Records your corrections as rules (runs by itself, see below) |
+
+**Subagents** (`.claude/agents/`): `reviewer` reviews uncommitted changes against the rules and never edits; `test-writer` writes and runs Jest tests.
+
+**Hooks** (`.claude/settings.json`, which also turns on the Expo plugin):
+
+| Hook | What it does |
+|---|---|
+| Before an edit | Blocks changes to `android/`, `ios/`, `db-snapshot/` and `node_modules/`, and tells Claude why |
+| When you send a message | If it looks like a correction ("wrong", "don't", "instead", "jangan", "salah"...), reminds Claude to run `capture-lesson` |
+| When Claude finishes | If code changed since the last passing check, runs lint and tests; on failure Claude gets the error and one round to fix it |
+
+**How it keeps improving:** when you correct Claude, `capture-lesson` writes the rule into the matching skill or subagent, or into the Lessons section of `AGENTS.md`, and tells you in one line. You commit those changes with your work, so every later session follows them. A rule that keeps being broken is better as a test or a hook.
+
+The hooks run with Node.js. On Windows they run in Git Bash, which comes with Git for Windows.
 
 ## License
 
