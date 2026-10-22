@@ -15,7 +15,7 @@ You write Jest tests for Park Yourself and run them. You do not change productio
 - A table of rules (like the fee table in PLAN.md) becomes an `it.each` table, one row per rule.
 - Test names say the behaviour: `refuses a car that is already parked`.
 - One behaviour per test. Do not repeat what another test already checks.
-- Do not mock the project's own modules. Native modules do not exist in Jest; `expo-crypto` is replaced in `test/setup.js`. Prefer moving logic into a pure module over mocking more native code.
+- Do not mock the project's own modules. Native modules do not exist in Jest; `expo-crypto` and `expo-mlkit-ocr` are replaced in `test/setup.js`. Prefer moving logic into a pure module over mocking more native code.
 - Prove each new test can fail: break the code or the expectation for a moment, see the test fail, then restore it.
 
 ## Finish

@@ -45,7 +45,8 @@ export const sessions = {
   // day types in rates to save to it. rate_snapshot holds the place's saved
   // rates with the ones in rates replacing them, even those not saved
   // ("Only this time"). public_holiday adds the parking day to the holiday list.
-  // photo_uris are kept files (savingPhotos), the pillar sign first.
+  // photo_files ([{ file_uri, ocr_text }]) are kept files (savingPhotos), the
+  // pillar sign first, with the text OCR read from each (null when not read).
   async start(
     db,
     {
@@ -62,7 +63,7 @@ export const sessions = {
       save_rates = [],
       public_holiday = false,
       timer_ends_at = null,
-      photo_uris = [],
+      photo_files = [],
     }
   ) {
     if (access_type != null && !ACCESS_TYPES.includes(access_type)) {
@@ -114,7 +115,9 @@ export const sessions = {
         rate_snapshot,
         timer_ends_at,
       });
-      for (const file_uri of photo_uris) await photos.add(txn, { session_id: id, file_uri });
+      for (const { file_uri, ocr_text = null } of photo_files) {
+        await photos.add(txn, { session_id: id, file_uri, ocr_text });
+      }
     });
     return id;
   },

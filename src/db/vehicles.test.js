@@ -28,6 +28,29 @@ describe('vehicles.add', () => {
   });
 });
 
+describe('vehicles.rename', () => {
+  it('saves the new name, trimmed, and its sessions show it', async () => {
+    const id = await vehicles.add(db, { name: 'My Myvi' });
+    const parked = await sessions.start(db, { vehicle_id: id });
+
+    await vehicles.rename(db, id, '  Red Myvi ');
+
+    expect((await vehicles.get(db, id)).name).toBe('Red Myvi');
+    expect((await sessions.getDetails(db, parked)).vehicle_name).toBe('Red Myvi');
+  });
+
+  it.each(['', '   ', null])('rejects the name %p and keeps the old one', async (name) => {
+    const id = await vehicles.add(db, { name: 'My Myvi' });
+
+    await expect(vehicles.rename(db, id, name)).rejects.toThrow('Give the car a name');
+    expect((await vehicles.get(db, id)).name).toBe('My Myvi');
+  });
+
+  it('refuses a car that is gone', async () => {
+    await expect(vehicles.rename(db, 'missing', 'Axia')).rejects.toThrow('No car with id missing');
+  });
+});
+
 describe('vehicles.list', () => {
   it('lists the default car first, then by name, without archived cars', async () => {
     await vehicles.add(db, { name: 'Myvi' });

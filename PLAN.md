@@ -1,6 +1,6 @@
 # Park Yourself: build plan
 
-Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. M2, M3 (notifications), M6, the M8 Settings screen and the M1 pillar photos are built and not yet checked on the phone. M7 (GPS) is on hold. Working name in earlier drafts: Parking Saver.
+Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. M2, M3 (notifications), M5 (share), M6, the M8 Settings screen, the M1 pillar photos and car rename, and M4 OCR are built and not yet checked on the phone. M7 (GPS) is on hold. Working name in earlier drafts: Parking Saver.
 
 An Android app (iPhone later) that remembers where you parked: a photo of the pillar sign, the level, bay number and zone colour read from that photo, the first shop you saw after leaving the lift or escalator, and a note. It remembers each car park's rates (weekday, weekend, and an optional fixed public holiday amount), calculates the fee, reminds you before paid parking runs out, lets you share your spot with someone, and shows your monthly parking spend. It supports several cars. All data stays on the phone.
 
@@ -37,7 +37,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Public holidays | Use the weekend rate by default. Optionally, a place can have a fixed public holiday amount (for example RM 8.00 per entry), which is used instead. Holiday dates are typed as `YYYY-MM-DD` (no date picker library), with a "Today" shortcut and an optional name |
 | Stays over midnight | Rare, and every car park has its own rules, so the app does not model them. It shows a clearly labelled estimate (each day charged at that day's rate and added) and you confirm the real amount paid from your receipt when you end the session. Per-car-park overnight rules are a later idea |
 | Fee | Calculated live while parked. When you end the session you can type the amount you actually paid if it differs (validation discount, lost ticket). The amount paid is stored only when it differs from the calculated fee; with no calculated fee (no place or no rate), a typed amount is stored and an empty field stores nothing |
-| Sharing | Share your spot as a message (text, pillar photo, map link if GPS saved) through WhatsApp or any app, or show a QR code. Only when you tap Share; the app never uploads anything by itself |
+| Sharing | Share your spot through WhatsApp or any app: the parking info as a message (map link if GPS saved), or a photo on its own. Only when you tap Share; the app never uploads anything by itself. Decided 2026-10-22: no QR code, and no extra library (the message and the photo are shared separately) |
 | Monthly spending | Spending screen with monthly totals, breakdown by place and by vehicle, and a 12-month chart |
 | Notifications | Ongoing notification per parked vehicle with **Navigate** and **Extend timer** buttons. Reminder 10 minutes before the timer ends and at the end. Extend adds 30 minutes to the later of the timer's end and now; with no timer yet it starts one from now. Settings changes the Extend amount (15, 30 or 60 min) and the reminder lead time (5, 10, 15 or 30 min). Decided 2026-10-22: built with `expo-notifications`, not Notifee. It cannot show a ticking clock, so the notification shows the start time ("since 2:15 PM") and the timer end but no fee; the live fee stays in the app. **Navigate** and **Extend timer** both open the app (Extend extends the timer as it opens Find), so no background task is needed |
 | Laptop DB access | Must be able to inspect the SQLite tables from a laptop (see "Checking the database from your laptop") |
@@ -71,7 +71,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 **Returning**
 - Tap **Navigate** (notification or app). The Find screen shows the photo, the level and bay in large text on a swatch of the zone colour, and the route back in reverse:
   `Find Starbucks → take the escalator beside it → B2 → blue zone, pillar C14`
-- **Share** sends the spot to someone or shows a QR code (see "Share your spot").
+- **Share** sends the parking info, or one photo, to someone (see "Share your spot").
 - If GPS was saved for this session, **Open in Google Maps** gives walking directions to the car park.
 - Tap **Found my car**. A summary screen shows the duration and the calculated fee, with an **Amount paid** field prefilled with that fee. Its end time is fixed when the summary opens, so the fee shown is the fee saved. Change the amount if you paid a different amount, then confirm. The session moves to history.
 - If the stay went past midnight, the fee is labelled **Estimate** on the Find screen, and the summary highlights the Amount paid field with "Overnight: check your receipt".
@@ -83,7 +83,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Tab bar | Home, History, Spending and Settings, at the bottom of every main screen. Park, Find, Vehicles and the other detail screens open above it |
 | Home | One vehicle at a time: a drawing of a car at the top (glowing emerald when parked), the vehicle's name, and a **Parked** or **Not parked** status. When parked, a card with the level and bay on the zone colour, the start time, the way back and (from M2) the fee so far. A round **Park** button at the bottom centre, which becomes **Find** when that vehicle is parked. With several vehicles, chips at the top switch between them and a green dot marks each parked one |
 | Park | Vehicle, place picker with rate, public holiday toggle, camera, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), access type, first shop, note, timer, GPS switch |
-| Find | Photos (tap to zoom, delete one) and Add photo while parked, level and bay on the zone colour swatch, reverse route, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
+| Find | Photos (tap to zoom, share or delete one) and Add photo while parked, level and bay on the zone colour swatch, reverse route, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
 | Found my car | Summary opened from Find (`/session/end/<id>`): the stay's times, duration and fee (with the Estimate label), a form for each missing rate (optional), Amount paid, Save. Back to Home afterwards |
 | History | Past sessions with date, vehicle, place, level/bay, duration, amount paid. Tap to view details and photo. Delete photo or session. Filters by vehicle, place and month are not built yet (2026-10-22); Spending opens one place's or car's sessions for a month instead |
 | Spending | Month switcher, monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart (tap a bar to pick that month). Tap a place or vehicle to open that month's sessions |
@@ -188,7 +188,7 @@ Write these as Jest tests before the fee screens.
 
 ## Share your spot
 
-- **Share** on the Find screen opens the Android share sheet (WhatsApp, Telegram, SMS, email) with this message plus the pillar photo:
+- **Share** on the Find screen (while parked) opens the Android share sheet (WhatsApp, Telegram, SMS, email) with this message:
 
   ```
   My Myvi is parked at Pavilion Bukit Jalil
@@ -199,7 +199,8 @@ Write these as Jest tests before the fee screens.
   ```
 
   The Map line appears only if GPS was saved. The person receiving it needs nothing installed.
-- **QR code:** shows the same text as a QR code on screen. The other person scans it with their phone camera. A QR code cannot hold the photo.
+- **A photo:** the share button in the full-screen photo view sends that photo on its own. The message and the photo go separately, because React Native's built-in `Share` cannot send text and an image together on Android; that would need `react-native-share`.
+- **QR code:** dropped on 2026-10-22.
 - **Later, when friends have the app:** a link such as `parkyourself://spot?...` that imports the spot into their app.
 
 ## Monthly spending
@@ -225,7 +226,7 @@ LIMIT 12;
 
 ## OCR for the pillar sign
 
-- Run text recognition on the device (Google ML Kit). No internet needed.
+- Run text recognition on the device (Google ML Kit). Reading needs no internet. Google's ML Kit data disclosure says it also collects per-installation identifiers and diagnostics and usage analytics and sends them to Google over HTTPS; there is no opt-out for text recognition. Accepted on 2026-10-22 as the one exception to "no analytics"; recorded in AGENTS.md, Privacy.
 - Shrink the photo first (about 1280 px wide) to save space and speed up OCR.
 - Parse the recognised text for:
   - Level: `B1`–`B9`, `P1`–`P9`, `L1`–`L20`, `LG`, `UG`, `G`, `M`, `LL`
@@ -424,11 +425,10 @@ Never edit a migration that has already run on your phone; add a new one.
 | Database | `expo-sqlite` with plain SQL and the `PRAGMA user_version` migration list |
 | UUIDs | `expo-crypto` (`Crypto.randomUUID()`) |
 | Camera, photo resize, crop | `expo-camera`, `expo-image-manipulator`, `expo-file-system` |
-| OCR | Google ML Kit text recognition through a React Native wrapper (check which package fits Expo at M4) |
+| OCR | `expo-mlkit-ocr` 0.2.7, pinned (chosen 2026-10-22): an Expo module for Google ML Kit text recognition with the bundled Latin model, so it reads on the phone with no model download (ML Kit's usage metrics: see "OCR for the pillar sign"). On iOS its config plugin, as added, uses Apple Vision instead of ML Kit; set `["expo-mlkit-ocr", { "iosEngine": "mlkit" }]` if the iPhone build should use ML Kit |
 | Zone colour | `react-native-image-colors` (uses Android's Palette to find the main and most vibrant colours; check at M4) |
 | Notifications | `expo-notifications` (chosen 2026-10-22 over Notifee, see "Notifications") |
-| Share spot (text + photo) | `react-native-share`. React Native's built-in `Share` sends text reliably but not text and image together on Android |
-| QR code | `react-native-qrcode-svg` with `react-native-svg` |
+| Share spot | React Native's built-in `Share` for the message, `expo-sharing` for a photo (2026-10-22: no extra library; text and image are not sent together) |
 | Charts | `react-native-gifted-charts` with `react-native-svg` and its peer dependency `expo-linear-gradient` (both added at M6, 2026-10-22; native code, so the phone needs a fresh `npx expo run:android`) |
 | Optional GPS | `expo-location`, foreground one-shot reading only |
 | Export database | `expo-sharing` |
@@ -530,7 +530,7 @@ npx expo install expo-router expo-dev-client expo-sqlite expo-crypto expo-camera
 npx expo run:android        # builds the dev app and installs it on the USB-connected phone
 ```
 
-Add `react-native-share` and `react-native-qrcode-svg` at the milestone that uses them (M5), after checking they still support the current Expo SDK. `react-native-gifted-charts` and `expo-linear-gradient` were added at M6 (2026-10-22). A native library added later needs a fresh `npx expo run:android`.
+`react-native-gifted-charts` and `expo-linear-gradient` were added at M6, and `expo-mlkit-ocr` at M4 (2026-10-22). M5 needs no extra library. A native library added later needs a fresh `npx expo run:android`.
 
 ### M0 setup notes (2026-10-20)
 
@@ -570,15 +570,16 @@ Version 1 is finished when M0 to M8 are done.
 
 - [ ] **M0 Setup**: Expo project (JavaScript), dev build running on the phone, SQLite with the `user_version` migration list and `foreign_keys` on, `db/` data layer following the data layer rules (UUIDs, `updated_at`, soft delete), tables visible in Android Studio Database Inspector
 - [ ] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, bottom tab bar, Home (one vehicle at a time with the round Park button), Park screen with photo, level/bay typed by hand, access type, first shop, note; Find screen with reverse route; Found my car; History with delete
-  - 2026-10-22: pillar photos built (several per session, Add photo on Find while parked, full-screen view, delete one); to check on the phone after `npx expo run:android`. Renaming a car (Screens, Vehicles: "edit") is not built.
+  - 2026-10-22: pillar photos built (several per session, Add photo on Find while parked, full-screen view, delete one); to check on the phone after `npx expo run:android`. Renaming a car (Cars → pencil → Rename car) built the same day.
 - [ ] **M2 Places, rates and fees**: place picker with search and recent places, weekday and weekend rates saved per place, optional fixed public holiday amount, update-rate prompt, public holiday list and toggle, overnight stays shown as Estimate, amount paid, Jest tests for every row of the fee test table
   - 2026-10-22: built with Jest tests; to check on the phone.
 - [ ] **M3 Notifications**: ongoing notification per parked vehicle with Navigate and Extend timer, timer reminders, permission prompts, tested with the screen locked
   - 2026-10-22: built with `expo-notifications`: the ongoing notification (start time and timer end, no fee), Navigate and Extend timer (both open the app), reminders before and at the end, the permission asked when Find first opens after parking, the reminder lead time in Settings. To check on the phone after `npx expo run:android`, including with the screen locked.
 - [ ] **M4 OCR and zone colour**: pillar photo → level and bay chips, raw OCR text saved; colour suggestion, tap-to-pick, colour chips, Jest tests for the hex-to-name table
   - 2026-10-22: dependencies approved: an ML Kit OCR wrapper and `react-native-image-colors`.
-- [ ] **M5 Share spot**: share message with photo through the share sheet, QR code screen
-  - 2026-10-22: dependencies approved: `react-native-share` and `react-native-qrcode-svg`.
+  - 2026-10-22: OCR built with `expo-mlkit-ocr`: the first photo is read (the next only if it gave nothing), level and bay chips fill the fields, the raw text is saved with the photo. Colour suggestion and tap-to-pick are not built yet.
+- [ ] **M5 Share spot**: share the parking info as a message, or a photo, through the share sheet (QR code dropped 2026-10-22)
+  - 2026-10-22: built without an extra library: Share on Find (message), share in the photo view (photo).
 - [ ] **M6 Monthly spending**: Spending screen, breakdown by place and vehicle, 12-month chart, tap through to sessions
   - 2026-10-22: built with Jest tests; to check on the phone after `npx expo run:android` (the chart has native code).
 - [ ] **M7 Optional GPS**: per-session switch, one-shot reading, Open in Google Maps, map link in the share message

@@ -4,18 +4,18 @@ An Android app that remembers where you parked and what it will cost.
 
 Take a photo of the pillar sign and the app reads the level, bay number and zone colour. Add the first shop you saw after the lift or escalator, and the app shows you the way back. It remembers each car park's weekday, weekend and public holiday rates, calculates the fee while you are away, reminds you before paid parking runs out, lets you share your spot through WhatsApp, and shows your monthly parking spend.
 
-All data stays on the phone. No account, no server. An optional cloud sync is planned for version 2.
+All data stays on the phone. No account, no server. An optional cloud sync is planned for version 2. The one thing that reaches the internet by itself is Google ML Kit, which reads the pillar sign: it sends Google anonymous usage metrics (see "Tech stack", OCR).
 
 ## Status
 
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, delete one, Add photo while parked |
-| Built, not yet on the phone | **M2 Places, rates and fees** (place picker, weekday/weekend rates, public holiday amount and list, live fee, overnight Estimate, Amount paid), **M3 Notifications** (timer on Park, Extend timer on Find; an ongoing notification per parked car with the start time and Navigate and Extend timer buttons, which open the app; reminders before and at the timer's end; the reminder lead time in Settings), **M6 Monthly spending** (Spending tab with the 12-month chart, tap through to a month's sessions) and the **M8 Settings** screen (Places, Public holidays, Extend timer by, Export database). Needs a fresh `npx expo run:android`: the chart has native code, and the camera and notification permissions are set in `app.json` |
-| Built ahead | **M4 logic**: zone colour names (`src/zone/`) and the OCR text parser (`src/ocr/`); text for the share message (`src/text/`). Covered by Jest tests. Their screens are not built yet |
+| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, rename, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, share or delete one, Add photo while parked. Renaming a car (built 2026-10-22) |
+| Built, not yet on the phone | **M2 Places, rates and fees** (place picker, weekday/weekend rates, public holiday amount and list, live fee, overnight Estimate, Amount paid), **M3 Notifications** (timer on Park, Extend timer on Find; an ongoing notification per parked car with the start time and Navigate and Extend timer buttons, which open the app; reminders before and at the timer's end; the reminder lead time in Settings), **M4 OCR** (the first photo is read on the phone with `expo-mlkit-ocr`; level and bay chips fill the fields), **M5 Share** (the parking info as a message from Find, or one photo from the photo view; no QR code), **M6 Monthly spending** (Spending tab with the 12-month chart, tap through to a month's sessions) and the **M8 Settings** screen (Places, Public holidays, Extend timer by, Export database). Needs a fresh `npx expo run:android`: the chart and OCR have native code, and the camera and notification permissions are set in `app.json` |
+| Built ahead | **M4 colour logic**: zone colour names from a hex (`src/zone/`), covered by Jest tests. The colour suggestion from the photo and tap-to-pick are not built yet |
 | On hold | **M7 GPS**, while its design is rethought |
-| Next | Rebuild with `npx expo run:android`, run the new screens, photos and notifications on the phone and fix what shows up; then M4 (OCR and colour from the photo) and M5 (share) |
+| Next | Rebuild with `npx expo run:android`, run the new screens, photos, OCR, sharing and notifications on the phone and fix what shows up; then the rest of M4 (colour from the photo) and M8 |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -27,7 +27,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
-- **Share:** the spot as a WhatsApp message with the photo, or as a QR code.
+- **Share:** the parking info as a message, or one photo, through WhatsApp or any app.
 - **Monthly spending:** totals by month, place and car.
 - **Several cars**, optional one-shot GPS, works fully offline.
 - **Look:** clean and minimal, dark mode by default with a Light option in Settings, and a bottom tab bar for Home, History, Spending and Settings.
@@ -42,9 +42,10 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Database | `expo-sqlite`, plain SQL, migrations tracked by `PRAGMA user_version`, WAL mode, foreign keys compiled on |
 | IDs | `expo-crypto` (`randomUUID()`) |
 | Camera and photos | `expo-camera`, `expo-image-manipulator`, `expo-file-system` |
+| OCR | `expo-mlkit-ocr` 0.2.7 (pinned): Google ML Kit's bundled Latin text model, read on the phone with no model download. ML Kit sends Google per-installation identifiers and diagnostics and usage metrics, with no opt-out; accepted on 2026-10-22 (AGENTS.md, Privacy) |
+| Sharing and export | React Native's `Share` for the parking info; `expo-sharing` for a photo and for Export database |
 | Notifications | `expo-notifications` |
 | Location (optional) | `expo-location` |
-| Sharing and export | `expo-sharing` |
 | Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
 | Charts | `react-native-gifted-charts` with `expo-linear-gradient` (its gradient peer dependency), for the Spending tab's 12-month bar chart. `expo-linear-gradient` has native code: after pulling it in, run `npx expo run:android` again |
 | Theme | Own dark and light colour sets in `src/components/theme.js`; the choice is saved in the `setting` table. Design rules in the `add-screen` skill |
@@ -53,7 +54,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
 
-Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5).
+Added at the milestone that needs it: `react-native-image-colors` (the rest of M4, approved). M5 needs no extra library; the QR code was dropped.
 
 ## Project structure
 
@@ -74,7 +75,7 @@ park-yourself/
 │   │   ├── sessions.js      One month's sessions for a place or car (from Spending)
 │   │   ├── places/          Places list and a place's rates (edit, delete)
 │   │   ├── holidays.js      Public holiday dates
-│   │   ├── vehicles/        Cars list (default, archive) and Add a car
+│   │   ├── vehicles/        Cars list (default, archive), Add a car, Rename car ([id].js)
 │   │   └── debug.js         Database check (development builds)
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
 │   │                        SegmentedControl, Field, ErrorText, icons, CarLogo, RateForm,
@@ -88,7 +89,8 @@ park-yourself/
 │   ├── text/                Screen text: way back, notifications, share message, rates, timer,
 │   │                        photos, Park and Find questions and hints, Spending lines
 │   ├── zone/                Zone colour chips and hex-to-name rules
-│   ├── ocr/                 Level and bay suggestions from pillar sign text
+│   ├── ocr/                 pillarText.js (level and bay suggestions from the sign's text),
+│   │                        readText.js (OCR on the phone with expo-mlkit-ocr)
 │   ├── fees/                Fee rules: pure functions, no database or React
 │   │   ├── calcFee.js       Fee per day and per stay (overnight estimate, borrowed rates)
 │   │   ├── dayType.js       Weekday, weekend or public holiday
@@ -111,7 +113,7 @@ park-yourself/
 │       ├── selfTest.js      Checks the data layer rules (development builds)
 │       ├── sessions.js      Park (place, rates, holiday, snapshot, photos in one transaction),
 │       │                    Extend timer, end with fee
-│       ├── photos.js        Photo rows, and the image files: shrink, keep, delete
+│       ├── photos.js        Photo rows (with OCR text), and the image files: shrink, keep, share, delete
 │       ├── places.js, holidays.js  Saved places and rates, public holiday dates
 │       ├── preferences.js   Extend and reminder minutes (setting table)
 │       ├── export.js        Export database: WAL checkpoint, copy, share sheet

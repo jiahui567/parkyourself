@@ -40,6 +40,8 @@ import { useFocusedLoad } from '../hooks/useFocusedLoad';
 import { indexAfterRemoval } from '../lib/listIndex';
 import { typedPlaceToConfirm } from '../lib/placeName';
 import { formatMinutes } from '../lib/time';
+import { shouldReadNextPhoto, suggestionsFromPhotos } from '../ocr/pillarText';
+import { readPhotoText } from '../ocr/readText';
 import { holidayAmountHint, keepPlaceLabel, rateUpdateQuestion, typedPlaceQuestion } from '../text/parkText';
 import { addPhotoLabel } from '../text/photoText';
 import { dayTypeLabel } from '../text/rateText';
@@ -90,19 +92,22 @@ export default function Park() {
   const [ratesError, setRatesError] = useState(null);
   const [holidaySwitch, setHolidaySwitch] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(null);
-  // Prepared photo files in the cache, the pillar sign first. They are kept
-  // in the app's storage only when the car is parked.
-  const [photoUris, setPhotoUris] = useState([]);
+  // Prepared photos in the cache, the pillar sign first: [{ uri, ocrText }],
+  // ocrText null for a photo OCR did not read. They are kept in the app's
+  // storage only when the car is parked.
+  const [taken, setTaken] = useState([]);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [preparing, setPreparing] = useState(false);
+  // null, 'preparing' (shrinking the photo) or 'reading' (OCR).
+  const [photoStep, setPhotoStep] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [photoError, setPhotoError] = useState(null);
+  const photoUris = taken.map((photo) => photo.uri);
   // Photos taken but never saved are deleted when Park closes. Saving has
   // already deleted the ones it kept copies of, so those are skipped.
   const unsavedPhotos = useRef([]);
   useEffect(() => {
-    unsavedPhotos.current = photoUris;
-  }, [photoUris]);
+    unsavedPhotos.current = taken.map((photo) => photo.uri);
+  }, [taken]);
   useEffect(() => () => deletePhotoFiles(unsavedPhotos.current), []);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -115,18 +120,31 @@ export default function Park() {
   const setField = (field) => (value) => setForm((current) => ({ ...current, [field]: value }));
   const updateRateInput = (change) => setRateInput((current) => current && { ...current, ...change(current) });
 
+  // OCR reads the first photo, and the next only while the ones before gave
+  // no level or bay. A photo OCR cannot read is still kept.
   const addPhoto = async (picture) => {
     setCameraOpen(false);
-    setPreparing(true);
+    setPhotoStep('preparing');
     setPhotoError(null);
+    let uri;
     try {
-      const uri = await preparePhoto(picture);
-      setPhotoUris((current) => [...current, uri]);
+      uri = await preparePhoto(picture);
     } catch (e) {
       setPhotoError(e);
-    } finally {
-      setPreparing(false);
+      setPhotoStep(null);
+      return;
     }
+    let ocrText = null;
+    if (shouldReadNextPhoto(taken.map((photo) => photo.ocrText))) {
+      setPhotoStep('reading');
+      try {
+        ocrText = await readPhotoText(uri);
+      } catch (e) {
+        setPhotoError(new Error(`Could not read the sign: ${String(e?.message ?? e)}. Type the level and bay below.`));
+      }
+    }
+    setTaken((current) => [...current, { uri, ocrText }]);
+    setPhotoStep(null);
   };
 
   const confirmRemovePhoto = (index) =>
@@ -136,9 +154,9 @@ export default function Park() {
         text: 'Remove',
         style: 'destructive',
         onPress: () => {
-          deletePhotoFiles([photoUris[index]]);
-          setPhotoUris((current) => current.filter((_, i) => i !== index));
-          setViewing(indexAfterRemoval(index, photoUris.length));
+          deletePhotoFiles([taken[index].uri]);
+          setTaken((current) => current.filter((_, i) => i !== index));
+          setViewing(indexAfterRemoval(index, taken.length));
         },
       },
     ]);
@@ -178,7 +196,11 @@ export default function Park() {
   const hasSavedRate = Boolean(rateInput?.saved[rateDayType]);
   // A chosen place's rates must be loaded first: without them every typed
   // rate would count as new and replace a saved one without asking.
-  const canSave = !saving && !preparing && (!place || rateInput != null);
+  const canSave = !saving && !photoStep && (!place || rateInput != null);
+  const ocrTexts = taken.map((photo) => photo.ocrText);
+  const suggestions = suggestionsFromPhotos(ocrTexts);
+  const hasSuggestions = suggestions.levels.length > 0 || suggestions.bays.length > 0;
+  const readNothing = !hasSuggestions && ocrTexts.some((text) => text != null);
 
   const start = async ({
     started_at,
@@ -190,7 +212,7 @@ export default function Park() {
     setSaving(true);
     setSaveError(null);
     try {
-      const id = await savingPhotos(photoUris, (photo_uris) =>
+      const id = await savingPhotos(photoUris, (keptUris) =>
         sessions.start(db, {
           vehicle_id: vehicleId,
           ...form,
@@ -200,7 +222,8 @@ export default function Park() {
           save_rates,
           public_holiday,
           timer_ends_at: timerMinutes ? timerEndFrom(started_at, timerMinutes) : null,
-          photo_uris,
+          // The raw text is kept, so the parser can be improved with real photos.
+          photo_files: keptUris.map((file_uri, i) => ({ file_uri, ocr_text: taken[i].ocrText })),
         })
       );
       router.replace(`/session/${id}`);
@@ -377,8 +400,15 @@ export default function Park() {
         <View style={styles.section}>
           <Text style={styles.label}>Photos</Text>
           <Text style={styles.hint}>Start with the pillar sign. Add more if they help you remember the spot.</Text>
-          <PhotoStrip uris={photoUris} onOpen={setViewing} />
-          {preparing && <Text style={styles.hint}>Preparing photo…</Text>}
+          {/* Closed while a photo is prepared or read: removing one then would
+              change which photo OCR should read. */}
+          <PhotoStrip uris={photoUris} onOpen={setViewing} disabled={Boolean(photoStep)} />
+          {photoStep && (
+            <Text style={styles.hint}>{photoStep === 'reading' ? 'Reading the sign…' : 'Preparing photo…'}</Text>
+          )}
+          {readNothing && !form.level && !form.bay && (
+            <Text style={styles.hint}>No level or bay found in the photo. Type them below.</Text>
+          )}
           <ErrorText error={photoError} />
           <View style={styles.sideActions}>
             <Button
@@ -387,10 +417,31 @@ export default function Park() {
               size="small"
               icon={CameraIcon}
               onPress={() => setCameraOpen(true)}
-              disabled={preparing || saving}
+              disabled={Boolean(photoStep) || saving}
             />
           </View>
         </View>
+
+        {hasSuggestions && (
+          <View style={styles.section}>
+            <Text style={styles.label}>From the photo</Text>
+            <Text style={styles.hint}>Tap to fill in the level and bay. You can still type them.</Text>
+            {suggestions.levels.length > 0 && (
+              <ChipGroup
+                options={suggestions.levels.map((level) => ({ value: level, label: `Level ${level}` }))}
+                value={form.level}
+                onChange={(level) => setField('level')(level ?? '')}
+              />
+            )}
+            {suggestions.bays.length > 0 && (
+              <ChipGroup
+                options={suggestions.bays.map((bay) => ({ value: bay, label: `Bay ${bay}` }))}
+                value={form.bay}
+                onChange={(bay) => setField('bay')(bay ?? '')}
+              />
+            )}
+          </View>
+        )}
         <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
         <PhotoViewer
           uris={photoUris}

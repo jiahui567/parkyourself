@@ -1,4 +1,4 @@
-import { pillarCandidates } from './pillarText';
+import { pillarCandidates, shouldReadNextPhoto, suggestionsFromPhotos } from './pillarText';
 
 describe('pillarCandidates', () => {
   it.each([
@@ -27,5 +27,42 @@ describe('pillarCandidates', () => {
 
   it.each(['', 'EXIT', null, undefined])('finds nothing in %p', (text) => {
     expect(pillarCandidates(text)).toEqual({ levels: [], bays: [] });
+  });
+});
+
+describe('suggestionsFromPhotos', () => {
+  it('takes the suggestions from the first photo', () => {
+    expect(suggestionsFromPhotos(['B2 C14', null])).toEqual({ levels: ['B2'], bays: ['C14'] });
+  });
+
+  it('moves on to the next photo when the first gave nothing', () => {
+    expect(suggestionsFromPhotos(['EXIT', 'LEVEL B3 ZONE D-20'])).toEqual({ levels: ['B3'], bays: ['D20'] });
+  });
+
+  it('does not mix suggestions from two photos', () => {
+    expect(suggestionsFromPhotos(['B2', 'C14'])).toEqual({ levels: ['B2'], bays: [] });
+  });
+
+  it('skips photos that were not read', () => {
+    expect(suggestionsFromPhotos([null, 'B2 C14'])).toEqual({ levels: ['B2'], bays: ['C14'] });
+  });
+
+  it('has nothing to suggest without photos', () => {
+    expect(suggestionsFromPhotos([])).toEqual({ levels: [], bays: [] });
+  });
+});
+
+describe('shouldReadNextPhoto', () => {
+  it('reads the first photo', () => {
+    expect(shouldReadNextPhoto([])).toBe(true);
+  });
+
+  it('reads another photo only while the ones before gave nothing', () => {
+    expect(shouldReadNextPhoto(['EXIT'])).toBe(true);
+    expect(shouldReadNextPhoto(['B2 C14'])).toBe(false);
+  });
+
+  it('reads the next photo when OCR failed on the one before', () => {
+    expect(shouldReadNextPhoto([null])).toBe(true);
   });
 });

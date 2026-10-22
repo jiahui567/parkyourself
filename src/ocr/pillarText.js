@@ -41,3 +41,23 @@ export function pillarCandidates(text) {
   }
   return { levels, bays };
 }
+
+const hasAny = ({ levels, bays }) => levels.length > 0 || bays.length > 0;
+
+// The suggestions Park shows: from the first photo whose text gives any. texts
+// holds each photo's OCR text in order, null for a photo that was not read.
+// Only the first photo is read, and the next only when the ones before gave
+// nothing (PLAN.md, "Decisions made", Pillar photo).
+export function suggestionsFromPhotos(texts) {
+  for (const text of texts) {
+    if (text == null) continue;
+    const candidates = pillarCandidates(text);
+    if (hasAny(candidates)) return candidates;
+  }
+  return { levels: [], bays: [] };
+}
+
+// Whether the next photo taken should be read.
+export function shouldReadNextPhoto(texts) {
+  return !hasAny(suggestionsFromPhotos(texts));
+}

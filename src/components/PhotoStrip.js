@@ -5,8 +5,8 @@ import { radius } from './theme';
 import { useThemedStyles } from './ThemeProvider';
 
 // A row of photo thumbnails, oldest first (the pillar sign leads). Tapping one
-// calls onOpen(index). Shows nothing when there are no photos.
-export function PhotoStrip({ uris, onOpen }) {
+// calls onOpen(index), unless disabled. Shows nothing when there are no photos.
+export function PhotoStrip({ uris, onOpen, disabled = false }) {
   const styles = useThemedStyles(createStyles);
   if (uris.length === 0) return null;
   return (
@@ -16,6 +16,8 @@ export function PhotoStrip({ uris, onOpen }) {
           key={uri}
           accessibilityRole="button"
           accessibilityLabel={photoLabel(index, uris.length)}
+          accessibilityState={{ disabled }}
+          disabled={disabled}
           onPress={() => onOpen(index)}
           style={({ pressed }) => pressed && styles.pressed}
         >

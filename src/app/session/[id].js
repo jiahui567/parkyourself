@@ -1,12 +1,12 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { CameraCapture } from '../../components/CameraCapture';
 import { ErrorText } from '../../components/ErrorText';
 import { EstimatePill } from '../../components/EstimatePill';
-import { CameraIcon, TimerIcon } from '../../components/icons';
+import { CameraIcon, ShareIcon, TimerIcon } from '../../components/icons';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { PhotoViewer } from '../../components/PhotoViewer';
 import { radius, space } from '../../components/theme';
@@ -19,6 +19,7 @@ import {
   preparePhoto,
   savingPhotos,
   sessions,
+  sharePhoto,
   useDatabase,
 } from '../../db';
 import { feeSoFar } from '../../fees';
@@ -32,7 +33,7 @@ import { syncNotifications } from '../../notify/notifications';
 import { endedFeeText, extendTimerText, stayTimesText } from '../../text/findText';
 import { addPhotoLabel } from '../../text/photoText';
 import { missingRateText } from '../../text/rateText';
-import { routeBackText } from '../../text/sessionText';
+import { routeBackText, shareMessage } from '../../text/sessionText';
 import { timerStatusText } from '../../text/timerText';
 import { swatchFor, textColourOn } from '../../zone/zoneColour';
 
@@ -164,6 +165,27 @@ export default function SessionScreen() {
       },
     ]);
 
+  // Sharing happens only when the user taps Share (PLAN.md, "Share your spot"):
+  // the parking info as a message, or one photo from the viewer.
+  const shareSpot = async () => {
+    setActionError(null);
+    try {
+      const message = shareMessage({ vehicleName: session.vehicle_name, placeName: session.place_name, session });
+      await Share.share({ message });
+    } catch (e) {
+      setActionError(e);
+    }
+  };
+
+  // Alert, because the viewer covers the screen's own error line.
+  const sharePhotoAt = async (index) => {
+    try {
+      await sharePhoto(photoUris[index]);
+    } catch (e) {
+      Alert.alert('Could not share the photo', String(e?.message ?? e));
+    }
+  };
+
   const confirmDelete = () =>
     Alert.alert('Delete this parking session?', 'Its photos are deleted too.', [
       { text: 'Cancel', style: 'cancel' },
@@ -213,7 +235,13 @@ export default function SessionScreen() {
         </View>
       )}
       <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
-      <PhotoViewer uris={photoUris} index={viewing} onClose={() => setViewing(null)} onDelete={confirmDeletePhoto} />
+      <PhotoViewer
+        uris={photoUris}
+        index={viewing}
+        onClose={() => setViewing(null)}
+        onShare={sharePhotoAt}
+        onDelete={confirmDeletePhoto}
+      />
 
       <View style={styles.card}>
         {session.place_name && <Text style={styles.label}>{session.place_name}</Text>}
@@ -255,6 +283,7 @@ export default function SessionScreen() {
             onPress={extend}
             disabled={busy}
           />
+          <Button title="Share" variant="tonal" size="small" icon={ShareIcon} onPress={shareSpot} disabled={busy} />
         </View>
       )}
 

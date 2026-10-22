@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as Sharing from 'expo-sharing';
 
 import { newId, now } from './core';
 
@@ -65,6 +66,13 @@ export async function savingPhotos(uris, save) {
     deletePhotoFiles(kept);
     throw e;
   }
+}
+
+// Opens the share sheet with one kept photo, for WhatsApp or any other app.
+// The only way a photo leaves the phone, and only when the user taps Share.
+export async function sharePhoto(uri) {
+  if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this phone.');
+  await Sharing.shareAsync(uri, { mimeType: 'image/jpeg', dialogTitle: 'Share photo' });
 }
 
 // Local-only table: no updated_at or soft delete, rows are deleted for real.

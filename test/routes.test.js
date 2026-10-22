@@ -17,6 +17,7 @@ const ROUTES = [
   'holidays',
   'vehicles/index',
   'vehicles/new',
+  'vehicles/[id]',
   'debug',
 ];
 

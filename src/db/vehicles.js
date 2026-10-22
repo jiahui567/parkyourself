@@ -26,6 +26,14 @@ export const vehicles = {
     return id;
   },
 
+  // Renames a car, with the same rule as add. Its sessions show the new name.
+  async rename(db, id, name) {
+    const trimmed = String(name ?? '').trim();
+    if (!trimmed) throw new Error('Give the car a name');
+    const changed = await base.update(db, id, { name: trimmed });
+    if (changed === 0) throw new Error(`No car with id ${id}`);
+  },
+
   async setDefault(db, id) {
     await inTransaction(db, async (txn) => {
       const changed = await base.update(txn, id, { is_default: true });

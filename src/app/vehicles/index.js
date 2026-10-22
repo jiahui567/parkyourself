@@ -5,13 +5,13 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { ErrorText } from '../../components/ErrorText';
 import { IconButton } from '../../components/IconButton';
-import { ArchiveIcon, CarIcon, PlusIcon } from '../../components/icons';
+import { ArchiveIcon, CarIcon, PencilIcon, PlusIcon } from '../../components/icons';
 import { radius } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { useDatabase, vehicles } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 
-// Cars: add a car, choose the default, archive a car you no longer use.
+// Cars: add a car, choose the default, rename a car, archive one you no longer use.
 export default function Cars() {
   const db = useDatabase();
   const { colours } = useAppTheme();
@@ -64,6 +64,7 @@ export default function Cars() {
                   onPress={() => run(() => vehicles.setDefault(db, car.id))}
                 />
               )}
+              <IconButton icon={PencilIcon} label={`Rename ${car.name}`} onPress={() => router.push(`/vehicles/${car.id}`)} />
               <IconButton icon={ArchiveIcon} label={`Archive ${car.name}`} tone="danger" onPress={() => confirmArchive(car)} />
             </View>
           ))}

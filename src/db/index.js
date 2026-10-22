@@ -6,7 +6,7 @@ export { DATABASE_NAME, DatabaseProvider } from './DatabaseProvider';
 export { readDatabaseInfo } from './debug';
 export { exportDatabase } from './export';
 export { holidays } from './holidays';
-export { deletePhotoFiles, photos, preparePhoto, savingPhotos } from './photos';
+export { deletePhotoFiles, photos, preparePhoto, savingPhotos, sharePhoto } from './photos';
 export { placeRates, places } from './places';
 export { preferences } from './preferences';
 export { runSelfTest } from './selfTest';

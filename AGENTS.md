@@ -32,8 +32,8 @@ npx expo install --fix      # fix incompatible package versions
 ## Navigation
 
 - Expo Router for all navigation. Routes live in `src/app/`: every file there is a screen, and `_layout.js` files define navigators.
-- Main sections are bottom tabs in `src/app/(tabs)/` (Home, History, Spending, Settings), listed in `(tabs)/_layout.js`. Detail screens (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car) live outside `(tabs)` and open above the tab bar from the root stack.
-- Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/`, OCR parsing in `src/ocr/`, timer rules in `src/timer/`, spending totals in `src/spending/`, notifications in `src/notify/` (`plan.js` decides what to show and is tested; `notifications.js` is the only code that calls `expo-notifications`), and small pure helpers that belong to no single feature (money, time, place names) in `src/lib/`. Only `src/db/` and `src/fees/` have an `index.js`; import other modules by file.
+- Main sections are bottom tabs in `src/app/(tabs)/` (Home, History, Spending, Settings), listed in `(tabs)/_layout.js`. Detail screens (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car, Rename car) live outside `(tabs)` and open above the tab bar from the root stack.
+- Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/`, OCR in `src/ocr/` (`pillarText.js` finds the level and bay and is tested; `readText.js` is the only code that calls `expo-mlkit-ocr`), timer rules in `src/timer/`, spending totals in `src/spending/`, notifications in `src/notify/` (`plan.js` decides what to show and is tested; `notifications.js` is the only code that calls `expo-notifications`), and small pure helpers that belong to no single feature (money, time, place names) in `src/lib/`. Only `src/db/` and `src/fees/` have an `index.js`; import other modules by file.
 - Screens stay thin: rules and text live in the tested modules above; a screen only loads, shows and saves. Load data with `useFocusedLoad` so it refreshes when the user comes back to the screen. The one exception is the Database check screen's self-test (`debug.js`): it builds a throwaway database, so it runs with `useEffect` once when the screen opens and again only when asked.
 - Import `Link`, `router` and `useLocalSearchParams` from `expo-router`.
 
@@ -58,9 +58,9 @@ npx expo install --fix      # fix incompatible package versions
 
 ## Privacy (local-first)
 
-- No network calls except ones the user starts: Share, and Open in Google Maps.
-- No analytics, ads or crash-reporting SDKs without asking.
-- Photos never leave the phone.
+- No network calls except ones the user starts: Share, and Open in Google Maps. The app's own code makes none.
+- No analytics, ads or crash-reporting SDKs without asking. One exception, accepted by the user on 2026-10-22: Google ML Kit (`expo-mlkit-ocr`, used for OCR) sends Google per-installation identifiers and diagnostics and usage metrics over HTTPS, with no opt-out (Google's ML Kit data disclosure). Do not add another library that does this without asking.
+- Photos never leave the phone unless the user shares one (`sharePhoto`, from the photo view).
 - Never commit `db-snapshot/` or any real parking data.
 
 ## Native code and dependencies

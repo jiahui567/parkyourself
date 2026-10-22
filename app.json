@@ -43,7 +43,8 @@
           "color": "#10B981"
         }
       ],
-      "./plugins/withCmakeVersion"
+      "./plugins/withCmakeVersion",
+      "expo-mlkit-ocr"
     ]
   }
 }
