@@ -159,7 +159,6 @@ Then set up the environment:
 4. **Phone:** Developer options and USB debugging on, connected by a data USB cable. `adb devices` must list it as `device`.
 
 Step-by-step details, including macOS and phone-brand notes, are in [PLAN.md](PLAN.md), section "Before you start: install from zero".
-
 ## Getting started
 
 ```bash
