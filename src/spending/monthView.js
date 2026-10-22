@@ -25,6 +25,14 @@ export function hasNextMonth(month, currentMonth) {
   return month < currentMonth;
 }
 
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+// The month History asks Spending to show (?month=YYYY-MM), or null when the
+// link has none, a malformed one, or a future month.
+export function requestedMonth(param, currentMonth) {
+  return typeof param === 'string' && MONTH_KEY.test(param) && param <= currentMonth ? param : null;
+}
+
 // The totals for month and the chart bars ending at end, from the rows of
 // chartRange(end). monthSummary does not filter by month, so this does.
 export function spendingView(rows, month, end) {

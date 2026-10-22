@@ -42,6 +42,43 @@ export function pillarCandidates(text) {
   return { levels, bays };
 }
 
+// The codes Park offers in its Level row and its Bay row. The patterns cannot
+// always tell a level from a bay (a sign reading "G3 A2" gives two bays), so
+// each row offers every code read, the likelier ones first.
+// codeRows({ levels: ['B2'], bays: ['C14'] }) -> { level: ['B2', 'C14'], bay: ['C14', 'B2'] }
+export function codeRows({ levels, bays }) {
+  return { level: [...levels, ...bays], bay: [...bays, ...levels] };
+}
+
+// A typed value read the way pillarCandidates reads the sign: 'c-14' is C14.
+const sameCode = (text, code) => String(text ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '') === code;
+const blank = (text) => String(text ?? '').trim() === '';
+
+// True when one tap can fill both fields: exactly two codes, and not two
+// readings of the same characters ('M 12' gives M and M12, one of which is
+// the whole sign), where the code left over would be wrong.
+export function fillsOther(codes) {
+  if (codes.length !== 2) return false;
+  const [a, b] = codes;
+  return !a.startsWith(b) && !b.startsWith(a);
+}
+
+// Park's level and bay ({ level, bay }, as typed) after the user taps code in
+// the field's row ('level' or 'bay'), or clears it (code null). When
+// fillsOther(codes), one tap does both: the other field gets the code left
+// over when it is empty or held the code just taken, so tapping the other row
+// swaps them. Any other typed value is kept. A code is never left in both
+// fields.
+export function pickCode(spot, field, code, codes) {
+  const other = field === 'level' ? 'bay' : 'level';
+  const next = { level: spot.level, bay: spot.bay, [field]: code ?? '' };
+  if (code == null) return next;
+  const otherTaken = sameCode(spot[other], code);
+  if (fillsOther(codes) && (blank(spot[other]) || otherTaken)) next[other] = codes.find((c) => c !== code);
+  else if (otherTaken) next[other] = '';
+  return next;
+}
+
 const hasAny = ({ levels, bays }) => levels.length > 0 || bays.length > 0;
 
 // The suggestions Park shows: from the first photo whose text gives any. texts

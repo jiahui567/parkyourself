@@ -21,8 +21,9 @@ const ICON_SIZE = 18;
 // null for no place. onChange gets the same shape. Nothing is picked until the
 // user taps a row, so a blank picker means no place. onQueryChange (optional)
 // gets the search text, trimmed, and '' once it is cleared or a row is tapped,
-// so the screen can ask about a name typed but never tapped.
-export function PlacePicker({ value, onChange, onQueryChange }) {
+// so the screen can ask about a name typed but never tapped. children are
+// drawn inside the chosen place's card, under its name (Park's rate row).
+export function PlacePicker({ value, onChange, onQueryChange, children }) {
   const db = useDatabase();
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
@@ -76,24 +77,27 @@ export function PlacePicker({ value, onChange, onQueryChange }) {
       <Text style={styles.label}>Place</Text>
 
       {mode !== 'search' && (
-        <View style={styles.chosen}>
-          <View style={styles.chosenIcon}>
-            <MapPinIcon size={ICON_SIZE} color={value ? colours.text : colours.muted} />
+        <View style={styles.card}>
+          <View style={styles.chosen}>
+            <View style={styles.chosenIcon}>
+              <MapPinIcon size={ICON_SIZE} color={value ? colours.text : colours.muted} />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={value ? styles.chosenName : styles.chosenNameMuted} numberOfLines={2}>
+                {value ? value.name : 'No place'}
+              </Text>
+              {!value && <Text style={styles.hint}>Free or unknown parking, no fee</Text>}
+              {value && value.id == null && <Text style={styles.hint}>New place, saved when you park</Text>}
+            </View>
+            {mode === 'chosen' ? (
+              <Button title="Change" variant="secondary" size="small" onPress={() => setMode('change')} />
+            ) : (
+              // Cancel keeps the choice without calling onChange, so the screen
+              // keeps the rates typed for it.
+              <Button title="Cancel" variant="secondary" size="small" onPress={close} />
+            )}
           </View>
-          <View style={styles.rowText}>
-            <Text style={value ? styles.chosenName : styles.chosenNameMuted} numberOfLines={2}>
-              {value ? value.name : 'No place'}
-            </Text>
-            {!value && <Text style={styles.hint}>Free or unknown parking, no fee</Text>}
-            {value && value.id == null && <Text style={styles.hint}>New place, saved when you park</Text>}
-          </View>
-          {mode === 'chosen' ? (
-            <Button title="Change" variant="secondary" size="small" onPress={() => setMode('change')} />
-          ) : (
-            // Cancel keeps the choice without calling onChange, so the screen
-            // keeps the rates typed for it.
-            <Button title="Cancel" variant="secondary" size="small" onPress={close} />
-          )}
+          {children}
         </View>
       )}
 
@@ -181,17 +185,7 @@ const createStyles = (c) =>
   StyleSheet.create({
     picker: { gap: 8 },
     label: { fontWeight: '600', color: c.text },
-    chosen: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: c.card,
-      borderRadius: radius.card,
-      paddingVertical: 12,
-      paddingLeft: 12,
-      paddingRight: 14,
-      boxShadow: c.shadow,
-    },
+    chosen: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 12, paddingRight: 14 },
     chosenIcon: {
       width: 36,
       height: 36,

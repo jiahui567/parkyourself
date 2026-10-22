@@ -11,6 +11,7 @@ export {
   EMPTY_RATE_FORM,
   feeFields,
   formFromRate,
+  hasMoreRateOptions,
   HOLIDAY_AMOUNT_ERROR,
   holidayRate,
   holidayRateFromText,

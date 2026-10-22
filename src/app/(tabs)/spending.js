@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
@@ -15,7 +15,14 @@ import { useNow } from '../../hooks/useNow';
 import { formatRM } from '../../lib/money';
 import { addMonths, formatMonth, localMonthKey } from '../../lib/time';
 import { chartBars, chartLayout, chartMaxValue } from '../../spending/chart';
-import { CHART_MONTHS, chartRange, chartWindowEnd, hasNextMonth, spendingView } from '../../spending/monthView';
+import {
+  CHART_MONTHS,
+  chartRange,
+  chartWindowEnd,
+  hasNextMonth,
+  requestedMonth,
+  spendingView,
+} from '../../spending/monthView';
 import {
   chartRangeText,
   chartSummaryText,
@@ -44,6 +51,16 @@ export default function Spending() {
   const [view, setView] = useState(() => ({ month: currentMonth, end: currentMonth }));
   const { month, end } = view;
   const select = (next) => setView((current) => ({ month: next, end: chartWindowEnd(next, current.end) }));
+  // History opens a month here with ?month=YYYY-MM&at=<tap>. Each tap moves
+  // to its month once, so the user can still change months afterwards, and
+  // tapping the same month in History again comes back to it.
+  const link = useLocalSearchParams();
+  const [openedAt, setOpenedAt] = useState(null);
+  if (link.at != null && link.at !== openedAt) {
+    setOpenedAt(link.at);
+    const opened = requestedMonth(link.month, currentMonth);
+    if (opened) select(opened);
+  }
 
   // The rows cover every month of the chart, so picking a month in it (a bar,
   // or Previous and Next inside the 12 months) reads nothing again; only

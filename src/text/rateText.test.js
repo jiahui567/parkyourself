@@ -1,5 +1,5 @@
 import { calcStayFee } from '../fees';
-import { missingRateText, rateSummary } from './rateText';
+import { blockPriceLabel, firstPriceLabel, missingRateText, rateSummary } from './rateText';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur). 2026-10-24 is a Saturday.
 const at = (localDateTime) => new Date(localDateTime).getTime();
@@ -59,5 +59,19 @@ describe('missingRateText', () => {
 
     expect(fee).toMatchObject({ feeSen: 0, missingRates: ['weekend'] });
     expect(missingRateText(fee)).toBeNull();
+  });
+});
+
+describe('price labels', () => {
+  it.each([
+    { minutes: '60', first: 'First hour (RM)', block: 'Each hour after (RM)' },
+    { minutes: ' 30 ', first: 'First 30 min (RM)', block: 'Each 30 min after (RM)' },
+    { minutes: '120', first: 'First 2 hours (RM)', block: 'Each 2 hours after (RM)' },
+    { minutes: '', first: 'First period (RM)', block: 'Each period after (RM)' },
+    { minutes: '0', first: 'First period (RM)', block: 'Each period after (RM)' },
+    { minutes: '1.5', first: 'First period (RM)', block: 'Each period after (RM)' },
+  ])('follow a period typed as "$minutes"', ({ minutes, first, block }) => {
+    expect(firstPriceLabel(minutes)).toBe(first);
+    expect(blockPriceLabel(minutes)).toBe(block);
   });
 });

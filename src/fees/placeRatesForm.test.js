@@ -71,7 +71,7 @@ describe('ratesFromPlaceRatesForm', () => {
   it('names the weekend rate when only that form has an error', () => {
     const form = { ...EMPTY_FORM, weekend: { ...EMPTY_RATE_FORM, firstPrice: '3.00' } };
 
-    expect(ratesFromPlaceRatesForm(form).error).toBe('Weekend rate: Enter the block price, such as 2.00.');
+    expect(ratesFromPlaceRatesForm(form).error).toBe('Weekend rate: Enter the price after the first period, such as 2.00.');
   });
 
   // How the amount is read is tested with holidayRateFromText.

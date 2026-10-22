@@ -1,6 +1,31 @@
-import { DAY_TYPES } from '../fees';
+import { DAY_TYPES, holidayRateFromText, rateFromForm } from '../fees';
+import { fillsOther } from '../ocr/pillarText';
+import { dayTypeLabel, rateSummary } from './rateText';
 
 // Text for the Park screen's place picker and rate questions.
+
+const NOT_FINISHED = 'Not finished · tap to check it';
+
+// Park's folded rate row: its label, and a hint with the rate the form holds,
+// so the rate can be checked without opening it. dayType is the form shown
+// (rateDayTypeFor). Either part not finished makes the row say so, checked in
+// enteredRates' order, as Save would refuse it. With holidayOn, the public
+// holiday amount is shown (the one typed, else savedHoliday, the place's saved
+// one), as the fee uses it; the weekend form only when there is neither.
+// { label: 'Weekday rate', hint: 'RM 3.00 first hour, then RM 2.00 per hour' }
+export function parkRateRowText({ dayType, form, holidayOn = false, holidayAmount = '', savedHoliday = null }) {
+  const label = holidayOn ? 'Public holiday rate' : `${dayTypeLabel(dayType)} rate`;
+  const { rate, error } = rateFromForm(form);
+  if (error) return { label, hint: NOT_FINISHED };
+  if (holidayOn) {
+    const typed = holidayRateFromText(holidayAmount);
+    if (typed.error) return { label, hint: NOT_FINISHED };
+    const holiday = typed.rate ?? savedHoliday;
+    if (holiday) return { label, hint: rateSummary(holiday) };
+  }
+  const prefix = holidayOn ? 'Weekend rate: ' : '';
+  return { label, hint: rate ? `${prefix}${rateSummary(rate)}` : `${prefix}Not set · optional` };
+}
 
 const SAVED_NAMES = { weekday: 'weekday rate', weekend: 'weekend rate', holiday: 'public holiday amount' };
 
@@ -17,6 +42,14 @@ export function rateUpdateQuestion(changed, placeName) {
   const names = DAY_TYPES.filter((dayType) => changed?.includes(dayType)).map((dayType) => SAVED_NAMES[dayType]);
   if (names.length === 0) return null;
   return `Update the saved ${listText(names)} for ${placeName}?`;
+}
+
+// The line under Park's "From the photo", for the codes read (codeRows): one
+// tap does both when fillsOther, and a single code is either one.
+export function photoCodesHint(codes) {
+  if (fillsOther(codes)) return 'Tap the level or the bay, and the other code fills in.';
+  if (codes.length === 1) return 'Tap it as the level or the bay, and type the other below.';
+  return 'Tap the level and the bay, or type them below.';
 }
 
 // The line under Park's public holiday amount. An emptied field still uses a

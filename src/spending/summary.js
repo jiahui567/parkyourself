@@ -53,6 +53,22 @@ export function monthSummary(rows) {
   };
 }
 
+// History's month groups, in the order the rows come (newest first from
+// sessions.listHistory): [{ key: '2026-10', totalSen, sessions, data }], data
+// being that month's rows, for a SectionList.
+export function historyByMonth(rows) {
+  const months = new Map();
+  for (const row of rows) {
+    const key = localMonthKey(row.started_at);
+    if (!months.has(key)) months.set(key, { key, totalSen: 0, sessions: 0, data: [] });
+    const month = months.get(key);
+    month.totalSen += amountSen(row);
+    month.sessions += 1;
+    month.data.push(row);
+  }
+  return [...months.values()];
+}
+
 // [{ key, totalSen, sessions }] for the count months ending at endMonthKey,
 // oldest first, for the bar chart. Months with nothing are 0; rows outside
 // these months are left out.

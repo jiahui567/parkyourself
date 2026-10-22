@@ -36,6 +36,18 @@ export function isRateFormEmpty(form) {
   return prices.every((field) => blank(form?.[field]));
 }
 
+// True when the form holds something RateForm keeps under "More options":
+// period lengths other than the prefilled hour (a cleared one too, which
+// rateFromForm refuses), free minutes or a daily max. The form then opens
+// with them shown, so a rule that changes the fee, or a field to fix, is
+// never hidden. Blank free minutes mean none.
+export function hasMoreRateOptions(form) {
+  const notPrefilled = (field) => String(form?.[field] ?? '').trim() !== EMPTY_RATE_FORM[field];
+  const hasGrace = !blank(form?.graceMinutes) && notPrefilled('graceMinutes');
+  if (form?.type === 'flat') return hasGrace;
+  return notPrefilled('firstMinutes') || notPrefilled('blockMinutes') || hasGrace || !blank(form?.dailyCap);
+}
+
 // Whole minutes typed as digits only, or null.
 function minutesOf(text) {
   const trimmed = String(text ?? '').trim();
@@ -56,17 +68,19 @@ function flatFromForm(form) {
   return { rate: { type: 'flat', flat_sen, grace_minutes } };
 }
 
-// Checked in the order the form shows the fields, so the first error is the
-// first field to fix. The messages use RateForm's field labels.
+// Checked in the order the form shows the fields (the prices, then "More
+// options"), so the first error is the first field to fix. The messages name
+// the fields in words that fit any period length, as the price labels follow
+// it ('First hour (RM)', 'First 30 min (RM)').
 function hourlyFromForm(form) {
-  const first_minutes = minutesOf(form.firstMinutes);
-  if (!first_minutes) return { error: 'Enter the first period in whole minutes, such as 60.' };
   const first_sen = parseRM(form.firstPrice);
   if (first_sen == null) return { error: 'Enter the first price, such as 3.00.' };
-  const block_minutes = minutesOf(form.blockMinutes);
-  if (!block_minutes) return { error: 'Enter each block in whole minutes, such as 60.' };
   const block_sen = parseRM(form.blockPrice);
-  if (block_sen == null) return { error: 'Enter the block price, such as 2.00.' };
+  if (block_sen == null) return { error: 'Enter the price after the first period, such as 2.00.' };
+  const first_minutes = minutesOf(form.firstMinutes);
+  if (!first_minutes) return { error: 'Enter the first period in whole minutes, such as 60.' };
+  const block_minutes = minutesOf(form.blockMinutes);
+  if (!block_minutes) return { error: 'Enter each period after in whole minutes, such as 60.' };
   const grace_minutes = graceOf(form);
   if (grace_minutes == null) return { error: GRACE_ERROR };
   let daily_cap_sen = null;

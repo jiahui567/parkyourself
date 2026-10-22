@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { hasMoreRateOptions } from '../fees';
+import { blockPriceLabel, firstPriceLabel } from '../text/rateText';
+import { Button } from './Button';
 import { Field } from './Field';
 import { SegmentedControl } from './SegmentedControl';
 import { space } from './theme';
@@ -14,7 +18,11 @@ const TYPE_OPTIONS = [
 // the screen's job (rateFromForm), and the screen shows the error, so this
 // form shows none. Switching type keeps the other type's fields, so switching
 // back loses nothing.
+// Most car parks charge by the hour, which the form is prefilled with, so it
+// shows only the prices; the period lengths, free minutes and daily max wait
+// under "More options", which starts open when the rate already uses them.
 export function RateForm({ value, onChange, disabled = false }) {
+  const [more, setMore] = useState(() => hasMoreRateOptions(value));
   const set = (key) => (text) => onChange({ ...value, [key]: text });
   const input = (key, keyboardType) => ({
     value: value[key],
@@ -24,35 +32,36 @@ export function RateForm({ value, onChange, disabled = false }) {
   });
   const minutes = (key) => input(key, 'number-pad');
   const price = (key) => input(key, 'decimal-pad');
+  const flat = value.type === 'flat';
 
   return (
     <View style={styles.form}>
       <SegmentedControl options={TYPE_OPTIONS} value={value.type} onChange={set('type')} disabled={disabled} />
-      {value.type === 'flat' ? (
+      {flat ? (
         <View style={styles.pair}>
           <View style={styles.half}>
-            <Field label="Price per entry (RM)" placeholder="0.00" {...price('flatPrice')} />
+            <Field label="Price per entry (RM)" placeholder="e.g. 5.00" {...price('flatPrice')} />
           </View>
-          <View style={styles.half}>
-            <Field label="Free minutes" {...minutes('graceMinutes')} />
-          </View>
+          <View style={styles.half}>{more && <Field label="Free minutes" {...minutes('graceMinutes')} />}</View>
         </View>
       ) : (
+        <View style={styles.pair}>
+          <View style={styles.half}>
+            <Field label={firstPriceLabel(value.firstMinutes)} placeholder="e.g. 3.00" {...price('firstPrice')} />
+          </View>
+          <View style={styles.half}>
+            <Field label={blockPriceLabel(value.blockMinutes)} placeholder="e.g. 2.00" {...price('blockPrice')} />
+          </View>
+        </View>
+      )}
+      {more && !flat && (
         <>
           <View style={styles.pair}>
             <View style={styles.half}>
               <Field label="First period (min)" {...minutes('firstMinutes')} />
             </View>
             <View style={styles.half}>
-              <Field label="First price (RM)" placeholder="0.00" {...price('firstPrice')} />
-            </View>
-          </View>
-          <View style={styles.pair}>
-            <View style={styles.half}>
-              <Field label="Each block (min)" {...minutes('blockMinutes')} />
-            </View>
-            <View style={styles.half}>
-              <Field label="Block price (RM)" placeholder="0.00" {...price('blockPrice')} />
+              <Field label="Each period after (min)" {...minutes('blockMinutes')} />
             </View>
           </View>
           <View style={styles.pair}>
@@ -65,6 +74,11 @@ export function RateForm({ value, onChange, disabled = false }) {
           </View>
         </>
       )}
+      {!more && (
+        <View style={styles.sideActions}>
+          <Button title="More options" variant="secondary" size="small" onPress={() => setMore(true)} />
+        </View>
+      )}
     </View>
   );
 }
@@ -74,4 +88,6 @@ const styles = StyleSheet.create({
   // flex-end keeps the two inputs level when a long label wraps (large fonts).
   pair: { flexDirection: 'row', alignItems: 'flex-end', gap: space },
   half: { flex: 1 },
+  // A row, so the small pill sits at the start instead of the centre.
+  sideActions: { flexDirection: 'row' },
 });

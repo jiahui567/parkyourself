@@ -44,7 +44,14 @@
         }
       ],
       "./plugins/withCmakeVersion",
-      "expo-mlkit-ocr"
+      "expo-mlkit-ocr",
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

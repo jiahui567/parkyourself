@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { launchImageLibraryAsync } from 'expo-image-picker';
 import { useRef, useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,14 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOnAppActive } from '../hooks/useOnAppActive';
 import { BackdropButton } from './BackdropButton';
 import { Button } from './Button';
-import { XIcon } from './icons';
+import { ImageIcon, XIcon } from './icons';
 import { radius } from './theme';
 import { useThemedStyles } from './ThemeProvider';
 
 const SHUTTER = 72;
 
-// A full-screen camera that takes one photo. onCapture gets the picture
-// ({ uri, width, height }, a temporary file); the caller closes the camera.
+// A full-screen camera that takes one photo, or picks one from the gallery
+// (the button beside the shutter). onCapture gets the picture ({ uri, width,
+// height }, a temporary file); the caller closes the camera. A gallery photo
+// is a copy the picker made in the app's cache, so deleting it once it is
+// prepared leaves the gallery alone.
 // Only one camera preview can run at a time, so it is mounted only while open.
 export function CameraCapture({ visible, onCapture, onClose }) {
   return (
@@ -45,11 +49,31 @@ function CameraBody({ onCapture, onClose }) {
     }
   };
 
+  // Android's photo picker needs no permission, so the gallery also works
+  // when the camera is not allowed. Cancelling it comes back to the camera.
+  const pick = async () => {
+    setTaking(true);
+    setError(null);
+    try {
+      const result = await launchImageLibraryAsync({ mediaTypes: ['images'] });
+      if (result.canceled) {
+        setTaking(false);
+        return;
+      }
+      onCapture(result.assets[0]);
+    } catch (e) {
+      setError(e);
+      setTaking(false);
+    }
+  };
+
   const closeButton = (
     <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
       <BackdropButton icon={XIcon} label="Close camera" onPress={onClose} />
     </View>
   );
+  // Not ErrorText: its danger red is hard to read on the black backdrop.
+  const errorLine = error && <Text style={styles.text}>{String(error?.message ?? error)}</Text>;
 
   // Still asking Android whether the app may use the camera.
   if (!permission) return <View style={styles.screen}>{closeButton}</View>;
@@ -66,6 +90,8 @@ function CameraBody({ onCapture, onClose }) {
             // Android stops asking after the user said no twice; only Settings can allow it then.
             <Button title="Open settings" onPress={() => Linking.openSettings()} />
           )}
+          <Button title="Choose from gallery" variant="secondary" size="small" onPress={pick} disabled={taking} />
+          {errorLine}
         </View>
       </View>
     );
@@ -76,18 +102,24 @@ function CameraBody({ onCapture, onClose }) {
       <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" onCameraReady={() => setReady(true)} />
       {closeButton}
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
-        {/* Not ErrorText: its danger red is hard to read on the black backdrop. */}
-        {error && <Text style={styles.text}>{String(error?.message ?? error)}</Text>}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Take photo"
-          accessibilityState={{ disabled: !ready || taking }}
-          onPress={take}
-          disabled={!ready || taking}
-          style={({ pressed }) => [styles.shutter, (pressed || !ready || taking) && styles.dimmed]}
-        >
-          <View style={styles.shutterInner} />
-        </Pressable>
+        {errorLine}
+        <View style={styles.controls}>
+          <View style={styles.side}>
+            <BackdropButton icon={ImageIcon} label="Choose from gallery" onPress={pick} disabled={taking} />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Take photo"
+            accessibilityState={{ disabled: !ready || taking }}
+            onPress={take}
+            disabled={!ready || taking}
+            style={({ pressed }) => [styles.shutter, (pressed || !ready || taking) && styles.dimmed]}
+          >
+            <View style={styles.shutterInner} />
+          </Pressable>
+          {/* Balances the gallery button, so the shutter stays in the middle. */}
+          <View style={styles.side} />
+        </View>
       </View>
     </View>
   );
@@ -100,6 +132,8 @@ const createStyles = (c) =>
     bottom: { position: 'absolute', bottom: 0, left: 16, right: 16, alignItems: 'center', gap: 12 },
     ask: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
     text: { color: c.onBackdrop, textAlign: 'center', lineHeight: 22 },
+    controls: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
+    side: { flex: 1, alignItems: 'center' },
     shutter: {
       width: SHUTTER,
       height: SHUTTER,

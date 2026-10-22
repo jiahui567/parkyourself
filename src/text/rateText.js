@@ -17,6 +17,22 @@ export function dayTypeLabel(dayType) {
 // One hour reads 'first hour' and 'per hour', not 'first 1 hour'.
 const periodText = (minutes) => (minutes === 60 ? 'hour' : formatMinutes(minutes));
 
+// RateForm's price labels follow the period lengths typed: 'First hour (RM)',
+// 'First 30 min (RM)', 'Each hour after (RM)', 'Each 2 hours after (RM)'.
+// Minutes that are not a whole number yet read as 'period'.
+const typedPeriodText = (typed) => {
+  const trimmed = String(typed ?? '').trim();
+  return /^\d+$/.test(trimmed) && Number(trimmed) > 0 ? periodText(Number(trimmed)) : 'period';
+};
+
+export function firstPriceLabel(firstMinutes) {
+  return `First ${typedPeriodText(firstMinutes)} (RM)`;
+}
+
+export function blockPriceLabel(blockMinutes) {
+  return `Each ${typedPeriodText(blockMinutes)} after (RM)`;
+}
+
 // 'RM 3.00 first hour, then RM 2.00 per hour · 15 min free · max RM 20.00 a day',
 // 'RM 5.00 per entry', or null for no rate.
 export function rateSummary(rate) {

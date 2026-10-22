@@ -34,7 +34,7 @@ export default function AddCar() {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Add a car' }} />
       <Text style={styles.intro}>Give your car a name you will recognise, such as &quot;My Myvi&quot;.</Text>
-      <Field label="Name" value={name} onChangeText={setName} placeholder="My Myvi" autoFocus />
+      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. My Myvi" autoFocus />
       <ErrorText error={error} />
       <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
     </ScrollView>

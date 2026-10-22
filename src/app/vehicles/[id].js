@@ -45,7 +45,7 @@ export default function RenameCar() {
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Rename car' }} />
-      <Field label="Name" value={typed} onChangeText={setName} placeholder="My Myvi" autoFocus />
+      <Field label="Name" value={typed} onChangeText={setName} placeholder="e.g. My Myvi" autoFocus />
       <ErrorText error={saveError} />
       <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
     </ScrollView>

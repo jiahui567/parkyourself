@@ -5,14 +5,15 @@ description: Use before adding or changing any Park Yourself screen (a file unde
 
 # Add or change a screen
 
-Status: design standard version 2, confirmed by the user on 2026-10-22 after testing on the phone (dark and light theme, bottom tabs, Home with the car drawing). When the user corrects how a screen looks or behaves, the capture-lesson skill updates this file.
+Status: design standard version 3. Version 2 (dark and light theme, bottom tabs, Home with the car drawing) was confirmed by the user on the phone on 2026-10-22; the Principles were added the same day, after the user found the Park, Find and History redesign simpler and better. When the user corrects how a screen looks or behaves, the capture-lesson skill updates this file.
 
 ## Steps
 
 1. Read PLAN.md, section "Screens", for what the screen must show.
-2. Create the route file. The file name is the URL: `park.js` is `/park`, `session/[id].js` is `/session/123`; the `(tabs)` folder does not appear in the URL. A main section with its own tab goes in `src/app/(tabs)/` and is added to `src/app/(tabs)/_layout.js`; a detail screen (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car, Rename car) goes outside `(tabs)` and opens above the tab bar. Default-export one function component named after the screen. Never put tests or helpers in `src/app/`.
-3. Titles: a detail screen sets its title with `<Stack.Screen options={{ title: '...' }} />` inside the screen; a tab screen gets its title from `Tabs.Screen` in `(tabs)/_layout.js`.
-4. Styles come from the active theme, never from a hex:
+2. Before writing code, list every field, button and line of text the screen would show, and run the list through the Principles below: cut, prefill, fold or move each one that most uses do not need. Say in one line what was folded or moved and why.
+3. Create the route file. The file name is the URL: `park.js` is `/park`, `session/[id].js` is `/session/123`; the `(tabs)` folder does not appear in the URL. A main section with its own tab goes in `src/app/(tabs)/` and is added to `src/app/(tabs)/_layout.js`; a detail screen (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car, Rename car) goes outside `(tabs)` and opens above the tab bar. Default-export one function component named after the screen. Never put tests or helpers in `src/app/`.
+4. Titles: a detail screen sets its title with `<Stack.Screen options={{ title: '...' }} />` inside the screen; a tab screen gets its title from `Tabs.Screen` in `(tabs)/_layout.js`.
+5. Styles come from the active theme, never from a hex:
    ```js
    const styles = useThemedStyles(createStyles); // inside the component, before any early return
 
@@ -23,7 +24,7 @@ Status: design standard version 2, confirmed by the user on 2026-10-22 after tes
      });
    ```
    For a colour passed as a prop (an icon's `color`, `placeholderTextColor`), use `const { colours } = useAppTheme();`. Both come from `src/components/ThemeProvider.js`. A file whose styles use no colour may use a plain module-level `const styles = StyleSheet.create(...)`.
-5. Load data with `useFocusedLoad` so it refreshes when the user comes back:
+6. Load data with `useFocusedLoad` so it refreshes when the user comes back:
    ```js
    const load = useCallback(() => sessions.getDetails(db, id), [db, id]);
    const { data, error, loading } = useFocusedLoad(load);
@@ -31,14 +32,26 @@ Status: design standard version 2, confirmed by the user on 2026-10-22 after tes
    if (loading) return null;
    if (!data) return <ErrorText error={new Error('This parking session no longer exists.')} />;
    ```
-6. Keep rules out of the screen. SQL goes in `src/db/`, fees in `src/fees/`, display text in `src/text/`, money and dates in `src/lib/`. New logic gets its own module and a Jest test first; the screen only loads, shows and saves.
-7. Saving: disable the button and show "Saving…" while it runs, show the error under the form with `ErrorText`, then navigate. After creating a record use `router.replace(...)` so Back does not return to the form; after editing use `router.back()` (or `router.replace('/')` when `router.canGoBack()` is false).
-8. Add the route to `ROUTES` in `test/routes.test.js`.
-9. Run `npm run lint` and `npm test`, then tell the user exactly what to check on the phone, in both dark and light mode.
+7. Keep rules out of the screen. SQL goes in `src/db/`, fees in `src/fees/`, display text in `src/text/`, money and dates in `src/lib/`. New logic gets its own module and a Jest test first; the screen only loads, shows and saves.
+8. Saving: disable the button and show "Saving…" while it runs, show the error under the form with `ErrorText`, then navigate. After creating a record use `router.replace(...)` so Back does not return to the form; after editing use `router.back()` (or `router.replace('/')` when `router.canGoBack()` is false).
+9. Add the route to `ROUTES` in `test/routes.test.js`.
+10. Run `npm run lint` and `npm test`, then tell the user exactly what to check on the phone, in both dark and light mode.
 
-## Design standard (version 2)
+## Design standard (version 3)
 
 **Look**: clean, minimal and tech-forward, like Apple Health or the Tesla app. Charcoal and white, with emerald kept for the main action, selected states and positive status (Parked, Default, PASS). Never use emerald for decoration or headings.
+
+**Principles**: simple, minimal and modern. Every screen is checked against these before it is built (step 2) and in review.
+- **One job, one main action.** Say what the screen is for in one sentence; everything on it serves that. The one main action is the only full-width button, placed last.
+- **Essentials first, the rest folded.** Show only what most uses need. Optional parts are folded `Disclosure` rows that show their value when closed ("Timer · Off", "Weekday rate · RM 3.00 first hour…", "Not set · optional") and open on tap. Park at the car is a place, a photo and Save.
+- **Ask when the user knows.** Ask for something at the moment the user has the answer, on the screen where they are then: the first shop is asked on Find while walking out, not on Park at the car.
+- **Fewer fields to type.** Before adding a field, try in this order: read it (OCR, a saved rate), prefill the common case (60-minute periods), offer chips, fold it under "More options". Typing is the last resort.
+- **Familiar patterns.** Use what people know from the apps they use daily rather than a new control: a gallery button beside the camera's shutter, as in WhatsApp; folded rows with a chevron, as in iOS Settings.
+- **Lead with what people scan for.** The first line of a card is what the list is searched by (the place in History); group long lists with a summary in the header (the month's total).
+- **Say it once.** Leave out what is the same on every row (the car's name when there is one car) or already in the title. No helper text that repeats a label.
+- **Quiet visuals.** No decoration, gradients or extra colours; one emerald accent; secondary text in `muted`; hairlines between rows rather than boxes in boxes; generous spacing (the Spacing rules below).
+- **Small edits save themselves.** Where a screen has no Save for it (Find's way back), a chip saves on tap and a field when it is left. Anything that loses data still asks first.
+- 2026-10-22: Design every screen simple, minimal and modern, by the Principles above, because the user found the redesign that applied them (folded optional rows, way back on Find, gallery in the camera, History by month) clearly better than a form with every field open.
 
 **Theme**: dark mode is the default. The user picks Dark or Light in Settings; the choice is saved in the `setting` table under `theme` and applies to the whole app at once.
 
@@ -84,18 +97,22 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
   - 2026-10-22: Only a screen's one main action (Save, Found my car) is a full-width `Button`. Side actions in lists use `size="small"` pills or an `IconButton` (archive, delete), and "Add" buttons are small `tonal` pills, because the user found full-width list buttons too big and long and wants a sharp, elegant look.
 - `IconButton`: round, 36 px with a 48 px touch area, icon only. Always pass `label` ("Archive My Myvi") for screen readers; `tone="danger"` for archive and delete.
 - `SegmentedControl`: one of two to four options with one always selected (Dark / Light).
-- `ChipGroup`: one choice from a few options (up to about 12). Tapping the selected chip clears it.
-- `Field`: labelled text input on `surface`. Codes such as level and bay use `autoCapitalize="characters"`.
+- `ChipGroup`: one choice from a few options (up to about 12). Tapping the selected chip clears it. When a row label outside the chips says what they are (Park's "Level" and "Bay" rows of photo codes), give each option an `accessibilityLabel` ("Level G3").
+- `Field`: labelled text input on `surface`. Codes such as level and bay use `autoCapitalize="characters"`. Under a row that already names it (a `Disclosure`), leave out `label` and pass `accessibilityLabel`.
 - `ErrorText` for every error the user should see.
-- `RateForm`: edits one rate (Hourly or Flat) as typed strings; check it with `rateFromForm` and show the error with `ErrorText`, since the form shows none.
+- `RateForm`: edits one rate (Hourly or Flat) as typed strings; check it with `rateFromForm` and show the error with `ErrorText`, since the form shows none. It shows only the prices; period lengths, free minutes and daily max are under "More options", which starts open when the rate uses them (decided when it mounts, so give a form that can switch day type a `key`).
+- `Disclosure`: a card row (label, optional icon, a short `value` at the end or a `muted` `hint` under the label, a chevron) that opens to show its children. The screen keeps `open`, so it can open the row itself for an error inside. Put rows in a card with `overflow: 'hidden'`; pass `first={false}` to every row after the first.
+  - Use it for every optional part of a form (Principles, "Essentials first, the rest folded").
 - `SwitchRow`: a label, optional `muted` hint and a themed switch; the whole row toggles. It has no side padding, so wrap it in a padded View inside a card.
 - `EstimatePill`: the amber "Estimate" pill beside a fee that may differ from the receipt (overnight, or a borrowed rate). Never emerald.
 - `ListSection` and `ListRow` (`List.js`): the Settings card list. A row with `onPress` shows a chevron; one without is read-only with a `muted` label. Pass `first={false}` to every row after the first.
 - `icons.js`: line icons on a 24 grid, stroke 2, shapes from Lucide drawn with `react-native-svg`. Add new icons there; no icon library.
 - `CarLogo`: the Home car drawing; `active` turns its glow emerald.
-- `CameraCapture`: a full-screen camera in a `Modal` that asks for the permission and takes one photo; mount one per screen and pass the picture to `preparePhoto`. `PhotoStrip`: a row of 3:4 thumbnails, oldest (the pillar sign) first. `PhotoViewer`: full-screen photos, swiped, with optional share and delete buttons. `PhotoStrip` takes `disabled` while a photo is being prepared or read. `BackdropButton`: the round icon button used over the camera and photos.
+- `CameraCapture`: a full-screen camera in a `Modal` that asks for the permission and takes one photo, or picks one with the gallery button beside the shutter (also offered when the camera is not allowed); mount one per screen and pass the picture to `preparePhoto`. `PhotoStrip`: a row of 3:4 thumbnails, oldest (the pillar sign) first. `PhotoViewer`: full-screen photos, swiped, with optional share and delete buttons. `PhotoStrip` takes `disabled` while a photo is being prepared or read. `BackdropButton`: the round icon button used over the camera and photos.
 - Delete, archive and other actions that lose data always ask first with `Alert.alert` (Cancel plus a `destructive` button).
-- Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`.
+- Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`. History uses a `SectionList` by month, with section-title-styled headers that show the month's total.
+- `SessionCard`: one finished session, the place first, then date and duration, the spot and the amount; pass `showVehicle={false}` when the car's name would repeat on every card.
+- `WayBackCard`: Find's way back while parked (how you left, first shop), a `Disclosure` that saves each part as it is given.
 - Planned features show as `muted` rows with the value "Soon", or a card with an `accentSoft` "Coming soon" badge.
 
 **Zone colour**: draw with `swatchFor(name)`, put text on a swatch in `textColourOn(swatch)`, and always show the colour name as text too, so colour is never the only signal.
@@ -103,6 +120,7 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 **Accessibility**: `accessibilityRole` on everything pressable (`button`, `radio`); touch targets at least 44 px (use `hitSlop` for small controls); icon-only buttons have an `accessibilityLabel`; text contrast at least 4.5:1, and 7:1 for body text, checked in `theme.test.js`.
 
 **Words**: English, sentence case, short. Money with `formatRM`, times with `formatTime`, `formatDate` and `formatDuration`; never format inline.
+- 2026-10-22: A placeholder must never look like a value. An example starts with "e.g." ("e.g. B2", "e.g. 3.00", "e.g. My Myvi"); otherwise use a word such as "Optional". Never "0.00" in a money field. The user read the Level placeholder "B2" as a level already filled in from the photo.
 
 **Known gaps** (check on the phone):
 - `app.json` still has `"userInterfaceStyle": "light"`, so Android draws system dialogs (`Alert.alert`) and the launch screen light, even in dark mode. Changing it needs a rebuild.

@@ -11,6 +11,7 @@ import { PhotoStrip } from '../../components/PhotoStrip';
 import { PhotoViewer } from '../../components/PhotoViewer';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
+import { WayBackCard } from '../../components/WayBackCard';
 import {
   deletePhotoFiles,
   holidays,
@@ -79,6 +80,7 @@ export default function SessionScreen() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [photoError, setPhotoError] = useState(null);
+  const [wayBackError, setWayBackError] = useState(null);
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;
@@ -123,6 +125,18 @@ export default function SessionScreen() {
       setActionError(e);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // The way back is added here while parked, as the user walks out; each
+  // part is saved as it is given.
+  const saveWayBack = async (changes) => {
+    setWayBackError(null);
+    try {
+      await sessions.setWayBack(db, session.id, changes);
+      await reload();
+    } catch (e) {
+      setWayBackError(e);
     }
   };
 
@@ -193,7 +207,9 @@ export default function SessionScreen() {
     ]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    // handled: with the keyboard up for the shop, a tap on a chip or button
+    // still works instead of only closing the keyboard.
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: session.vehicle_name }} />
 
       <View style={[styles.spot, spotColours]}>
@@ -208,11 +224,15 @@ export default function SessionScreen() {
         {session.zone_colour_name && <Text style={spotTextStyle}>{session.zone_colour_name} zone</Text>}
       </View>
 
-      {route && (
-        <View style={styles.card}>
-          <Text style={styles.label}>Way back</Text>
-          <Text style={styles.route}>{route}</Text>
-        </View>
+      {active ? (
+        <WayBackCard session={session} route={route} onSave={saveWayBack} error={wayBackError} />
+      ) : (
+        route && (
+          <View style={styles.card}>
+            <Text style={styles.label}>Way back</Text>
+            <Text style={styles.route}>{route}</Text>
+          </View>
+        )
       )}
 
       {(photoUris.length > 0 || active) && (

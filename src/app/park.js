@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { CameraCapture } from '../components/CameraCapture';
 import { ChipGroup } from '../components/ChipGroup';
+import { Disclosure } from '../components/Disclosure';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
-import { CameraIcon } from '../components/icons';
+import { CameraIcon, NoteIcon, TimerIcon } from '../components/icons';
 import { PhotoStrip } from '../components/PhotoStrip';
 import { PhotoViewer } from '../components/PhotoViewer';
 import { PlacePicker } from '../components/PlacePicker';
@@ -40,25 +41,29 @@ import { useFocusedLoad } from '../hooks/useFocusedLoad';
 import { indexAfterRemoval } from '../lib/listIndex';
 import { typedPlaceToConfirm } from '../lib/placeName';
 import { formatMinutes } from '../lib/time';
-import { shouldReadNextPhoto, suggestionsFromPhotos } from '../ocr/pillarText';
+import { codeRows, pickCode, shouldReadNextPhoto, suggestionsFromPhotos } from '../ocr/pillarText';
 import { readPhotoText } from '../ocr/readText';
-import { holidayAmountHint, keepPlaceLabel, rateUpdateQuestion, typedPlaceQuestion } from '../text/parkText';
+import {
+  holidayAmountHint,
+  keepPlaceLabel,
+  parkRateRowText,
+  photoCodesHint,
+  rateUpdateQuestion,
+  typedPlaceQuestion,
+} from '../text/parkText';
 import { addPhotoLabel } from '../text/photoText';
-import { dayTypeLabel } from '../text/rateText';
 import { TIMER_OPTIONS, timerEndFrom } from '../timer/timer';
 import { ZONE_COLOURS } from '../zone/zoneColour';
 
 const ZONE_OPTIONS = ZONE_COLOURS.map((c) => ({ value: c.name, label: c.name, swatch: c.swatch }));
-const ACCESS_OPTIONS = [
-  { value: 'lift', label: 'Lift' },
-  { value: 'escalator', label: 'Escalator' },
-  { value: 'stairs', label: 'Stairs' },
-  { value: 'other', label: 'Other' },
-];
 const TIMER_CHIPS = TIMER_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
-const EMPTY_FORM = { level: '', bay: '', zone_colour_name: null, access_type: null, landmark: '', note: '' };
+// How the user left the car park and the first shop they saw are added on
+// Find as they walk out: at the car, when Save is tapped, they are not known yet.
+const EMPTY_FORM = { level: '', bay: '', zone_colour_name: null, note: '' };
 const NO_SAVED_RATES = { weekday: null, weekend: null, holiday: null };
+// The optional parts start folded, so parking takes a place, a photo and Save.
+const ALL_CLOSED = { rate: false, timer: false, note: false };
 
 // Only the Save handler reads the clock. The React Compiler lint cannot tell
 // that handler from render code, so the read lives outside the component.
@@ -92,6 +97,7 @@ export default function Park() {
   const [ratesError, setRatesError] = useState(null);
   const [holidaySwitch, setHolidaySwitch] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(null);
+  const [open, setOpen] = useState(ALL_CLOSED);
   // Prepared photos in the cache, the pillar sign first: [{ uri, ocrText }],
   // ocrText null for a photo OCR did not read. They are kept in the app's
   // storage only when the car is parked.
@@ -119,6 +125,9 @@ export default function Park() {
 
   const setField = (field) => (value) => setForm((current) => ({ ...current, [field]: value }));
   const updateRateInput = (change) => setRateInput((current) => current && { ...current, ...change(current) });
+  const toggle = (part) => () => setOpen((current) => ({ ...current, [part]: !current[part] }));
+  // A rate to check opens its row, so the user does not have to find it.
+  const openRate = () => setOpen((current) => ({ ...current, rate: true }));
 
   // OCR reads the first photo, and the next only while the ones before gave
   // no level or bay. A photo OCR cannot read is still kept.
@@ -201,6 +210,20 @@ export default function Park() {
   const suggestions = suggestionsFromPhotos(ocrTexts);
   const hasSuggestions = suggestions.levels.length > 0 || suggestions.bays.length > 0;
   const readNothing = !hasSuggestions && ocrTexts.some((text) => text != null);
+  const rows = codeRows(suggestions);
+  const codeChips = (codes, name) => codes.map((code) => ({ value: code, label: code, accessibilityLabel: `${name} ${code}` }));
+  const pick = (field) => (code) =>
+    setForm((current) => ({ ...current, ...pickCode(current, field, code, rows.level) }));
+  const rateRow =
+    rateInput &&
+    parkRateRowText({
+      dayType: rateDayType,
+      form: rateInput.form[rateDayType],
+      holidayOn,
+      holidayAmount: rateInput.form.holidayAmount,
+      savedHoliday: rateInput.saved.holiday,
+    });
+  const note = form.note.trim();
 
   const start = async ({
     started_at,
@@ -261,6 +284,7 @@ export default function Park() {
     if (dayTypeOf(started_at, holidayDates) !== todayType) {
       setFormDay(started_at);
       setSaveError(new Error('The day changed while Park was open. Check the rate, then tap Save again.'));
+      openRate();
       return;
     }
     const { entered, error } = enteredRates({
@@ -273,6 +297,7 @@ export default function Park() {
     });
     if (error) {
       setSaveError(new Error(error));
+      openRate();
       return;
     }
     const plan = planRateSave(rateInput.saved, entered);
@@ -343,59 +368,65 @@ export default function Park() {
       >
         <Stack.Screen options={{ title: `Park ${car.name}` }} />
 
-        <PlacePicker value={place} onChange={choosePlace} onQueryChange={setTypedPlace} />
-        <ErrorText error={ratesError} />
-
-        {place && rateInput && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{dayTypeLabel(rateDayType)} rate</Text>
+        <PlacePicker value={place} onChange={choosePlace} onQueryChange={setTypedPlace}>
+          {place && rateInput && (
+            <Disclosure
+              label={rateRow.label}
+              hint={rateRow.hint}
+              open={open.rate}
+              onToggle={toggle('rate')}
+              first={false}
+            >
               <Text style={styles.hint}>
                 {hasSavedRate
                   ? 'Filled in from your saved rate.'
                   : "Saved to this place for next time. Leave it empty if you don't know it."}
               </Text>
-            </View>
-            <RateForm
-              value={rateInput.form[rateDayType]}
-              onChange={(next) => updateRateInput((current) => ({ form: { ...current.form, [rateDayType]: next } }))}
-            />
-            {offersSameEveryDay(rateInput.saved, rateDayType) && (
-              <SwitchRow
-                label="Same rate every day"
-                hint="Saves it as the weekday and weekend rate."
-                value={rateInput.sameEveryDay}
-                onValueChange={(sameEveryDay) => updateRateInput(() => ({ sameEveryDay }))}
+              {/* Keyed by day type: each form decides on its own whether its
+                  "More options" start open. */}
+              <RateForm
+                key={rateDayType}
+                value={rateInput.form[rateDayType]}
+                onChange={(next) => updateRateInput((current) => ({ form: { ...current.form, [rateDayType]: next } }))}
               />
-            )}
-            <View style={styles.divider} />
-            <SwitchRow
-              label="Public holiday"
-              hint={
-                todayIsHoliday
-                  ? 'Today is in your holiday list. Remove it in Settings > Public holidays.'
-                  : 'Adds today to your public holiday list.'
-              }
-              value={holidayOn}
-              onValueChange={setHolidaySwitch}
-              disabled={todayIsHoliday}
-            />
-            {holidayOn && (
-              <>
-                <Field
-                  label="Public holiday amount (RM, per entry)"
-                  value={rateInput.form.holidayAmount}
-                  onChangeText={(holidayAmount) =>
-                    updateRateInput((current) => ({ form: { ...current.form, holidayAmount } }))
-                  }
-                  placeholder="Optional"
-                  keyboardType="decimal-pad"
+              {offersSameEveryDay(rateInput.saved, rateDayType) && (
+                <SwitchRow
+                  label="Same rate every day"
+                  hint="Saves it as the weekday and weekend rate."
+                  value={rateInput.sameEveryDay}
+                  onValueChange={(sameEveryDay) => updateRateInput(() => ({ sameEveryDay }))}
                 />
-                <Text style={styles.hint}>{holidayAmountHint(Boolean(rateInput.saved.holiday))}</Text>
-              </>
-            )}
-          </View>
-        )}
+              )}
+              <View style={styles.divider} />
+              <SwitchRow
+                label="Public holiday"
+                hint={
+                  todayIsHoliday
+                    ? 'Today is in your holiday list. Remove it in Settings > Public holidays.'
+                    : 'Adds today to your public holiday list.'
+                }
+                value={holidayOn}
+                onValueChange={setHolidaySwitch}
+                disabled={todayIsHoliday}
+              />
+              {holidayOn && (
+                <>
+                  <Field
+                    label="Public holiday amount (RM, per entry)"
+                    value={rateInput.form.holidayAmount}
+                    onChangeText={(holidayAmount) =>
+                      updateRateInput((current) => ({ form: { ...current.form, holidayAmount } }))
+                    }
+                    placeholder="Optional"
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={styles.hint}>{holidayAmountHint(Boolean(rateInput.saved.holiday))}</Text>
+                </>
+              )}
+            </Disclosure>
+          )}
+        </PlacePicker>
+        <ErrorText error={ratesError} />
 
         <View style={styles.section}>
           <Text style={styles.label}>Photos</Text>
@@ -425,21 +456,19 @@ export default function Park() {
         {hasSuggestions && (
           <View style={styles.section}>
             <Text style={styles.label}>From the photo</Text>
-            <Text style={styles.hint}>Tap to fill in the level and bay. You can still type them.</Text>
-            {suggestions.levels.length > 0 && (
-              <ChipGroup
-                options={suggestions.levels.map((level) => ({ value: level, label: `Level ${level}` }))}
-                value={form.level}
-                onChange={(level) => setField('level')(level ?? '')}
-              />
-            )}
-            {suggestions.bays.length > 0 && (
-              <ChipGroup
-                options={suggestions.bays.map((bay) => ({ value: bay, label: `Bay ${bay}` }))}
-                value={form.bay}
-                onChange={(bay) => setField('bay')(bay ?? '')}
-              />
-            )}
+            <Text style={styles.hint}>{photoCodesHint(rows.level)}</Text>
+            <View style={styles.codeRow}>
+              <Text style={styles.codeLabel}>Level</Text>
+              <View style={styles.codeChips}>
+                <ChipGroup options={codeChips(rows.level, 'Level')} value={form.level} onChange={pick('level')} />
+              </View>
+            </View>
+            <View style={styles.codeRow}>
+              <Text style={styles.codeLabel}>Bay</Text>
+              <View style={styles.codeChips}>
+                <ChipGroup options={codeChips(rows.bay, 'Bay')} value={form.bay} onChange={pick('bay')} />
+              </View>
+            </View>
           </View>
         )}
         <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
@@ -452,10 +481,22 @@ export default function Park() {
 
         <View style={styles.row}>
           <View style={styles.half}>
-            <Field label="Level" value={form.level} onChangeText={setField('level')} placeholder="B2" autoCapitalize="characters" />
+            <Field
+              label="Level"
+              value={form.level}
+              onChangeText={setField('level')}
+              placeholder="e.g. B2"
+              autoCapitalize="characters"
+            />
           </View>
           <View style={styles.half}>
-            <Field label="Bay" value={form.bay} onChangeText={setField('bay')} placeholder="C14" autoCapitalize="characters" />
+            <Field
+              label="Bay"
+              value={form.bay}
+              onChangeText={setField('bay')}
+              placeholder="e.g. C14"
+              autoCapitalize="characters"
+            />
           </View>
         </View>
 
@@ -464,23 +505,35 @@ export default function Park() {
           <ChipGroup options={ZONE_OPTIONS} value={form.zone_colour_name} onChange={setField('zone_colour_name')} />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>How you left the car park</Text>
-          <ChipGroup options={ACCESS_OPTIONS} value={form.access_type} onChange={setField('access_type')} />
-        </View>
-
-        <Field
-          label="First shop you saw"
-          value={form.landmark}
-          onChangeText={setField('landmark')}
-          placeholder="Starbucks"
-        />
-        <Field label="Note" value={form.note} onChangeText={setField('note')} multiline />
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Timer</Text>
-          <Text style={styles.hint}>Optional, such as the time you paid for.</Text>
-          <ChipGroup options={TIMER_CHIPS} value={timerMinutes} onChange={setTimerMinutes} />
+        <View style={styles.listCard}>
+          <Disclosure
+            icon={TimerIcon}
+            label="Timer"
+            value={timerMinutes ? formatMinutes(timerMinutes) : 'Off'}
+            open={open.timer}
+            onToggle={toggle('timer')}
+          >
+            <Text style={styles.hint}>Optional, such as the time you paid for.</Text>
+            <ChipGroup options={TIMER_CHIPS} value={timerMinutes} onChange={setTimerMinutes} />
+          </Disclosure>
+          <Disclosure
+            icon={NoteIcon}
+            label="Note"
+            value={note ? null : 'Add'}
+            hint={open.note ? null : note}
+            open={open.note}
+            onToggle={toggle('note')}
+            first={false}
+          >
+            <Field
+              accessibilityLabel="Note"
+              value={form.note}
+              onChangeText={setField('note')}
+              placeholder="Anything that helps you find the car"
+              multiline
+              autoFocus
+            />
+          </Disclosure>
         </View>
 
         <View style={styles.section}>
@@ -501,9 +554,11 @@ const createStyles = (c) =>
     half: { flex: 1 },
     label: { fontWeight: '600', color: c.text },
     hint: { fontSize: 13, color: c.muted },
-    card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 10, boxShadow: c.shadow },
-    cardHeader: { gap: 2 },
-    cardTitle: { fontSize: 17, fontWeight: '600', color: c.text },
+    codeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space },
+    // Level with the chips' text, as the chips wrap onto more lines.
+    codeLabel: { width: 44, paddingTop: 9, fontWeight: '600', color: c.muted },
+    codeChips: { flex: 1 },
+    listCard: { backgroundColor: c.card, borderRadius: radius.card, overflow: 'hidden', boxShadow: c.shadow },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: c.border },
     // A row, so the small pill sits at the start instead of stretching.
     sideActions: { flexDirection: 'row' },

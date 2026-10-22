@@ -77,7 +77,7 @@ export default function Holidays() {
               label="Date"
               value={date}
               onChangeText={setDate}
-              placeholder="2026-12-25"
+              placeholder="e.g. 2026-12-25"
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={10}
@@ -99,7 +99,7 @@ export default function Holidays() {
           label="Name (optional)"
           value={name}
           onChangeText={setName}
-          placeholder="Christmas"
+          placeholder="e.g. Christmas"
           editable={!adding}
         />
         <Button

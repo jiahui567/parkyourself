@@ -4,7 +4,9 @@ import { radius } from './theme';
 import { useThemedStyles } from './ThemeProvider';
 
 // One choice from a row of chips. Tapping the selected chip clears the choice.
-// options: [{ value, label, swatch? }]
+// options: [{ value, label, swatch?, accessibilityLabel? }]; give
+// accessibilityLabel when a row label outside the chips says what they are
+// ('Level G3' for a chip reading 'G3').
 export function ChipGroup({ options, value, onChange }) {
   const styles = useThemedStyles(createStyles);
   return (
@@ -15,6 +17,7 @@ export function ChipGroup({ options, value, onChange }) {
           <Pressable
             key={option.value}
             accessibilityRole="radio"
+            accessibilityLabel={option.accessibilityLabel}
             accessibilityState={{ selected }}
             onPress={() => onChange(selected ? null : option.value)}
             style={[styles.chip, selected && styles.selected]}

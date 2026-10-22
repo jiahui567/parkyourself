@@ -1,4 +1,4 @@
-import { chartRange, chartWindowEnd, hasNextMonth, spendingView } from './monthView';
+import { chartRange, chartWindowEnd, hasNextMonth, requestedMonth, spendingView } from './monthView';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
 const at = (localDateTime) => new Date(localDateTime).getTime();
@@ -67,5 +67,19 @@ describe('spendingView', () => {
     expect(totals[0].key).toBe('2025-11');
     expect(totals[11].key).toBe('2026-10');
     expect(totals[10]).toEqual({ key: '2026-09', totalSen: 300, sessions: 1 });
+  });
+});
+
+describe('requestedMonth', () => {
+  it.each([
+    { param: '2026-09', month: '2026-09' },
+    { param: '2026-10', month: '2026-10' },
+    { param: '2026-11', month: null },
+    { param: '2026-13', month: null },
+    { param: '2026-9', month: null },
+    { param: undefined, month: null },
+    { param: ['2026-09'], month: null },
+  ])('reads $param in Oct 2026 as $month', ({ param, month }) => {
+    expect(requestedMonth(param, '2026-10')).toBe(month);
   });
 });

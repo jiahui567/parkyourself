@@ -145,7 +145,7 @@ describe('readEndForm', () => {
 
     expect(result).toEqual({
       input: null,
-      rateErrors: { weekend: 'Enter the block price, such as 2.00.' },
+      rateErrors: { weekend: 'Enter the price after the first period, such as 2.00.' },
       paidError: null,
     });
   });

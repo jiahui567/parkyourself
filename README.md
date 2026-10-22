@@ -11,7 +11,7 @@ All data stays on the phone. No account, no server. An optional cloud sync is pl
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, rename, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, share or delete one, Add photo while parked. Renaming a car (built 2026-10-22) |
+| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, note), Find (way back, Found my car), History, Cars (default, rename, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, share or delete one, Add photo while parked. Renaming a car (built 2026-10-22). Redesign (built 2026-10-22, not yet on the phone): Park's rate, timer and note fold away, the way back is added on Find while parked, photos can come from the gallery, and History is grouped by month with totals |
 | Built, not yet on the phone | **M2 Places, rates and fees** (place picker, weekday/weekend rates, public holiday amount and list, live fee, overnight Estimate, Amount paid), **M3 Notifications** (timer on Park, Extend timer on Find; an ongoing notification per parked car with the start time and Navigate and Extend timer buttons, which open the app; reminders before and at the timer's end; the reminder lead time in Settings), **M4 OCR** (the first photo is read on the phone with `expo-mlkit-ocr`; level and bay chips fill the fields), **M5 Share** (the parking info as a message from Find, or one photo from the photo view; no QR code), **M6 Monthly spending** (Spending tab with the 12-month chart, tap through to a month's sessions) and the **M8 Settings** screen (Places, Public holidays, Extend timer by, Export database). Needs a fresh `npx expo run:android`: the chart and OCR have native code, and the camera and notification permissions are set in `app.json` |
 | Built ahead | **M4 colour logic**: zone colour names from a hex (`src/zone/`), covered by Jest tests. The colour suggestion from the photo and tap-to-pick are not built yet |
 | On hold | **M7 GPS**, while its design is rethought |
@@ -22,8 +22,8 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 
 ## Features (version 1)
 
-- **Park:** pillar photo, level and bay read by on-device OCR, zone colour picked from the photo, lift/escalator/stairs, first shop seen, note.
-- **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14").
+- **Park:** pillar photo (camera or gallery), level and bay read by on-device OCR, zone colour picked from the photo. The rate, timer and note fold away until you need them.
+- **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
@@ -41,7 +41,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Navigation | Expo Router, screens in `src/app/` |
 | Database | `expo-sqlite`, plain SQL, migrations tracked by `PRAGMA user_version`, WAL mode, foreign keys compiled on |
 | IDs | `expo-crypto` (`randomUUID()`) |
-| Camera and photos | `expo-camera`, `expo-image-manipulator`, `expo-file-system` |
+| Camera and photos | `expo-camera`, `expo-image-manipulator`, `expo-file-system`, `expo-image-picker` (a photo from the gallery; native code, so run `npx expo run:android` again after pulling it in) |
 | OCR | `expo-mlkit-ocr` 0.2.7 (pinned): Google ML Kit's bundled Latin text model, read on the phone with no model download. ML Kit sends Google per-installation identifiers and diagnostics and usage metrics, with no opt-out; accepted on 2026-10-22 (AGENTS.md, Privacy) |
 | Sharing and export | React Native's `Share` for the parking info; `expo-sharing` for a photo and for Export database |
 | Notifications | `expo-notifications` |
@@ -66,11 +66,12 @@ park-yourself/
 │   │   ├── (tabs)/          The bottom tab bar (the folder name is not part of the URL)
 │   │   │   ├── _layout.js   Tabs: Home, History, Spending, Settings
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
-│   │   │   ├── history.js   Finished parking, newest first
+│   │   │   ├── history.js   Finished parking, newest first, by month with totals
 │   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
 │   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Extend timer, Export, Database check
-│   │   ├── park.js          Park: place and rate, level, bay, zone colour, way out, first shop, note, timer
-│   │   ├── session/[id].js  Find: the spot, the way back, fee so far, Extend timer, Found my car / Delete
+│   │   ├── park.js          Park: place and rate, photos, level, bay, zone colour, timer, note
+│   │   ├── session/[id].js  Find: the spot, the way back (added here while parked), fee so far, Extend timer,
+│   │   │                    Found my car / Delete
 │   │   ├── session/end/[id].js  Found my car summary: fee, missing rate, Amount paid
 │   │   ├── sessions.js      One month's sessions for a place or car (from Spending)
 │   │   ├── places/          Places list and a place's rates (edit, delete)
@@ -80,7 +81,8 @@ park-yourself/
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
 │   │                        SegmentedControl, Field, ErrorText, icons, CarLogo, RateForm,
 │   │                        SwitchRow, List (ListSection, ListRow), PlacePicker, SessionCard,
-│   │                        EstimatePill, CameraCapture, PhotoStrip, PhotoViewer, BackdropButton
+│   │                        EstimatePill, CameraCapture, PhotoStrip, PhotoViewer, BackdropButton,
+│   │                        Disclosure (folded rows), WayBackCard (Find's way back while parked)
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
 │   │                        (notification taps, in the root layout)

@@ -1,4 +1,4 @@
-import { amountSen, monthSummary, monthlyTotals } from './summary';
+import { amountSen, historyByMonth, monthSummary, monthlyTotals } from './summary';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
 const at = (localDateTime) => new Date(localDateTime).getTime();
@@ -92,5 +92,22 @@ describe('monthlyTotals', () => {
       { key: '2026-12', totalSen: 0, sessions: 0 },
       { key: '2027-01', totalSen: 300, sessions: 1 },
     ]);
+  });
+});
+
+describe('historyByMonth', () => {
+  it('groups the rows by the local month they started, keeping their order', () => {
+    const nov2 = row({ id: 'b', started_at: at('2026-11-02T09:00'), fee_sen: 500 });
+    const nov1 = row({ id: 'a', started_at: at('2026-11-01T00:30'), fee_sen: null, paid_sen: 200 });
+    const oct = row({ id: 'c', started_at: at('2026-10-31T23:30'), fee_sen: null });
+
+    expect(historyByMonth([nov2, nov1, oct])).toEqual([
+      { key: '2026-11', totalSen: 700, sessions: 2, data: [nov2, nov1] },
+      { key: '2026-10', totalSen: 0, sessions: 1, data: [oct] },
+    ]);
+  });
+
+  it('gives no groups for no rows', () => {
+    expect(historyByMonth([])).toEqual([]);
   });
 });

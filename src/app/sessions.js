@@ -49,6 +49,8 @@ export default function Sessions() {
 
   const name = ownerName(filter, data.rows, data.owner);
   const summary = monthSummary(data.rows);
+  // As on History: a car's name only tells the sessions apart with several cars.
+  const showVehicle = summary.byVehicle.length > 1;
 
   return (
     <>
@@ -64,7 +66,7 @@ export default function Sessions() {
           </View>
         }
         ListEmptyComponent={<Text style={styles.muted}>{noSessionsText(filter.month)}</Text>}
-        renderItem={({ item }) => <SessionCard session={item} />}
+        renderItem={({ item }) => <SessionCard session={item} showVehicle={showVehicle} />}
       />
     </>
   );

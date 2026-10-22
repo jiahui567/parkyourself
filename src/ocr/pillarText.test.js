@@ -1,4 +1,11 @@
-import { pillarCandidates, shouldReadNextPhoto, suggestionsFromPhotos } from './pillarText';
+import {
+  codeRows,
+  fillsOther,
+  pickCode,
+  pillarCandidates,
+  shouldReadNextPhoto,
+  suggestionsFromPhotos,
+} from './pillarText';
 
 describe('pillarCandidates', () => {
   it.each([
@@ -64,5 +71,74 @@ describe('shouldReadNextPhoto', () => {
 
   it('reads the next photo when OCR failed on the one before', () => {
     expect(shouldReadNextPhoto([null])).toBe(true);
+  });
+});
+
+describe('codeRows', () => {
+  it('offers every code in both rows, the likelier ones first', () => {
+    expect(codeRows(pillarCandidates('B2 C14'))).toEqual({ level: ['B2', 'C14'], bay: ['C14', 'B2'] });
+  });
+
+  it('offers a sign whose codes all look like bays for the level too', () => {
+    expect(codeRows(pillarCandidates('G3 A2'))).toEqual({ level: ['G3', 'A2'], bay: ['G3', 'A2'] });
+  });
+});
+
+describe('pickCode', () => {
+  const EMPTY = { level: '', bay: '' };
+  const TWO = ['G3', 'A2'];
+
+  it('fills the other field with the code left over, either way round', () => {
+    expect(pickCode(EMPTY, 'bay', 'G3', TWO)).toEqual({ level: 'A2', bay: 'G3' });
+    expect(pickCode(EMPTY, 'level', 'G3', TWO)).toEqual({ level: 'G3', bay: 'A2' });
+  });
+
+  it('swaps the two when the other row is tapped', () => {
+    expect(pickCode({ level: 'A2', bay: 'G3' }, 'level', 'G3', TWO)).toEqual({ level: 'G3', bay: 'A2' });
+  });
+
+  it('keeps a value the user typed in the other field', () => {
+    expect(pickCode({ level: 'B1', bay: '' }, 'bay', 'G3', TWO)).toEqual({ level: 'B1', bay: 'G3' });
+  });
+
+  it('fills only the field tapped when more than one code is left', () => {
+    expect(pickCode(EMPTY, 'bay', 'G3', ['G3', 'A2', '12'])).toEqual({ level: '', bay: 'G3' });
+  });
+
+  it('never leaves a code in both fields', () => {
+    expect(pickCode({ level: 'G3', bay: '' }, 'bay', 'G3', ['G3', 'A2', '12'])).toEqual({ level: '', bay: 'G3' });
+    expect(pickCode({ level: ' g3 ', bay: '' }, 'bay', 'G3', TWO)).toEqual({ level: 'A2', bay: 'G3' });
+  });
+
+  it('clears only the field whose chip was tapped again', () => {
+    expect(pickCode({ level: 'A2', bay: 'G3' }, 'bay', null, TWO)).toEqual({ level: 'A2', bay: '' });
+  });
+
+  it('fills nothing else when only one code was read', () => {
+    expect(pickCode(EMPTY, 'level', 'B2', ['B2'])).toEqual({ level: 'B2', bay: '' });
+  });
+
+  it.each(['M 12', 'G-3'])('fills nothing else for %p, two readings of the same characters', (sign) => {
+    const codes = codeRows(pillarCandidates(sign)).level;
+
+    expect(codes).toHaveLength(2);
+    expect(pickCode(EMPTY, 'bay', codes[1], codes)).toEqual({ level: '', bay: codes[1] });
+  });
+
+  it('reads a typed value as the sign is read, so a code is not left in both fields', () => {
+    expect(pickCode({ level: 'c-14', bay: '' }, 'bay', 'C14', ['B2', 'C14', '7'])).toEqual({ level: '', bay: 'C14' });
+  });
+});
+
+describe('fillsOther', () => {
+  it.each([
+    { codes: ['G3', 'A2'], fills: true },
+    { codes: ['B2', 'C14'], fills: true },
+    { codes: ['M', 'M12'], fills: false },
+    { codes: ['G3', 'G'], fills: false },
+    { codes: ['B2'], fills: false },
+    { codes: ['B2', 'C14', '7'], fills: false },
+  ])('is $fills for $codes', ({ codes, fills }) => {
+    expect(fillsOther(codes)).toBe(fills);
   });
 });

@@ -28,6 +28,12 @@ const DETAILS_SQL = `
 
 const ACTIVE_SQL = "SELECT * FROM parking_session WHERE id = ? AND status = 'active' AND deleted_at IS NULL";
 
+function assertAccessType(access_type) {
+  if (access_type != null && !ACCESS_TYPES.includes(access_type)) {
+    throw new Error(`Unknown access type: ${access_type}`);
+  }
+}
+
 // Rates typed by the user, checked before any write. Returns the day types
 // that have a rate.
 function checkRates(rates) {
@@ -66,9 +72,7 @@ export const sessions = {
       photo_files = [],
     }
   ) {
-    if (access_type != null && !ACCESS_TYPES.includes(access_type)) {
-      throw new Error(`Unknown access type: ${access_type}`);
-    }
+    assertAccessType(access_type);
     const placeName = text(place_name);
     const entered = checkRates(rates);
     for (const dayType of save_rates) {
@@ -172,6 +176,24 @@ export const sessions = {
         throw new Error('The timer must end after you park.');
       }
       await base.update(txn, id, { timer_ends_at });
+    });
+  },
+
+  // The way back, added on Find while parked: how the user left the car park
+  // and the first shop they saw, which they only know after walking out.
+  // Only the fields in changes are written, so the chips and the shop field
+  // save on their own without undoing each other.
+  async setWayBack(db, id, changes) {
+    const update = {};
+    if ('access_type' in changes) {
+      assertAccessType(changes.access_type);
+      update.access_type = changes.access_type ?? null;
+    }
+    if ('landmark' in changes) update.landmark = text(changes.landmark);
+    await inTransaction(db, async (txn) => {
+      const session = await txn.getFirstAsync(ACTIVE_SQL, [id]);
+      if (!session) throw new Error('This session has already ended.');
+      await base.update(txn, id, update);
     });
   },
 

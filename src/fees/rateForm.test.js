@@ -3,6 +3,7 @@ import {
   EMPTY_RATE_FORM,
   feeFields,
   formFromRate,
+  hasMoreRateOptions,
   HOLIDAY_AMOUNT_ERROR,
   holidayRate,
   holidayRateFromText,
@@ -63,9 +64,9 @@ describe('rateFromForm', () => {
   });
 
   it.each([
-    { rule: 'no block price', form: { blockPrice: '' }, error: 'block price' },
+    { rule: 'no block price', form: { blockPrice: '' }, error: 'price after the first period' },
     { rule: 'a first period of 0 min', form: { firstMinutes: '0' }, error: 'first period in whole minutes' },
-    { rule: 'a block of 1.5 min', form: { blockMinutes: '1.5' }, error: 'each block in whole minutes' },
+    { rule: 'a block of 1.5 min', form: { blockMinutes: '1.5' }, error: 'each period after in whole minutes' },
     { rule: 'a first price with letters', form: { firstPrice: 'three' }, error: 'first price' },
     { rule: 'free minutes of -5', form: { graceMinutes: '-5' }, error: 'free minutes' },
     { rule: 'a daily max of 0', form: { dailyCap: '0' }, error: 'daily max' },
@@ -74,6 +75,34 @@ describe('rateFromForm', () => {
 
     expect(result.rate).toBeNull();
     expect(result.error).toContain(error);
+  });
+
+  it('names the prices before the fields under More options, in the order the form shows them', () => {
+    const result = rateFromForm({ ...WEEKDAY_FORM, firstMinutes: '', blockPrice: '' });
+
+    expect(result.error).toContain('price after the first period');
+  });
+});
+
+describe('hasMoreRateOptions', () => {
+  it.each([
+    { rule: 'the empty form', form: EMPTY_RATE_FORM, more: false },
+    { rule: 'prices only, with the prefilled hour', form: { ...EMPTY_RATE_FORM, firstPrice: '3', blockPrice: '2' }, more: false },
+    { rule: 'free minutes left blank', form: { ...EMPTY_RATE_FORM, graceMinutes: ' ' }, more: false },
+    { rule: 'a first period of 30 min', form: { ...EMPTY_RATE_FORM, firstMinutes: '30' }, more: true },
+    { rule: 'blocks of 30 min', form: { ...EMPTY_RATE_FORM, blockMinutes: '30' }, more: true },
+    { rule: 'a first period cleared', form: { ...EMPTY_RATE_FORM, firstMinutes: ' ' }, more: true },
+    { rule: 'a block cleared', form: { ...EMPTY_RATE_FORM, blockMinutes: '' }, more: true },
+    { rule: '15 free minutes', form: { ...EMPTY_RATE_FORM, graceMinutes: '15' }, more: true },
+    { rule: 'a daily max', form: { ...EMPTY_RATE_FORM, dailyCap: '20' }, more: true },
+    { rule: 'a flat rate with free minutes', form: { ...EMPTY_RATE_FORM, type: 'flat', graceMinutes: '10' }, more: true },
+    {
+      rule: 'a flat rate, ignoring the hidden hourly fields',
+      form: { ...EMPTY_RATE_FORM, type: 'flat', firstMinutes: '30', dailyCap: '20' },
+      more: false,
+    },
+  ])('is $more for $rule', ({ form, more }) => {
+    expect(hasMoreRateOptions(form)).toBe(more);
   });
 });
 

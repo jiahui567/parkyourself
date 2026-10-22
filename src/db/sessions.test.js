@@ -325,6 +325,48 @@ describe('sessions.setTimer', () => {
   });
 });
 
+describe('sessions.setWayBack', () => {
+  it('saves how the car park was left and the first shop, each on its own', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, started_at: 1000 });
+
+    await sessions.setWayBack(db, id, { access_type: 'escalator' });
+    await sessions.setWayBack(db, id, { landmark: ' Starbucks ' });
+
+    expect(await sessions.get(db, id)).toMatchObject({ access_type: 'escalator', landmark: 'Starbucks' });
+  });
+
+  it('clears a field set to null or empty text, and leaves the other alone', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, access_type: 'lift', landmark: 'Starbucks' });
+
+    await sessions.setWayBack(db, id, { access_type: null });
+    expect(await sessions.get(db, id)).toMatchObject({ access_type: null, landmark: 'Starbucks' });
+    await sessions.setWayBack(db, id, { landmark: '   ' });
+    expect((await sessions.get(db, id)).landmark).toBeNull();
+  });
+
+  it('moves updated_at on', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi });
+    await db.runAsync('UPDATE parking_session SET updated_at = 1 WHERE id = ?', [id]);
+
+    await sessions.setWayBack(db, id, { access_type: 'stairs' });
+
+    expect((await sessions.get(db, id)).updated_at).toBeGreaterThan(1);
+  });
+
+  it('rejects an unknown access type', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi });
+
+    await expect(sessions.setWayBack(db, id, { access_type: 'ladder' })).rejects.toThrow('Unknown access type');
+  });
+
+  it('refuses a session that has ended', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, started_at: 1000 });
+    await sessions.end(db, id, { ended_at: 2000 });
+
+    await expect(sessions.setWayBack(db, id, { landmark: 'Starbucks' })).rejects.toThrow('already ended');
+  });
+});
+
 describe('sessions.extend', () => {
   const MINUTE = 60 * 1000;
 

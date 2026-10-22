@@ -150,7 +150,7 @@ export default function FoundMyCar() {
             label="Amount paid (RM)"
             value={paidText}
             onChangeText={setTypedPaid}
-            placeholder="0.00"
+            placeholder="e.g. 5.00"
             keyboardType="decimal-pad"
             editable={!saving}
           />

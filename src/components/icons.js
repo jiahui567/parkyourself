@@ -205,3 +205,32 @@ export function XIcon(props) {
     </Icon>
   );
 }
+
+export function ChevronDownIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+// Lucide's image, for choosing a photo from the gallery.
+export function ImageIcon(props) {
+  return (
+    <Icon {...props}>
+      <Rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+      <Circle cx="9" cy="9" r="2" />
+      <Path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </Icon>
+  );
+}
+
+// Lucide's sticky-note, for the free-text note.
+export function NoteIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z" />
+      <Path d="M15 3v6h6" />
+    </Icon>
+  );
+}

@@ -3,13 +3,14 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { radius } from './theme';
 import { useAppTheme, useThemedStyles } from './ThemeProvider';
 
-// A labelled text input. Other props go to TextInput.
+// A labelled text input. Other props go to TextInput. Without a label (a
+// field under a row that already names it), pass accessibilityLabel.
 export function Field({ label, ...inputProps }) {
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      {label != null && <Text style={styles.label}>{label}</Text>}
       <TextInput
         style={[styles.input, inputProps.multiline && styles.multiline]}
         placeholderTextColor={colours.muted}
