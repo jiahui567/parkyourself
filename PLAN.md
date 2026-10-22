@@ -1,6 +1,6 @@
 # Park Yourself: build plan
 
-Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. Working name in earlier drafts: Parking Saver.
+Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. M2, M3 (notifications), M6, the M8 Settings screen and the M1 pillar photos are built and not yet checked on the phone. M7 (GPS) is on hold. Working name in earlier drafts: Parking Saver.
 
 An Android app (iPhone later) that remembers where you parked: a photo of the pillar sign, the level, bay number and zone colour read from that photo, the first shop you saw after leaving the lift or escalator, and a note. It remembers each car park's rates (weekday, weekend, and an optional fixed public holiday amount), calculates the fee, reminds you before paid parking runs out, lets you share your spot with someone, and shows your monthly parking spend. It supports several cars. All data stays on the phone.
 
@@ -24,22 +24,22 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Look and theme | Decided 2026-10-22. Clean, minimal look in the style of Apple Health and the Tesla app: charcoal and white, emerald only for the main action and positive states such as Parked. Dark mode by default; Light can be picked in Settings and is saved on the phone. Bottom tab bar: Home, History, Spending, Settings. Colours, type and components are in `.claude/skills/add-screen/SKILL.md` |
 | Data | Version 1: stored only on the phone (SQLite). No account, no server. Version 2 adds optional cloud sync and sharing (see "Version 2: Park Yourself Cloud") |
 | Database IDs and deletes | Prepared for version 2 from day one: every row has a UUID text id made on the phone, an `updated_at` time, and is soft-deleted (`deleted_at`) instead of removed, so sync can be added later without rewriting the data layer |
-| GPS | Optional, off by default. One reading when you park, only if you switch it on for that session. No continuous or background tracking |
+| GPS | Optional, off by default. One reading when you park, only if you switch it on for that session. No continuous or background tracking. On hold since 2026-10-22: the design is being rethought, so M7 waits |
 | Floor detection (barometer) | Dropped. Not accurate enough to trust |
-| Pillar photo | Core feature. On-device OCR reads the level and bay number from the photo |
+| Pillar photo | Core feature. On-device OCR reads the level and bay number from the photo. Decided 2026-10-22: a session can have several photos. The first is the pillar photo; the others help you remember the place. OCR reads the first photo, and reads the next only if the first gives no level or bay |
 | Pillar zone colour | Many malls colour their pillars by zone. The app suggests the colour from the photo, you confirm it, and it is saved as data (name and hex) so it shows as a big swatch, in the notification and in the share message |
 | Route note | Core feature. Record whether you used the lift, escalator or stairs, and the first shop you saw when you came out |
 | Free-text note | Always available |
 | Photos | Stay on the phone only, in version 2 too; never uploaded, to avoid cloud storage cost. Kept until you delete them. Delete button per photo and per session |
 | Vehicles | Cars only, no motorbike type and no plate number. You can add more than one car. Each session belongs to one car. One active session per car |
-| Saved places | Type a place name such as "Pavilion Bukit Jalil" the first time. The rate you enter is saved to that place. Next time you pick the place and the rate fills in |
-| Rates | Saved per place for weekday and weekend. A "same rate every day" shortcut saves both at once |
-| Public holidays | Use the weekend rate by default. Optionally, a place can have a fixed public holiday amount (for example RM 8.00 per entry), which is used instead |
+| Saved places | Type a place name such as "Pavilion Bukit Jalil" the first time. The rate you enter is saved to that place. Next time you pick the place and the rate fills in. A deleted place keeps its name on past sessions (History, Find, Spending); the place picker and the Places list skip it |
+| Rates | Saved per place for weekday and weekend. A "same rate every day" shortcut saves both at once. A rate is optional when parking: a rate form left empty saves no rate and no fee is calculated; a half-filled form is an error |
+| Public holidays | Use the weekend rate by default. Optionally, a place can have a fixed public holiday amount (for example RM 8.00 per entry), which is used instead. Holiday dates are typed as `YYYY-MM-DD` (no date picker library), with a "Today" shortcut and an optional name |
 | Stays over midnight | Rare, and every car park has its own rules, so the app does not model them. It shows a clearly labelled estimate (each day charged at that day's rate and added) and you confirm the real amount paid from your receipt when you end the session. Per-car-park overnight rules are a later idea |
-| Fee | Calculated live while parked. When you end the session you can type the amount you actually paid if it differs (validation discount, lost ticket) |
+| Fee | Calculated live while parked. When you end the session you can type the amount you actually paid if it differs (validation discount, lost ticket). The amount paid is stored only when it differs from the calculated fee; with no calculated fee (no place or no rate), a typed amount is stored and an empty field stores nothing |
 | Sharing | Share your spot as a message (text, pillar photo, map link if GPS saved) through WhatsApp or any app, or show a QR code. Only when you tap Share; the app never uploads anything by itself |
 | Monthly spending | Spending screen with monthly totals, breakdown by place and by vehicle, and a 12-month chart |
-| Notifications | Ongoing notification per parked vehicle with **Navigate** and **Extend timer** buttons. Reminder 10 minutes before the timer ends and at the end. Extend adds 30 minutes. Both defaults can be changed in Settings |
+| Notifications | Ongoing notification per parked vehicle with **Navigate** and **Extend timer** buttons. Reminder 10 minutes before the timer ends and at the end. Extend adds 30 minutes to the later of the timer's end and now; with no timer yet it starts one from now. Settings changes the Extend amount (15, 30 or 60 min) and the reminder lead time (5, 10, 15 or 30 min). Decided 2026-10-22: built with `expo-notifications`, not Notifee. It cannot show a ticking clock, so the notification shows the start time ("since 2:15 PM") and the timer end but no fee; the live fee stays in the app. **Navigate** and **Extend timer** both open the app (Extend extends the timer as it opens Find), so no background task is needed |
 | Laptop DB access | Must be able to inspect the SQLite tables from a laptop (see "Checking the database from your laptop") |
 
 ## User flow
@@ -51,20 +51,21 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 1. Open the app and tap the round **Park** button on Home. The default vehicle shows first; with several vehicles, tap another one's chip at the top to switch.
 2. Pick the place: recent places are listed first, or search ("bukit" finds Pavilion Bukit Jalil), or type a new name.
    - **Saved place with a rate for today's day type:** the rate fills in.
-   - **New place, or no rate yet for today's day type:** enter the rate. It is saved to the place automatically. Tick **Same rate every day** to save it for weekday and weekend at once.
-   - **You change a filled-in rate:** the app asks "Update the saved weekend rate for Pavilion Bukit Jalil?" with **Yes, update** or **Only this time**.
-   - **Today is a public holiday:** tap the **Public holiday** toggle. Today is added to your holiday list, and the place's fixed public holiday amount is used if you saved one, otherwise the weekend rate. You can type a fixed amount here too; it is saved to the place.
+   - **New place, or no rate yet for today's day type:** enter the rate. It is saved to the place automatically, without asking. Tick **Same rate every day** to save it for weekday and weekend at once. If you don't know the rate, leave the form empty: no rate is saved and no fee is calculated.
+   - **You change a filled-in rate:** the app asks "Update the saved weekend rate for Pavilion Bukit Jalil?" with **Yes, update**, **Only this time** or **Cancel** (back to the form, nothing saved). Either of the first two parks with the rate you typed. The same rule applies to the public holiday amount.
+   - **Today is a public holiday:** tap the **Public holiday** toggle. Today (the local date you park) is added to your holiday list when you save, and the place's fixed public holiday amount is used if you saved one, otherwise the weekend rate. You can type a fixed amount here too; it is saved to the place. If today is already in your holiday list, the toggle is on and cannot be switched off here; remove the date in Settings > Public holidays. A saved amount fills in and is still used if you empty the field; remove it in Settings > Places to use the weekend rate.
    - **No place** is allowed for free or unknown parking; no fee is calculated.
+   - **A name typed but not picked:** Save asks first, `Park at "Pavilion" as a new place?` (or `Park at "Pavilion Bukit Jalil"?` when it matches a saved place), with **Use it**, **No place** or **Cancel**, so a fee is never lost by forgetting to tap the place. **Use it** parks there with the place's saved rates (none for a new place; Found my car then asks for the rate). The same question comes up when a place was picked, then **Change** was tapped and a different name typed but not picked; its buttons are then **Use it**, **Keep "Pavilion"** (the place picked before) and **Cancel**.
 3. Take a photo of the pillar or level sign. OCR suggests the level (for example `B2`) and bay (for example `C14`). Tap to confirm or edit.
 4. Confirm the zone colour: the app suggests one (for example **Blue**). Tap the pillar in the photo to pick its colour exactly, choose another colour chip, or choose **None**.
 5. Choose how you left the car park: Lift, Escalator, Stairs or Other.
 6. Type the first shop you saw (for example "Starbucks").
-7. Optional: add a note, set a timer, switch on "Save GPS".
-8. Tap **Save**. The ongoing notification appears: `My Myvi · Pavilion Bukit Jalil · B2 C14 Blue · 0h 05m · RM 3.00`.
+7. Optional: add a note, set a timer (30 min, 1, 2, 3 or 4 hours from when you save), switch on "Save GPS".
+8. Tap **Save**. The ongoing notification appears: `My Myvi · Pavilion Bukit Jalil · B2 C14 Blue · since 2:15 PM`.
 
 **While away**
-- The notification shows the elapsed time and the fee so far.
-- **Extend timer** adds 30 minutes (or your default) and reschedules the reminders.
+- The notification shows when you parked and when the timer ends. The elapsed time and the fee so far are in the app, which stays current.
+- **Extend timer** (on Find, and on the notification, where it opens Find) adds 30 minutes (or your default) to the later of the timer's end and now, and reschedules the reminders. With no timer yet, it starts one that ends 30 minutes from now.
 - A reminder fires 10 minutes (or your default) before the timer ends, and again when it ends.
 
 **Returning**
@@ -72,8 +73,8 @@ Package names and versions below were written from memory on 2026-10-20. Check t
   `Find Starbucks → take the escalator beside it → B2 → blue zone, pillar C14`
 - **Share** sends the spot to someone or shows a QR code (see "Share your spot").
 - If GPS was saved for this session, **Open in Google Maps** gives walking directions to the car park.
-- Tap **Found my car**. A summary shows the duration and the calculated fee, with an **Amount paid** field prefilled with that fee. Change it if you paid a different amount, then confirm. The session moves to history.
-- If the stay went past midnight, the fee is labelled **Estimate** on the Find screen and in the notification, and the summary highlights the Amount paid field with "Overnight: check your receipt".
+- Tap **Found my car**. A summary screen shows the duration and the calculated fee, with an **Amount paid** field prefilled with that fee. Its end time is fixed when the summary opens, so the fee shown is the fee saved. Change the amount if you paid a different amount, then confirm. The session moves to history.
+- If the stay went past midnight, the fee is labelled **Estimate** on the Find screen, and the summary highlights the Amount paid field with "Overnight: check your receipt".
 
 ## Screens
 
@@ -82,12 +83,15 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Tab bar | Home, History, Spending and Settings, at the bottom of every main screen. Park, Find, Vehicles and the other detail screens open above it |
 | Home | One vehicle at a time: a drawing of a car at the top (glowing emerald when parked), the vehicle's name, and a **Parked** or **Not parked** status. When parked, a card with the level and bay on the zone colour, the start time, the way back and (from M2) the fee so far. A round **Park** button at the bottom centre, which becomes **Find** when that vehicle is parked. With several vehicles, chips at the top switch between them and a green dot marks each parked one |
 | Park | Vehicle, place picker with rate, public holiday toggle, camera, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), access type, first shop, note, timer, GPS switch |
-| Find | Photo (tap to zoom), level and bay on the zone colour swatch, reverse route, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
-| History | Past sessions with date, vehicle, place, level/bay, duration, amount paid. Filter by vehicle, place and month. Tap to view details and photo. Delete photo or session |
-| Spending | Monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart. Until M6, the tab shows a "Coming soon" preview |
+| Find | Photos (tap to zoom, delete one) and Add photo while parked, level and bay on the zone colour swatch, reverse route, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
+| Found my car | Summary opened from Find (`/session/end/<id>`): the stay's times, duration and fee (with the Estimate label), a form for each missing rate (optional), Amount paid, Save. Back to Home afterwards |
+| History | Past sessions with date, vehicle, place, level/bay, duration, amount paid. Tap to view details and photo. Delete photo or session. Filters by vehicle, place and month are not built yet (2026-10-22); Spending opens one place's or car's sessions for a month instead |
+| Spending | Month switcher, monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart (tap a bar to pick that month). Tap a place or vehicle to open that month's sessions |
+| Sessions | One month's sessions for one place (or "No place") or one vehicle, opened from Spending as `/sessions?month=YYYY-MM` with `placeId=<id>` (`none` for no place) or `vehicleId=<id>`. Opens above the tab bar |
 | Places | Saved places with visit count. Tap to edit the weekday rate, weekend rate and public holiday amount, rename or delete |
+| Public holidays | Your holiday dates, by date. Add a date typed as `YYYY-MM-DD` (with a "Today" shortcut) and an optional name; delete a date |
 | Vehicles | Add, edit, set default, archive (archived vehicles keep their history) |
-| Settings | Appearance (Dark or Light), link to Vehicles, reminder lead time, Extend amount, GPS default, public holiday dates, export database. Settings not built yet are listed as "Soon"; development builds also link to Database check |
+| Settings | Appearance (Dark or Light), Cars, Places, Public holidays, Extend timer by (15, 30 or 60 min, default 30), Remind me before the timer ends (5, 10, 15 or 30 min, default 10) with an Allow notifications button when they are off, Export database. "GPS location" is listed under Coming soon. Development builds also link to Database check |
 
 ## Saved places and rates
 
@@ -101,10 +105,12 @@ Package names and versions below were written from memory on 2026-10-20. Check t
   | Public holiday | Optional fixed amount per entry | Weekend rate is used |
 
 - **Day type:** Monday to Friday is a weekday, Saturday and Sunday are the weekend, and any date in your public holiday list is a public holiday (even on a weekend).
-- **Public holiday list:** dates you add in Settings, or by tapping the Public holiday toggle when parking. Stored on the phone; no internet calendar.
-- **Auto-save:** a rate entered for a combination that has none is saved without asking. Changing a saved rate asks first (Yes, update / Only this time), because a one-off promotion should not overwrite the normal rate.
-- **Rates change over time:** each session keeps a copy of the rates it used, so updating a place's rate later never changes past fees or monthly totals.
-- **Missing rate later in a stay:** if a stay runs into a day type with no saved rate (parked Friday night, only a weekday rate saved, collected Saturday), the Find screen shows "Estimate uses the weekday rate" and asks for the weekend rate when you end the session.
+- **Public holiday list:** dates you add in Settings (typed as `YYYY-MM-DD`), or by tapping the Public holiday toggle when parking. Stored on the phone; no internet calendar.
+- **Optional rate:** a rate form left empty when parking saves no rate, and the fee is unknown. A form with only some prices typed is an error, shown under the form.
+- **Auto-save:** a rate entered for a combination that has none is saved without asking. Changing a saved rate asks first (Yes, update / Only this time / Cancel), because a one-off promotion should not overwrite the normal rate. The same rule applies to the public holiday amount.
+- **Rates change over time:** each session keeps a copy of the rates it used (`rate_snapshot`): all the place's saved rates when you park, with the rates typed on Park in place of the saved ones for those day types, also after "Only this time". Updating a place's rate later never changes past fees or monthly totals.
+- **Missing rate later in a stay:** if a stay runs into a day type with no saved rate (parked Friday night, only a weekday rate saved, collected Saturday), the Find screen shows "Estimate uses the weekday rate" and the Found my car summary asks for the weekend rate (optional; left empty, the fee stays the estimate). The summary asks only for the rates the stay actually needed: weekday for a weekday, weekend for a weekend day, and weekend for a public holiday with no holiday amount. A stay at a place with no rate at all (the rate was left empty on Park) gets the same optional forms, so the fee can still be worked out. Parking with no place never asks. The rate is used for this stay and saved to the place only if the place still exists and still has no rate for that day type; otherwise it is used for this stay only, and the summary says so.
+- **Deleted places:** deleting a place soft-deletes it and its rates. Past sessions keep showing its name (History, Find, Spending); the place picker and the Places list no longer show it.
 
 ## Fee calculator
 
@@ -115,7 +121,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Type | Hourly | `hourly` or `flat` (fixed price per entry) |
 | First period | 60 min at RM 3.00 | |
 | Each block after | 60 min at RM 2.00 | Charged per block or part of a block |
-| Grace period | 15 min | A stay this long or shorter is free |
+| Grace period | 15 min | A stay this long or shorter is free. Both types have one: a flat-price car park often lets a short stop leave free |
 | Daily cap | RM 20.00 | Optional maximum per day |
 | Flat price | RM 5.00 | Only for `flat` type |
 
@@ -199,15 +205,15 @@ Write these as Jest tests before the fee screens.
 ## Monthly spending
 
 - Spending screen: pick a month to see total spent, number of sessions, hours parked, totals by place (highest first) and by vehicle, and a bar chart of the last 12 months.
-- Uses the amount paid when you entered one, otherwise the calculated fee.
-- A session counts in the month it started.
-- Tap a place or vehicle to see that month's sessions.
+- Uses the amount paid when one is stored (it is stored only when it differs from the calculated fee), otherwise the calculated fee, otherwise 0: `COALESCE(paid_sen, fee_sen, 0)`.
+- A session counts in the month it started, in local phone time.
+- Tap a place or vehicle to open the Sessions screen with that month's sessions. A deleted place keeps its name here.
 
 Example query:
 
 ```sql
 SELECT strftime('%Y-%m', started_at / 1000, 'unixepoch', 'localtime') AS month,
-       SUM(COALESCE(paid_sen, fee_sen)) AS total_sen,
+       SUM(COALESCE(paid_sen, fee_sen, 0)) AS total_sen,
        COUNT(*)                         AS sessions
 FROM parking_session
 WHERE status = 'ended'
@@ -256,15 +262,16 @@ Basement lighting (yellow or dim lights) shifts colours, which is why you always
 
 ## Notifications
 
-- **Ongoing notification** for each parked vehicle: vehicle, place, level, bay, zone colour, elapsed time, fee so far, and the buttons **Navigate** and **Extend timer**.
+- **Ongoing notification** for each parked vehicle: vehicle, place, level, bay, zone colour, the start time and the timer end, and the buttons **Navigate** and **Extend timer**. No fee: the notification cannot update itself, so a fee there would go stale.
 - **Timer reminders:** one 10 minutes before the end (default), one at the end.
-- Permissions: Android 13+ needs the notification permission at first use.
+- Permissions: Android 13+ needs the notification permission at first use. The app asks when Find first opens for a parked car (right after Park), at most once per run of the app; Settings has an Allow notifications button when they are off.
 
 Android behaviour to test on your phone:
 - Since Android 14, users can swipe away most ongoing notifications. The Home screen must still show every active session (the green dot on each parked car's chip).
 - Android limits exact alarms for most apps, so a reminder can arrive a few minutes late. The lead-time reminder covers this.
 - Battery savers on some brands (Xiaomi, Oppo, Vivo, Samsung) can delay or block scheduled notifications. Settings could show a hint to exclude the app from battery optimisation.
-- Compare `expo-notifications` with Notifee at M3. Notifee has more Android control (ongoing style, chronometer, exact triggers). Check that it is still maintained before picking it.
+- 2026-10-22: `expo-notifications` was chosen over Notifee. The buttons open the app, so it needs no background task (`expo-task-manager`).
+- 2026-10-22 (replaced the same day by the line above): notifications were deferred until the app could be built and tested on a phone. The timer, Extend timer and the reminder times (`src/timer/timer.js`, `reminderTimes`) are built and tested without them. Notes from the SDK 58 docs for that decision: `expo-notifications` supports a sticky (ongoing) notification and action buttons, but no ticking chronometer, and a button that works without opening the app needs `expo-task-manager`.
 
 ## Data model (SQLite)
 
@@ -344,10 +351,10 @@ CREATE TABLE parking_session (
   access_type     TEXT CHECK (access_type IN ('lift','escalator','stairs','other')),
   landmark        TEXT,                      -- first shop seen
   note            TEXT,
-  rate_snapshot   TEXT,                      -- JSON copy of the weekday/weekend/holiday rates used
+  rate_snapshot   TEXT,                      -- JSON { weekday?, weekend?, holiday? }: fee fields of the rates used
   timer_ends_at   INTEGER,
   fee_sen         INTEGER,                   -- calculated fee, set when ended
-  paid_sen        INTEGER,                   -- amount actually paid, if different
+  paid_sen        INTEGER,                   -- amount paid, only if it differs from fee_sen (or no fee)
   lat             REAL,                      -- only if GPS saved
   lng             REAL,
   gps_accuracy_m  REAL,
@@ -381,7 +388,7 @@ CREATE TABLE setting (
 - Insert: set `id` (new UUID), `created_at` and `updated_at`.
 - Update: always set `updated_at`.
 - Delete: set `deleted_at` and `updated_at`; never `DELETE` a synced table. The unique indexes ignore deleted rows, so a deleted place name can be reused.
-- Read: every query filters `deleted_at IS NULL`.
+- Read: every query filters `deleted_at IS NULL`. One exception, for display only: a session's place name is read even when the place was deleted, so past sessions keep showing it.
 - Deleting a place also soft-deletes its `place_rate` rows.
 - Deleting a session soft-deletes it and really deletes its `photo` rows and image files.
 - Version 1 keeps the soft-deleted rows (they are tiny). Version 2 decides when to purge them.
@@ -419,10 +426,10 @@ Never edit a migration that has already run on your phone; add a new one.
 | Camera, photo resize, crop | `expo-camera`, `expo-image-manipulator`, `expo-file-system` |
 | OCR | Google ML Kit text recognition through a React Native wrapper (check which package fits Expo at M4) |
 | Zone colour | `react-native-image-colors` (uses Android's Palette to find the main and most vibrant colours; check at M4) |
-| Notifications | `expo-notifications` or Notifee (decide at M3) |
+| Notifications | `expo-notifications` (chosen 2026-10-22 over Notifee, see "Notifications") |
 | Share spot (text + photo) | `react-native-share`. React Native's built-in `Share` sends text reliably but not text and image together on Android |
 | QR code | `react-native-qrcode-svg` with `react-native-svg` |
-| Charts | `react-native-gifted-charts` with `react-native-svg` (check at M6) |
+| Charts | `react-native-gifted-charts` with `react-native-svg` and its peer dependency `expo-linear-gradient` (both added at M6, 2026-10-22; native code, so the phone needs a fresh `npx expo run:android`) |
 | Optional GPS | `expo-location`, foreground one-shot reading only |
 | Export database | `expo-sharing` |
 | Laptop DB view | Android Studio Database Inspector (see below) |
@@ -523,7 +530,7 @@ npx expo install expo-router expo-dev-client expo-sqlite expo-crypto expo-camera
 npx expo run:android        # builds the dev app and installs it on the USB-connected phone
 ```
 
-Add `react-native-share`, `react-native-qrcode-svg` and `react-native-gifted-charts` at the milestones that use them (M5, M6), after checking they still support the current Expo SDK. A native library added later needs a fresh `npx expo run:android`.
+Add `react-native-share` and `react-native-qrcode-svg` at the milestone that uses them (M5), after checking they still support the current Expo SDK. `react-native-gifted-charts` and `expo-linear-gradient` were added at M6 (2026-10-22). A native library added later needs a fresh `npx expo run:android`.
 
 ### M0 setup notes (2026-10-20)
 
@@ -563,13 +570,21 @@ Version 1 is finished when M0 to M8 are done.
 
 - [ ] **M0 Setup**: Expo project (JavaScript), dev build running on the phone, SQLite with the `user_version` migration list and `foreign_keys` on, `db/` data layer following the data layer rules (UUIDs, `updated_at`, soft delete), tables visible in Android Studio Database Inspector
 - [ ] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, bottom tab bar, Home (one vehicle at a time with the round Park button), Park screen with photo, level/bay typed by hand, access type, first shop, note; Find screen with reverse route; Found my car; History with delete
+  - 2026-10-22: pillar photos built (several per session, Add photo on Find while parked, full-screen view, delete one); to check on the phone after `npx expo run:android`. Renaming a car (Screens, Vehicles: "edit") is not built.
 - [ ] **M2 Places, rates and fees**: place picker with search and recent places, weekday and weekend rates saved per place, optional fixed public holiday amount, update-rate prompt, public holiday list and toggle, overnight stays shown as Estimate, amount paid, Jest tests for every row of the fee test table
+  - 2026-10-22: built with Jest tests; to check on the phone.
 - [ ] **M3 Notifications**: ongoing notification per parked vehicle with Navigate and Extend timer, timer reminders, permission prompts, tested with the screen locked
+  - 2026-10-22: built with `expo-notifications`: the ongoing notification (start time and timer end, no fee), Navigate and Extend timer (both open the app), reminders before and at the end, the permission asked when Find first opens after parking, the reminder lead time in Settings. To check on the phone after `npx expo run:android`, including with the screen locked.
 - [ ] **M4 OCR and zone colour**: pillar photo → level and bay chips, raw OCR text saved; colour suggestion, tap-to-pick, colour chips, Jest tests for the hex-to-name table
+  - 2026-10-22: dependencies approved: an ML Kit OCR wrapper and `react-native-image-colors`.
 - [ ] **M5 Share spot**: share message with photo through the share sheet, QR code screen
+  - 2026-10-22: dependencies approved: `react-native-share` and `react-native-qrcode-svg`.
 - [ ] **M6 Monthly spending**: Spending screen, breakdown by place and vehicle, 12-month chart, tap through to sessions
+  - 2026-10-22: built with Jest tests; to check on the phone after `npx expo run:android` (the chart has native code).
 - [ ] **M7 Optional GPS**: per-session switch, one-shot reading, Open in Google Maps, map link in the share message
+  - 2026-10-22: on hold while the GPS design is rethought.
 - [ ] **M8 Polish**: Settings, export database, app icon, signed APK for your phone. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
+  - 2026-10-22: Settings (Places, Public holidays, Extend timer by) and Export database are built; to check on the phone. App icon, signed APK and the dark system dialogs are still to do.
 
 ## Version 2: Park Yourself Cloud (future)
 

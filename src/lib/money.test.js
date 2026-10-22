@@ -1,4 +1,16 @@
-import { formatRM, parseRM } from './money';
+import { formatAmountInput, formatRM, parseRM } from './money';
+
+describe('formatAmountInput', () => {
+  it.each([
+    [300, '3.00'],
+    [5, '0.05'],
+    [123450, '1234.50'],
+    [null, ''],
+  ])('%p sen -> %p, which parseRM reads back', (sen, text) => {
+    expect(formatAmountInput(sen)).toBe(text);
+    if (sen != null) expect(parseRM(text)).toBe(sen);
+  });
+});
 
 describe('formatRM', () => {
   it.each([

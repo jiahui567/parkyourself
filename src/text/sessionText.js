@@ -1,8 +1,8 @@
 import { formatRM } from '../lib/money';
-import { formatDuration, formatTime } from '../lib/time';
+import { formatTime } from '../lib/time';
 
 // Text built from a parking_session row, shared by the Find screen, the
-// notification and the share message (formats from PLAN.md).
+// notifications (notificationText.js) and the share message (formats from PLAN.md).
 
 const ACCESS_WORDS = { lift: 'lift', escalator: 'escalator', stairs: 'stairs' };
 
@@ -42,13 +42,6 @@ export function routeBackText(session) {
 export function feeText(fee) {
   if (fee?.feeSen == null) return null;
   return fee.isEstimate ? `${formatRM(fee.feeSen)} (estimate)` : formatRM(fee.feeSen);
-}
-
-// 'My Myvi · Pavilion Bukit Jalil · B2 C14 Blue · 0h 05m · RM 3.00'
-export function notificationText({ vehicleName, placeName, session, elapsedMs, fee }) {
-  return [vehicleName, placeName, spotText(session), formatDuration(elapsedMs), feeText(fee)]
-    .filter(Boolean)
-    .join(' · ');
 }
 
 export function googleMapsUrl(lat, lng) {

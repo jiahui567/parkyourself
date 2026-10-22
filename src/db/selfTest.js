@@ -1,10 +1,13 @@
 import { File, Paths } from 'expo-file-system';
-import { deleteDatabaseAsync, openDatabaseAsync } from 'expo-sqlite';
+import { defaultDatabaseDirectory, deleteDatabaseAsync, openDatabaseAsync } from 'expo-sqlite';
 
+import { holidayRate } from '../fees';
 import { inTransaction } from './core';
+import { copyDatabaseTo, fileUri } from './export';
+import { holidays } from './holidays';
 import { migrate } from './migrate';
 import { MIGRATIONS } from './migrations';
-import { photos } from './photos';
+import { deletePhotoFiles, photos, savingPhotos } from './photos';
 import { placeRates, places } from './places';
 import { sessions } from './sessions';
 import { settings } from './settings';
@@ -42,7 +45,9 @@ export async function runSelfTest() {
     }
   };
 
-  await deleteDatabaseAsync(TEST_DB).catch(() => {});
+  // A test database is only left behind when a run was interrupted, and
+  // expo-sqlite throws when asked to delete one that is not there.
+  if (new File(fileUri(defaultDatabaseDirectory), TEST_DB).exists) await deleteDatabaseAsync(TEST_DB);
   const db = await openDatabaseAsync(TEST_DB);
   try {
     await migrate(db);
@@ -163,6 +168,103 @@ export async function runSelfTest() {
       assert(!new File(file.uri).exists, 'image file still on disk');
     });
 
+    await check('Keeping photos copies them out of the cache', async () => {
+      const prepared = new File(Paths.cache, 'selftest-prepared.jpg');
+      prepared.create({ overwrite: true });
+      prepared.writeSync('not really a photo');
+      const kept = await savingPhotos([prepared.uri], async (uris) => uris);
+      const copy = new File(kept[0]);
+      try {
+        assert(copy.exists && copy.size > 0, `kept copy at ${copy.uri} is missing or empty`);
+        assert(!copy.uri.startsWith(Paths.cache.uri), 'the kept copy is still in the cache');
+        assert(!new File(prepared.uri).exists, 'the prepared file was not deleted');
+      } finally {
+        deletePhotoFiles(kept);
+      }
+    });
+
+    await check('A failed save deletes the kept photo copies', async () => {
+      const prepared = new File(Paths.cache, 'selftest-prepared.jpg');
+      prepared.create({ overwrite: true });
+      prepared.writeSync('not really a photo');
+      let kept = [];
+      await expectRejected(
+        savingPhotos([prepared.uri], async (uris) => {
+          kept = uris;
+          throw new Error('save failed');
+        }),
+        /save failed/
+      );
+      try {
+        assert(kept.length === 1 && !new File(kept[0]).exists, 'the kept copy was left behind');
+        assert(new File(prepared.uri).exists, 'the prepared file should stay for another try');
+      } finally {
+        deletePhotoFiles([prepared.uri]);
+      }
+    });
+
+    // sessions.start and sessions.end write several tables in one exclusive
+    // transaction, which expo-sqlite runs on a second connection.
+    const hourly = {
+      type: 'hourly',
+      first_minutes: 60,
+      first_sen: 300,
+      block_minutes: 60,
+      block_sen: 200,
+      grace_minutes: 15,
+      daily_cap_sen: 2000,
+    };
+    const parkAtMall = (vehicle_id) =>
+      sessions.start(db, {
+        vehicle_id,
+        place_name: 'Self-test Mall',
+        rates: { weekday: hourly, holiday: holidayRate(800) },
+        save_rates: ['weekday', 'holiday'],
+        public_holiday: true,
+        started_at: new Date(2026, 9, 27, 10, 0).getTime(),
+      });
+
+    await check('Failed parking leaves no place, rate or holiday', async () => {
+      const result = await expectRejected(parkAtMall('no-such-vehicle'), /FOREIGN KEY/i);
+      assert((await places.findByName(db, 'Self-test Mall')) === null, 'place was kept');
+      assert((await holidays.dateSet(db)).size === 0, 'holiday was kept');
+      return result;
+    });
+
+    const parkedId = await vehicles.create(db, { name: 'Test Bezza' });
+    let sessionId;
+
+    await check('Parking saves place, rates, holiday and session together', async () => {
+      sessionId = await parkAtMall(parkedId);
+      const place = await places.findByName(db, 'Self-test Mall');
+      assert(place, 'place not created');
+      const rates = await places.getRates(db, place.id);
+      assert(rates.weekday && rates.holiday && !rates.weekend, 'rates not saved');
+      assert((await holidays.dateSet(db)).has('2026-10-27'), 'holiday not added');
+      const session = await sessions.get(db, sessionId);
+      assert(session.place_id === place.id, 'session not linked to the place');
+      assert(session.rate_snapshot?.includes('"holiday"'), `rate_snapshot is ${session.rate_snapshot}`);
+    });
+
+    await check('Ending a session stores the fee', async () => {
+      // A public holiday with an RM 8.00 amount saved, so 5 hours is RM 8.00.
+      const ended = await sessions.end(db, sessionId, { ended_at: new Date(2026, 9, 27, 15, 0).getTime() });
+      const row = await sessions.get(db, sessionId);
+      assert(ended.fee_sen === 800 && row.fee_sen === 800, `fee_sen is ${row.fee_sen}`);
+      assert(row.status === 'ended' && row.paid_sen === null, 'session not ended as expected');
+    });
+
+    // The plain databasePath to file:// URI step only shows on the phone. Its
+    // own file name, so a real export made today is neither replaced nor deleted.
+    await check('Export copies the database file', async () => {
+      const copy = await copyDatabaseTo(db, new File(Paths.cache, 'park-yourself-selftest-export.db'));
+      try {
+        assert(copy.exists && copy.size > 0, `copy at ${copy.uri} is missing or empty`);
+      } finally {
+        if (copy.exists) copy.delete();
+      }
+    });
+
     await check('Settings upsert', async () => {
       await settings.set(db, 'reminder_lead_minutes', '10');
       await settings.set(db, 'reminder_lead_minutes', '15');
@@ -173,7 +275,7 @@ export async function runSelfTest() {
     results.push({ name: 'Self-test setup', ok: false, detail: String(e?.message ?? e) });
   } finally {
     await db.closeAsync();
-    await deleteDatabaseAsync(TEST_DB).catch(() => {});
+    await check('Delete the test database', () => deleteDatabaseAsync(TEST_DB));
   }
   return results;
 }

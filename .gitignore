@@ -42,3 +42,6 @@ db-snapshot/
 # generated native folders
 /ios
 /android
+
+# Jest coverage report (npm test -- --coverage)
+coverage/

@@ -52,6 +52,10 @@ describe('palettes', () => {
     ['onPrimary', 'primary', 4.5],
     ['danger', 'background', 4.5],
     ['danger', 'card', 4.5],
+    ['warning', 'background', 4.5],
+    ['warning', 'card', 4.5],
+    ['warning', 'warningSoft', 4.5],
+    ['onBackdrop', 'backdrop', 7],
   ];
 
   describe.each(THEME_MODES)('%s mode', (mode) => {

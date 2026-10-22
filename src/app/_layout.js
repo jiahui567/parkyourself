@@ -5,6 +5,7 @@ import { useEffect, useMemo } from 'react';
 
 import { AppThemeProvider, navigationThemeFor, useAppTheme } from '../components/ThemeProvider';
 import { DatabaseProvider } from '../db';
+import { useNotificationResponses } from '../hooks/useNotificationResponses';
 
 export default function RootLayout() {
   return (
@@ -20,6 +21,7 @@ export default function RootLayout() {
 function ThemedStack() {
   const { mode, colours } = useAppTheme();
   const navigationTheme = useMemo(() => navigationThemeFor(mode, colours), [mode, colours]);
+  useNotificationResponses();
 
   // The root view shows behind screens while they animate; app.json fixes it to
   // white, so match it to the theme.

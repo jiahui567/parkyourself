@@ -1,5 +1,5 @@
-import { navigationThemeFor } from './ThemeProvider';
 import { palettes } from './theme';
+import { navigationThemeFor } from './ThemeProvider';
 
 describe('navigationThemeFor', () => {
   it.each(['dark', 'light'])('gives the %s headers and tab bar the app colours', (mode) => {

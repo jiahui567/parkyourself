@@ -1,35 +1,87 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { CameraCapture } from '../../components/CameraCapture';
 import { ErrorText } from '../../components/ErrorText';
+import { EstimatePill } from '../../components/EstimatePill';
+import { CameraIcon, TimerIcon } from '../../components/icons';
+import { PhotoStrip } from '../../components/PhotoStrip';
+import { PhotoViewer } from '../../components/PhotoViewer';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
-import { sessions, useDatabase } from '../../db';
+import {
+  deletePhotoFiles,
+  holidays,
+  photos,
+  preferences,
+  preparePhoto,
+  savingPhotos,
+  sessions,
+  useDatabase,
+} from '../../db';
+import { feeSoFar } from '../../fees';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
+import { useOnAppActive } from '../../hooks/useOnAppActive';
+import { indexAfterRemoval } from '../../lib/listIndex';
+import { formatRM } from '../../lib/money';
 import { formatDate, formatDuration, formatTime } from '../../lib/time';
+import { syncNotifications } from '../../notify/notifications';
+import { endedFeeText, extendTimerText, stayTimesText } from '../../text/findText';
+import { addPhotoLabel } from '../../text/photoText';
+import { missingRateText } from '../../text/rateText';
 import { routeBackText } from '../../text/sessionText';
+import { timerStatusText } from '../../text/timerText';
 import { swatchFor, textColourOn } from '../../zone/zoneColour';
 
 const goHome = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-// Find: where the car is and the way back. An active session ends with
-// "Found my car"; an ended one (opened from History) can be deleted.
+// Find: where the car is and the way back. A parked car shows its fee so far
+// and timer, and "Found my car" opens the summary that ends it; an ended
+// session (opened from History) shows what it cost and can be deleted.
 export default function SessionScreen() {
   const db = useDatabase();
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
-  const { id } = useLocalSearchParams();
-  const load = useCallback(() => sessions.getDetails(db, id), [db, id]);
-  const { data: session, error, loading } = useFocusedLoad(load);
+  // extendedAt: set when Extend timer on a notification opened this screen.
+  const { id, extendedAt } = useLocalSearchParams();
+  const load = useCallback(async () => {
+    const [session, holidayDates, prefs, sessionPhotos] = await Promise.all([
+      sessions.getDetails(db, id),
+      holidays.dateSet(db),
+      preferences.get(db),
+      photos.listForSession(db, id),
+    ]);
+    return { session, holidayDates, prefs, sessionPhotos };
+  }, [db, id]);
+  const { data, error, loading, reload } = useFocusedLoad(load);
+  // Find opens after Park and from a notification, and Extend changes the
+  // timer, so the notifications are brought up to date here, also when the
+  // app comes back to the front. Right after parking is when the permission
+  // is first asked for.
+  const syncLoad = useCallback(() => syncNotifications(db, { askPermission: true }), [db]);
+  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad);
+  useOnAppActive(resyncNotifications);
+  // When this Find was already open, Extend timer on a notification only
+  // changes extendedAt, so the new end is loaded and synced here.
+  useEffect(() => {
+    if (extendedAt) {
+      reload();
+      resyncNotifications();
+    }
+  }, [extendedAt, reload, resyncNotifications]);
   const now = useNow();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [viewing, setViewing] = useState(null);
+  const [photoError, setPhotoError] = useState(null);
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;
+  const { session, holidayDates, prefs, sessionPhotos } = data;
   if (!session) return <ErrorText error={new Error('This parking session no longer exists.')} />;
 
   const active = session.status === 'active';
@@ -38,6 +90,11 @@ export default function SessionScreen() {
   const spotTextStyle = { color: swatch ? textColourOn(swatch) : colours.text };
   const route = routeBackText(session);
   const durationMs = Math.max(0, (active ? now : session.ended_at) - session.started_at);
+  const fee = active ? feeSoFar(session, now, holidayDates) : null;
+  const missingRate = missingRateText(fee);
+  const timerText = active ? timerStatusText(session.timer_ends_at, now) : null;
+  const paid = active ? null : endedFeeText(session);
+  const photoUris = sessionPhotos.map((photo) => photo.file_uri);
 
   const run = async (action) => {
     setBusy(true);
@@ -50,6 +107,62 @@ export default function SessionScreen() {
       setBusy(false);
     }
   };
+
+  // Extend counts from the real clock, not the screen's, which ticks every 30 s.
+  // The button stays disabled until the new end time is on screen, so a quick
+  // second tap extends from it instead of saving the same time again.
+  const extend = async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await sessions.extend(db, session.id);
+      await reload();
+      await resyncNotifications();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // An extra photo, taken while parked, is kept at once. If keeping it fails
+  // there is nothing to try again with, so the prepared file goes too.
+  const addPhoto = async (picture) => {
+    setCameraOpen(false);
+    setBusy(true);
+    setPhotoError(null);
+    let prepared = null;
+    try {
+      prepared = await preparePhoto(picture);
+      await savingPhotos([prepared], ([file_uri]) => photos.add(db, { session_id: session.id, file_uri }));
+      await reload();
+    } catch (e) {
+      if (prepared) deletePhotoFiles([prepared]);
+      setPhotoError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmDeletePhoto = (index) =>
+    Alert.alert('Delete this photo?', 'It is deleted from the phone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setPhotoError(null);
+          try {
+            await photos.remove(db, sessionPhotos[index].id);
+            setViewing(indexAfterRemoval(index, sessionPhotos.length));
+            await reload();
+          } catch (e) {
+            setViewing(null);
+            setPhotoError(e);
+          }
+        },
+      },
+    ]);
 
   const confirmDelete = () =>
     Alert.alert('Delete this parking session?', 'Its photos are deleted too.', [
@@ -80,19 +193,74 @@ export default function SessionScreen() {
         </View>
       )}
 
+      {(photoUris.length > 0 || active) && (
+        <View style={styles.card}>
+          <Text style={styles.label}>Photos</Text>
+          <PhotoStrip uris={photoUris} onOpen={setViewing} />
+          <ErrorText error={photoError} />
+          {active && (
+            <View style={styles.sideActions}>
+              <Button
+                title={addPhotoLabel(photoUris.length)}
+                variant="tonal"
+                size="small"
+                icon={CameraIcon}
+                onPress={() => setCameraOpen(true)}
+                disabled={busy}
+              />
+            </View>
+          )}
+        </View>
+      )}
+      <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
+      <PhotoViewer uris={photoUris} index={viewing} onClose={() => setViewing(null)} onDelete={confirmDeletePhoto} />
+
       <View style={styles.card}>
         {session.place_name && <Text style={styles.label}>{session.place_name}</Text>}
         <Text style={styles.body}>
-          {formatDate(session.started_at)}, {formatTime(session.started_at)}
-          {!active && ` to ${formatTime(session.ended_at)}`}
+          {active
+            ? `${formatDate(session.started_at)}, ${formatTime(session.started_at)}`
+            : stayTimesText(session.started_at, session.ended_at)}
         </Text>
         <Text style={styles.muted}>{active ? 'Parked for ' : 'Parked '}{formatDuration(durationMs)}</Text>
+        {timerText && <Text style={styles.body}>{timerText}</Text>}
         {session.note && <Text style={styles.body}>{session.note}</Text>}
       </View>
 
-      <ErrorText error={actionError} />
+      {fee?.feeSen != null && (
+        <View style={styles.card}>
+          <View style={styles.feeHeader}>
+            <Text style={styles.label}>Fee so far</Text>
+            {fee.isEstimate && <EstimatePill />}
+          </View>
+          <Text style={styles.fee}>{formatRM(fee.feeSen)}</Text>
+          {missingRate && <Text style={styles.muted}>{missingRate}</Text>}
+        </View>
+      )}
+
+      {paid && (
+        <View style={styles.card}>
+          <Text style={styles.paid}>{paid.paid}</Text>
+          {paid.calculated && <Text style={styles.muted}>{paid.calculated}</Text>}
+        </View>
+      )}
+
+      {active && (
+        <View style={styles.sideActions}>
+          <Button
+            title={extendTimerText(session.timer_ends_at, prefs.extendMinutes)}
+            variant="tonal"
+            size="small"
+            icon={TimerIcon}
+            onPress={extend}
+            disabled={busy}
+          />
+        </View>
+      )}
+
+      <ErrorText error={actionError ?? notifyError} />
       {active ? (
-        <Button title="Found my car" onPress={() => run(() => sessions.end(db, session.id))} disabled={busy} />
+        <Button title="Found my car" onPress={() => router.push(`/session/end/${session.id}`)} disabled={busy} />
       ) : (
         <Button title="Delete" variant="danger" onPress={confirmDelete} disabled={busy} />
       )}
@@ -111,4 +279,9 @@ const createStyles = (c) =>
     route: { fontSize: 17, lineHeight: 24, color: c.text },
     body: { color: c.text },
     muted: { color: c.muted },
+    feeHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    fee: { fontSize: 24, fontWeight: '700', color: c.text },
+    paid: { fontSize: 17, fontWeight: '600', color: c.text },
+    // A row, so the small pill sits at the start instead of the centre.
+    sideActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   });

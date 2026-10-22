@@ -106,3 +106,93 @@ export function PlusIcon(props) {
     </Icon>
   );
 }
+
+export function TrashIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M3 6h18" />
+      <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <Path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <Path d="M10 11v6" />
+      <Path d="M14 11v6" />
+    </Icon>
+  );
+}
+
+export function ChevronLeftIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="m15 18-6-6 6-6" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M8 2v4" />
+      <Path d="M16 2v4" />
+      <Rect width="18" height="18" x="3" y="4" rx="2" />
+      <Path d="M3 10h18" />
+    </Icon>
+  );
+}
+
+export function TimerIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M10 2h4" />
+      <Path d="m12 14 3-3" />
+      <Circle cx="12" cy="14" r="8" />
+    </Icon>
+  );
+}
+
+export function MapPinIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+      <Circle cx="12" cy="10" r="3" />
+    </Icon>
+  );
+}
+
+// Lucide's share-2 (three linked dots), the share symbol Android users know.
+export function ShareIcon(props) {
+  return (
+    <Icon {...props}>
+      <Circle cx="18" cy="5" r="3" />
+      <Circle cx="6" cy="12" r="3" />
+      <Circle cx="18" cy="19" r="3" />
+      <Path d="m8.59 13.51 6.83 3.98" />
+      <Path d="m15.41 6.51-6.82 3.98" />
+    </Icon>
+  );
+}
+
+export function SearchIcon(props) {
+  return (
+    <Icon {...props}>
+      <Circle cx="11" cy="11" r="8" />
+      <Path d="m21 21-4.3-4.3" />
+    </Icon>
+  );
+}
+
+export function CameraIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <Circle cx="12" cy="13" r="3" />
+    </Icon>
+  );
+}
+
+export function XIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M18 6 6 18" />
+      <Path d="m6 6 12 12" />
+    </Icon>
+  );
+}

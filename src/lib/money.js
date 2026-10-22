@@ -12,6 +12,15 @@ export function formatRM(sen) {
   return `${sign}RM ${ringgit}.${cents}`;
 }
 
+// The text to prefill an amount field with, which has its own RM label:
+// formatAmountInput(123450) -> '1234.50', and '' for no amount. No thousands
+// separator, so the user can edit it digit by digit.
+export function formatAmountInput(sen) {
+  if (sen == null) return '';
+  if (!Number.isInteger(sen) || sen < 0) throw new Error(`An amount must be whole sen of 0 or more, got ${sen}`);
+  return `${Math.floor(sen / 100)}.${String(sen % 100).padStart(2, '0')}`;
+}
+
 // Reads a typed amount such as '3', '3.5', 'RM 3.00' or '1,234.50' into sen.
 // Returns null for anything else: empty, negative, letters, more than two
 // decimals. Works on the digits as text, so '0.10' is exactly 10 sen.

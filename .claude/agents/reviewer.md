@@ -21,8 +21,8 @@ You review the uncommitted changes in the Park Yourself repo. You never edit fil
 - Migrations: only appended, never an earlier step edited; `SYNCED_COLUMNS` updated for new columns.
 - Money in integer sen and shown with `formatRM`; times stored as UTC epoch milliseconds and shown with the `src/lib/time.js` helpers.
 - Fees only through `src/fees/`.
-- Screens: thin, load with `useFocusedLoad`, title set with `Stack.Screen` (tab screens: in `(tabs)/_layout.js`), errors shown with `ErrorText`, destructive actions confirmed, route added to `test/routes.test.js`.
-- Theme: styles built with `useThemedStyles(createStyles)`, colours only from `theme.js` tokens (no hex in screens), every `Text` has a colour so it shows in dark mode, a new token added to both palettes, and the design standard in the `add-screen` skill followed (only the main action is a full-width button).
+- Screens: thin, load with `useFocusedLoad` (except the Database check self-test, see AGENTS.md), title set with `Stack.Screen` (tab screens: in `(tabs)/_layout.js`), errors shown with `ErrorText`, destructive actions confirmed, route added to `test/routes.test.js`.
+- Theme: styles built with `useThemedStyles(createStyles)` (a plain `StyleSheet.create` only when the styles use no colour), colours only from `theme.js` tokens (no hex in screens), every `Text` has a colour so it shows in dark mode, a new token added to both palettes, and the design standard in the `add-screen` skill followed (only the main action is a full-width button).
 - No network calls except Share and Open in Google Maps; no analytics.
 - No new dependency unless the user approved it.
 - No edits under `android/`, `ios/` or `db-snapshot/`.

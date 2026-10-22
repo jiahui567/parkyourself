@@ -64,17 +64,24 @@ function pickRate(rates, dayType) {
   return null;
 }
 
-// Splits a stay at each local midnight. A stay that ends exactly at midnight
-// has no part on the next day.
-function splitByLocalDay(startMs, endMs) {
+// Splits a stay at each local midnight, with each part's day type. A stay
+// that ends exactly at midnight has no part on the next day.
+function splitByLocalDay(startMs, endMs, holidayDates) {
   const parts = [];
   let start = startMs;
   do {
     const end = Math.min(nextLocalMidnight(start), endMs);
-    parts.push({ start, end });
+    parts.push({ start, end, dayType: dayTypeOf(start, holidayDates) });
     start = end;
   } while (start < endMs);
   return parts;
+}
+
+// The day type of each calendar day a stay covers, in order, split the same
+// way calcStayFee prices it. Found my car uses it to ask for the rates the
+// stay needed (PLAN.md, "Missing rate later in a stay").
+export function stayDayTypes(startMs, endMs, holidayDates = new Set()) {
+  return splitByLocalDay(startMs, endMs, holidayDates).map((part) => part.dayType);
 }
 
 // Fee for a whole stay. rates is { weekday, weekend, holiday }, each a rate or
@@ -91,13 +98,12 @@ export function calcStayFee(startMs, endMs, rates, holidayDates = new Set()) {
   }
   if (endMs < startMs) throw new Error('A stay cannot end before it starts');
 
-  const parts = splitByLocalDay(startMs, endMs);
+  const parts = splitByLocalDay(startMs, endMs, holidayDates);
   const overnight = parts.length > 1;
   const missingRates = [];
   const picked = [];
   for (const part of parts) {
-    const dayType = dayTypeOf(part.start, holidayDates);
-    const choice = pickRate(rates, dayType);
+    const choice = pickRate(rates, part.dayType);
     if (!choice) {
       return {
         feeSen: null,
@@ -110,7 +116,7 @@ export function calcStayFee(startMs, endMs, rates, holidayDates = new Set()) {
     }
     assertValidRate(choice.rate);
     if (choice.missing && !missingRates.includes(choice.missing)) missingRates.push(choice.missing);
-    picked.push({ ...part, dayType, ...choice });
+    picked.push({ ...part, ...choice });
   }
 
   const graceMs = (picked[0].rate.grace_minutes ?? 0) * MINUTE;

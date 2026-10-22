@@ -1,6 +1,13 @@
-import { File } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { newId, now } from './core';
+
+// Kept photos live in the app's own storage, which the system never clears.
+const PHOTO_DIR = 'photos';
+// Wide enough for OCR to read a pillar sign, small enough to keep many
+// (PLAN.md, "OCR for the pillar sign").
+const MAX_WIDTH = 1280;
 
 // Deletes image files after their rows are gone. A leftover file is harmless;
 // a row pointing at a missing file is not, so rows always go first.
@@ -15,6 +22,51 @@ export function deletePhotoFiles(uris) {
   }
 }
 
+// Shrinks a camera picture ({ uri }) to at most MAX_WIDTH wide, saved as a
+// JPEG in the cache, and deletes the camera's full-size file, even when
+// shrinking fails. Returns the new file's uri. Nothing is kept until savingPhotos.
+export async function preparePhoto({ uri }) {
+  let context = null;
+  try {
+    // Decoded straight to the smaller size, so the full-size picture (tens
+    // of MB as a bitmap) is never held in memory.
+    context = ImageManipulator.manipulate(uri, { maxWidth: MAX_WIDTH });
+    const image = await context.renderAsync();
+    try {
+      const saved = await image.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
+      return saved.uri;
+    } finally {
+      image.release();
+    }
+  } finally {
+    context?.release();
+    deletePhotoFiles([uri]);
+  }
+}
+
+// Copies prepared photos into the app's storage and runs save(keptUris),
+// which writes their rows. If save fails, the copies are deleted and the
+// prepared files stay, so the user can tap Save again; once it succeeds, the
+// prepared files are deleted. Returns what save returns.
+export async function savingPhotos(uris, save) {
+  const kept = [];
+  try {
+    const dir = new Directory(Paths.document, PHOTO_DIR);
+    dir.create({ intermediates: true, idempotent: true });
+    for (const uri of uris) {
+      const copy = new File(dir, `${newId()}.jpg`);
+      await new File(uri).copy(copy);
+      kept.push(copy.uri);
+    }
+    const result = await save(kept);
+    deletePhotoFiles(uris);
+    return result;
+  } catch (e) {
+    deletePhotoFiles(kept);
+    throw e;
+  }
+}
+
 // Local-only table: no updated_at or soft delete, rows are deleted for real.
 export const photos = {
   async add(db, { session_id, file_uri, ocr_text = null }) {
@@ -26,10 +78,10 @@ export const photos = {
     return id;
   },
 
+  // Oldest first, so the first photo is the pillar sign OCR reads. Photos saved
+  // together share a created_at; rowid keeps the order they were added in.
   listForSession(db, sessionId) {
-    return db.getAllAsync('SELECT * FROM photo WHERE session_id = ? ORDER BY created_at', [
-      sessionId,
-    ]);
+    return db.getAllAsync('SELECT * FROM photo WHERE session_id = ? ORDER BY created_at, rowid', [sessionId]);
   },
 
   async remove(db, id) {

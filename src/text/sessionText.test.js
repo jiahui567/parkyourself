@@ -2,7 +2,6 @@ import {
   feeText,
   googleMapsUrl,
   levelBayText,
-  notificationText,
   routeBackText,
   shareMessage,
   spotText,
@@ -91,26 +90,6 @@ describe('feeText', () => {
   it('returns null without a fee', () => {
     expect(feeText(null)).toBeNull();
     expect(feeText({ feeSen: null })).toBeNull();
-  });
-});
-
-describe('notificationText', () => {
-  it('builds the notification line from PLAN.md', () => {
-    const text = notificationText({
-      vehicleName: 'My Myvi',
-      placeName: 'Pavilion Bukit Jalil',
-      session: FULL,
-      elapsedMs: 5 * 60 * 1000,
-      fee: { feeSen: 300, isEstimate: false },
-    });
-
-    expect(text).toBe('My Myvi · Pavilion Bukit Jalil · B2 C14 Blue · 0h 05m · RM 3.00');
-  });
-
-  it('skips the place and fee when there are none', () => {
-    const text = notificationText({ vehicleName: 'My Myvi', session: { level: 'B2' }, elapsedMs: 0 });
-
-    expect(text).toBe('My Myvi · B2 · 0h 00m');
   });
 });
 

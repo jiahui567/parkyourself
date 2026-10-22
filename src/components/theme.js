@@ -22,10 +22,16 @@ export const palettes = {
     accent: '#34D399', // emerald text, icons and selected states
     accentSoft: '#123528', // background behind accent text
     danger: '#F87171',
+    warning: '#FBBF24', // amber text: "Estimate", "Overnight: check your receipt"
+    warningSoft: '#3A2A0A', // background behind warning text
     // A 1 px ring instead of a shadow: shadows do not show on a dark background.
     shadow: '0 0 0 1px rgba(255, 255, 255, 0.06)',
     primaryGlow: '0 6px 24px rgba(16, 185, 129, 0.35)', // under the round Park button
     statusBar: 'light',
+    // Behind the camera and a full-screen photo, the same in both modes.
+    backdrop: '#000000',
+    onBackdrop: '#FFFFFF',
+    backdropSoft: 'rgba(0, 0, 0, 0.45)', // round buttons over the camera preview
     car: {
       bodyTop: '#454C55',
       bodyBottom: '#1C2026',
@@ -50,9 +56,14 @@ export const palettes = {
     accent: '#047857',
     accentSoft: '#D1FAE5',
     danger: '#C62828',
+    warning: '#A14A07',
+    warningSoft: '#FEF3C7',
     shadow: '0 2px 12px rgba(31, 35, 40, 0.08)',
     primaryGlow: '0 6px 20px rgba(16, 185, 129, 0.4)',
     statusBar: 'dark',
+    backdrop: '#000000',
+    onBackdrop: '#FFFFFF',
+    backdropSoft: 'rgba(0, 0, 0, 0.45)',
     car: {
       bodyTop: '#FFFFFF',
       bodyBottom: '#D5DAE0',

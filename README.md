@@ -11,9 +11,11 @@ All data stays on the phone. No account, no server. An optional cloud sync is pl
 | | |
 |---|---|
 | Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive), Settings, and a Spending preview, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build; the pillar photo (camera) is still to add |
-| Built ahead | **M2 fee logic** (`src/fees/`) with money and date formatters (`src/lib/`); **M4 logic**: zone colour names (`src/zone/`) and the OCR text parser (`src/ocr/`); text for the way back, the notification and the share message (`src/text/`). All covered by Jest tests. Their screens are not built yet |
-| Next | Run the M1 screens on the phone and fix what shows up; add the pillar photo to Park |
+| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, lift/escalator/stairs, first shop, note), Find (way back, Found my car), History, Cars (default, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, delete one, Add photo while parked |
+| Built, not yet on the phone | **M2 Places, rates and fees** (place picker, weekday/weekend rates, public holiday amount and list, live fee, overnight Estimate, Amount paid), **M3 Notifications** (timer on Park, Extend timer on Find; an ongoing notification per parked car with the start time and Navigate and Extend timer buttons, which open the app; reminders before and at the timer's end; the reminder lead time in Settings), **M6 Monthly spending** (Spending tab with the 12-month chart, tap through to a month's sessions) and the **M8 Settings** screen (Places, Public holidays, Extend timer by, Export database). Needs a fresh `npx expo run:android`: the chart has native code, and the camera and notification permissions are set in `app.json` |
+| Built ahead | **M4 logic**: zone colour names (`src/zone/`) and the OCR text parser (`src/ocr/`); text for the share message (`src/text/`). Covered by Jest tests. Their screens are not built yet |
+| On hold | **M7 GPS**, while its design is rethought |
+| Next | Rebuild with `npx expo run:android`, run the new screens, photos and notifications on the phone and fix what shows up; then M4 (OCR and colour from the photo) and M5 (share) |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -44,13 +46,14 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Location (optional) | `expo-location` |
 | Sharing and export | `expo-sharing` |
 | Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
+| Charts | `react-native-gifted-charts` with `expo-linear-gradient` (its gradient peer dependency), for the Spending tab's 12-month bar chart. `expo-linear-gradient` has native code: after pulling it in, run `npx expo run:android` again |
 | Theme | Own dark and light colour sets in `src/components/theme.js`; the choice is saved in the `setting` table. Design rules in the `add-screen` skill |
 | Build | Expo development build (`expo-dev-client`), built locally with Android Studio's SDK. Expo Go is not supported |
 | Lint | ESLint 9 with `eslint-config-expo` |
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
 
-Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5), `react-native-gifted-charts` (M6).
+Added at the milestone that needs them: an ML Kit OCR wrapper and `react-native-image-colors` (M4), `react-native-share` and `react-native-qrcode-svg` (M5).
 
 ## Project structure
 
@@ -63,31 +66,56 @@ park-yourself/
 │   │   │   ├── _layout.js   Tabs: Home, History, Spending, Settings
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
 │   │   │   ├── history.js   Finished parking, newest first
-│   │   │   ├── spending.js  Monthly spending (a "Coming soon" preview until M6)
-│   │   │   └── settings.js  Dark/Light, Cars, planned settings, Database check
-│   │   ├── park.js          Park: record level, bay, zone colour, way out, first shop, note
-│   │   ├── session/[id].js  Find: the spot, the way back, Found my car / Delete
+│   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
+│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Extend timer, Export, Database check
+│   │   ├── park.js          Park: place and rate, level, bay, zone colour, way out, first shop, note, timer
+│   │   ├── session/[id].js  Find: the spot, the way back, fee so far, Extend timer, Found my car / Delete
+│   │   ├── session/end/[id].js  Found my car summary: fee, missing rate, Amount paid
+│   │   ├── sessions.js      One month's sessions for a place or car (from Spending)
+│   │   ├── places/          Places list and a place's rates (edit, delete)
+│   │   ├── holidays.js      Public holiday dates
 │   │   ├── vehicles/        Cars list (default, archive) and Add a car
 │   │   └── debug.js         Database check (development builds)
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
-│   │                        SegmentedControl, Field, ErrorText, icons, CarLogo
-│   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time)
-│   ├── text/                Way back, notification and share message text
+│   │                        SegmentedControl, Field, ErrorText, icons, CarLogo, RateForm,
+│   │                        SwitchRow, List (ListSection, ListRow), PlacePicker, SessionCard,
+│   │                        EstimatePill, CameraCapture, PhotoStrip, PhotoViewer, BackdropButton
+│   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
+│   │                        useOnAppActive (app back in front), useNotificationResponses
+│   │                        (notification taps, in the root layout)
+│   ├── notify/              Notifications: plan.js (what to show, tested), notifications.js
+│   │                        (expo-notifications: channels, buttons, sync with the parked cars)
+│   ├── text/                Screen text: way back, notifications, share message, rates, timer,
+│   │                        photos, Park and Find questions and hints, Spending lines
 │   ├── zone/                Zone colour chips and hex-to-name rules
 │   ├── ocr/                 Level and bay suggestions from pillar sign text
 │   ├── fees/                Fee rules: pure functions, no database or React
 │   │   ├── calcFee.js       Fee per day and per stay (overnight estimate, borrowed rates)
-│   │   └── dayType.js       Weekday, weekend or public holiday
+│   │   ├── dayType.js       Weekday, weekend or public holiday
+│   │   ├── sessionFee.js    A session's fee from its rate snapshot
+│   │   ├── rateForm.js      Typed rate form to place_rate fields and back; which rates to save
+│   │   └── parkRates.js, endForm.js, placeRatesForm.js, feeSoFar.js  Rules behind Park,
+│   │                        Found my car, a place's rates and the fee so far
+│   ├── timer/               Timer options, Extend, reminder times
+│   ├── spending/            Monthly totals, by place and by car; Sessions screen filter
 │   ├── lib/                 Shared helpers
-│   │   ├── money.js         formatRM ("RM 3.00") and parseRM (typed text to sen)
-│   │   └── time.js          Local date key, next midnight, time/date/duration text
+│   │   ├── money.js         formatRM ("RM 3.00"), formatAmountInput ("3.00") and parseRM
+│   │   ├── time.js          Local date and month keys, time/date/month/duration text
+│   │   ├── placeName.js     Whether a typed place name is new
+│   │   └── listIndex.js     Which photo to show after one is deleted
 │   └── db/                  Data layer: the only code that runs SQL
 │       ├── index.js         What screens import
 │       ├── core.js          Insert, update, soft delete, transactions, UUIDs
 │       ├── migrations.js    Schema steps, applied in order
 │       ├── migrate.js       Applies migrations on app start
 │       ├── selfTest.js      Checks the data layer rules (development builds)
-│       └── vehicles.js, places.js, sessions.js, photos.js, holidays.js, settings.js
+│       ├── sessions.js      Park (place, rates, holiday, snapshot, photos in one transaction),
+│       │                    Extend timer, end with fee
+│       ├── photos.js        Photo rows, and the image files: shrink, keep, delete
+│       ├── places.js, holidays.js  Saved places and rates, public holiday dates
+│       ├── preferences.js   Extend and reminder minutes (setting table)
+│       ├── export.js        Export database: WAL checkpoint, copy, share sheet
+│       └── vehicles.js, settings.js
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
 ├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
@@ -151,8 +179,8 @@ The first build takes a while. After that:
 |---|---|
 | `npm start` | Starts the Expo dev server |
 | `npm run android` | Builds and installs the development build on the connected phone |
-| `npm run lint` | Runs ESLint on `src/` and `test/`. Add `-- --no-cache` if a result looks stale |
-| `npm test` | Runs the Jest tests (fee rules, formatters). No phone needed |
+| `npm run lint` | Runs ESLint on `src/` and `test/`, including import order and the 120-character limit for code lines. Add `-- --no-cache` if a result looks stale |
+| `npm test` | Runs the Jest tests: rules, display text, the data layer on Node's SQLite, and a load check of every screen. No phone needed. `npm test -- --coverage` also writes a coverage report to `coverage/`, which git ignores |
 | `npm run db:pull` | Copies the database (and its `-wal` file) from the phone into `db-snapshot/` |
 
 `npm run ios` and `npm run web` come from the Expo template and are not used yet.
@@ -175,19 +203,20 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 - Screens never run SQL. They call functions exported from `src/db/index.js`.
 - Every row gets a UUID `id`, `created_at` and `updated_at`. Times are UTC epoch milliseconds.
-- Synced tables are never `DELETE`d: deleting sets `deleted_at`, and every read skips deleted rows.
+- Synced tables are never `DELETE`d: deleting sets `deleted_at`, and every read skips deleted rows. The one exception is display only: a past session keeps showing its place's name after the place is deleted.
 - Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`.
 
 **Changing the schema:** add a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. The app refuses to open a database whose schema is newer than it knows, so install the newer app rather than downgrading.
 
 **Self-test:** in development builds, the Database check screen runs `src/db/selfTest.js` against a throwaway database and shows PASS or FAIL for each rule, including what only the phone's driver can show (WAL mode, the second connection used by transactions).
 
-**Tests in CI:** `npm test` also runs the migrations and the car and session functions against Node's built-in SQLite through `test/testDatabase.js`, so a broken migration or query fails on GitHub before it reaches the phone.
+**Tests in CI:** `npm test` also runs the migrations and the data functions (cars, places, holidays, sessions, preferences) against Node's built-in SQLite through `test/testDatabase.js`, so a broken migration or query fails on GitHub before it reaches the phone.
 
 ## Checking the data from your laptop
 
 - **Live:** Android Studio → App Inspection → Database Inspector, with the phone on USB. Browse tables and run SQL.
 - **Copy:** `npm run db:pull`, then open `db-snapshot/park-yourself.db` in DBeaver or DB Browser for SQLite. Do not use `adb exec-out ... > file` in Windows PowerShell; it corrupts the file.
+- **Export:** Settings → Export database shares a copy (through Google Drive, email or any app) that you open on the laptop. It also works on a release build.
 - Both need a development (debuggable) build. `db-snapshot/` is in `.gitignore` because it holds your parking data.
 
 ## Native code
@@ -204,6 +233,7 @@ Rules the data layer enforces (see `src/db/core.js`):
 | Gradle or Java version error | Point `JAVA_HOME` at Android Studio's `jbr` folder (JDK 21) |
 | `No Android connected device found` | Run `adb devices`, accept the USB debugging prompt on the phone, try another cable |
 | A native change or new library has no effect | Run `npx expo run:android` again |
+| `npm test` fails to load `node:sqlite` (the `src/db` suites) | Node is older than 22.13 or is 23.0 to 23.3, where `node:sqlite` needs a flag. Use Node 22 (`.nvmrc`), or add `node-options=--experimental-sqlite` to your user `~/.npmrc` |
 | "Compressed folder is invalid" when moving the project as a zip | Do not zip `node_modules/` or `android/`. Move the project with git (push, then clone or pull) |
 
 ## Working with Claude Code

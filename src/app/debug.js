@@ -1,19 +1,29 @@
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
+import { ErrorText } from '../components/ErrorText';
 import { radius } from '../components/theme';
 import { useThemedStyles } from '../components/ThemeProvider';
-import { DATABASE_NAME, useDatabase } from '../db';
-import { readDatabaseInfo } from '../db/debug';
-import { runSelfTest } from '../db/selfTest';
+import { DATABASE_NAME, readDatabaseInfo, runSelfTest, useDatabase } from '../db';
+import { useFocusedLoad } from '../hooks/useFocusedLoad';
 
-async function selfTestAndLog() {
-  const results = await runSelfTest();
-  const failed = results.filter((r) => !r.ok).length;
-  console.log(`[selftest] ${results.length - failed}/${results.length} passed`, JSON.stringify(results));
-  return results;
+// One run at a time, even across leaving and reopening this screen: a second
+// run would try to delete the test database the first one still has open.
+let inFlight = null;
+
+function selfTestAndLog() {
+  inFlight ??= runSelfTest()
+    .then((results) => {
+      const failed = results.filter((r) => !r.ok).length;
+      console.log(`[selftest] ${results.length - failed}/${results.length} passed`, JSON.stringify(results));
+      return results;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
 }
 
 // Database check (development builds): database facts and the data layer
@@ -21,27 +31,43 @@ async function selfTestAndLog() {
 export default function DatabaseCheck() {
   const db = useDatabase();
   const styles = useThemedStyles(createStyles);
-  const [info, setInfo] = useState(null);
+  const loadInfo = useCallback(() => readDatabaseInfo(db), [db]);
+  const { data: info, error: infoError } = useFocusedLoad(loadInfo);
   const [results, setResults] = useState(null);
+  const [testError, setTestError] = useState(null);
+  // The self-test starts by itself only in development builds.
+  const running = __DEV__ && !results && !testError;
 
+  // The self-test builds and deletes a throwaway database, so it runs once
+  // when the screen opens and again only when asked, not on every focus.
   useEffect(() => {
     let cancelled = false;
-    readDatabaseInfo(db).then((i) => !cancelled && setInfo(i));
-    if (__DEV__) selfTestAndLog().then((r) => !cancelled && setResults(r));
+    if (__DEV__) {
+      selfTestAndLog().then(
+        (r) => !cancelled && setResults(r),
+        (e) => !cancelled && setTestError(e)
+      );
+    }
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, []);
 
   const rerun = async () => {
     setResults(null);
-    setResults(await selfTestAndLog());
+    setTestError(null);
+    try {
+      setResults(await selfTestAndLog());
+    } catch (e) {
+      setTestError(e);
+    }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Stack.Screen options={{ title: 'Database check' }} />
       <Text style={styles.heading}>Database</Text>
+      <ErrorText error={infoError} />
       {info && (
         <View style={styles.card}>
           <Text style={styles.body}>File: {DATABASE_NAME}</Text>
@@ -59,7 +85,8 @@ export default function DatabaseCheck() {
 
       <Text style={styles.heading}>Data layer self-test</Text>
       <View style={styles.card}>
-        {!results && <Text style={styles.body}>Running…</Text>}
+        {running && <Text style={styles.body}>Running…</Text>}
+        <ErrorText error={testError} />
         {results?.map((r) => (
           <Text key={r.name} style={r.ok ? styles.pass : styles.fail}>
             {r.ok ? 'PASS' : 'FAIL'} {r.name}
@@ -67,7 +94,8 @@ export default function DatabaseCheck() {
           </Text>
         ))}
       </View>
-      <Button title="Run self-test again" onPress={rerun} />
+      {/* A second run while one is going would try to delete the open test database. */}
+      <Button title="Run self-test again" onPress={rerun} disabled={running} />
     </ScrollView>
   );
 }

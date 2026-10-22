@@ -8,11 +8,16 @@ import { ErrorText } from '../../components/ErrorText';
 import { FindIcon } from '../../components/icons';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
-import { sessions, useDatabase, vehicles } from '../../db';
+import { holidays, sessions, useDatabase, vehicles } from '../../db';
+import { feeSoFar } from '../../fees';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
+import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { formatDuration } from '../../lib/time';
+import { syncNotifications } from '../../notify/notifications';
+import { feeSoFarText } from '../../text/findText';
 import { levelBayText, routeBackText, zoneSinceText } from '../../text/sessionText';
+import { timerStatusText } from '../../text/timerText';
 import { swatchFor } from '../../zone/zoneColour';
 
 const PARK_BUTTON_SIZE = 96;
@@ -28,10 +33,20 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(null);
   const load = useCallback(async () => {
-    const [cars, active] = await Promise.all([vehicles.list(db), sessions.listActive(db)]);
-    return { cars, active };
+    const [cars, active, holidayDates] = await Promise.all([
+      vehicles.list(db),
+      sessions.listActive(db),
+      holidays.dateSet(db),
+    ]);
+    return { cars, active, holidayDates };
   }, [db]);
   const { data, error } = useFocusedLoad(load);
+  // Coming back to Home follows every change to a parked car (Found my car,
+  // Delete), so the notifications are brought up to date here too, and when
+  // the app comes back to the front (after allowing them in Android settings).
+  const syncLoad = useCallback(() => syncNotifications(db), [db]);
+  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad);
+  useOnAppActive(resyncNotifications);
   const now = useNow();
 
   if (error) {
@@ -100,10 +115,11 @@ export default function Home() {
         </View>
 
         {session ? (
-          <SpotCard session={session} styles={styles} />
+          <SpotCard session={session} now={now} holidayDates={data.holidayDates} styles={styles} />
         ) : (
           <Text style={styles.hint}>Tap Park when you leave the car. We&apos;ll keep the way back for you.</Text>
         )}
+        <ErrorText error={notifyError} />
       </View>
 
       <View style={styles.bottom}>
@@ -131,10 +147,13 @@ export default function Home() {
   );
 }
 
-// Where the car is: level and bay on the zone colour, then the way back.
-function SpotCard({ session, styles }) {
+// Where the car is: level and bay on the zone colour, the way back, then the
+// fee so far and the timer in muted text.
+function SpotCard({ session, now, holidayDates, styles }) {
   const swatch = swatchFor(session.zone_colour_name);
   const route = routeBackText(session);
+  const fee = feeSoFarText(feeSoFar(session, now, holidayDates));
+  const timer = timerStatusText(session.timer_ends_at, now);
   return (
     <Pressable
       accessibilityRole="button"
@@ -150,6 +169,12 @@ function SpotCard({ session, styles }) {
         <Text style={styles.route} numberOfLines={2}>
           {route}
         </Text>
+      )}
+      {(fee || timer) && (
+        <View style={styles.cardFooter}>
+          {fee && <Text style={styles.footerText}>{fee}</Text>}
+          {timer && <Text style={styles.footerText}>{timer}</Text>}
+        </View>
       )}
     </Pressable>
   );
@@ -173,7 +198,7 @@ const createStyles = (c) =>
     carChipText: { color: c.muted, fontWeight: '600' },
     carChipTextSelected: { color: c.accent, fontWeight: '600' },
     errorWrap: { paddingHorizontal: 16 },
-    hero: { alignItems: 'center', gap: 12, paddingTop: 12 },
+    hero: { alignItems: 'center', gap: space, paddingTop: 12 },
     nameBlock: { alignItems: 'center', gap: 2, alignSelf: 'stretch', paddingHorizontal: 16 },
     overlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     hairline: { width: 32, height: StyleSheet.hairlineWidth * 2, backgroundColor: c.border },
@@ -199,6 +224,15 @@ const createStyles = (c) =>
     spot: { fontSize: 24, fontWeight: '700', color: c.text },
     muted: { color: c.muted },
     route: { color: c.text, lineHeight: 20 },
+    // A hairline keeps the fee and timer apart from where the car is.
+    cardFooter: {
+      gap: 2,
+      marginTop: 4,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
+    footerText: { color: c.muted, fontSize: 13, lineHeight: 18 },
     bottom: { alignItems: 'center', paddingTop: 32 },
     // A faint ring around the button, like a glow.
     parkRing: {

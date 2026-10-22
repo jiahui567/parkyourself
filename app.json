@@ -31,6 +31,18 @@
         }
       ],
       "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#10B981"
+        }
+      ],
       "./plugins/withCmakeVersion"
     ]
   }

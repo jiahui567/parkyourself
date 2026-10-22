@@ -10,7 +10,7 @@ Status: design standard version 2, confirmed by the user on 2026-10-22 after tes
 ## Steps
 
 1. Read PLAN.md, section "Screens", for what the screen must show.
-2. Create the route file. The file name is the URL: `park.js` is `/park`, `session/[id].js` is `/session/123`; the `(tabs)` folder does not appear in the URL. A main section with its own tab goes in `src/app/(tabs)/` and is added to `src/app/(tabs)/_layout.js`; a detail screen (Park, Find, Cars, Add a car) goes outside `(tabs)` and opens above the tab bar. Default-export one function component named after the screen. Never put tests or helpers in `src/app/`.
+2. Create the route file. The file name is the URL: `park.js` is `/park`, `session/[id].js` is `/session/123`; the `(tabs)` folder does not appear in the URL. A main section with its own tab goes in `src/app/(tabs)/` and is added to `src/app/(tabs)/_layout.js`; a detail screen (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car) goes outside `(tabs)` and opens above the tab bar. Default-export one function component named after the screen. Never put tests or helpers in `src/app/`.
 3. Titles: a detail screen sets its title with `<Stack.Screen options={{ title: '...' }} />` inside the screen; a tab screen gets its title from `Tabs.Screen` in `(tabs)/_layout.js`.
 4. Styles come from the active theme, never from a hex:
    ```js
@@ -22,7 +22,7 @@ Status: design standard version 2, confirmed by the user on 2026-10-22 after tes
        title: { fontSize: 17, fontWeight: '600', color: c.text },
      });
    ```
-   For a colour passed as a prop (an icon's `color`, `placeholderTextColor`), use `const { colours } = useAppTheme();`. Both come from `src/components/ThemeProvider.js`.
+   For a colour passed as a prop (an icon's `color`, `placeholderTextColor`), use `const { colours } = useAppTheme();`. Both come from `src/components/ThemeProvider.js`. A file whose styles use no colour may use a plain module-level `const styles = StyleSheet.create(...)`.
 5. Load data with `useFocusedLoad` so it refreshes when the user comes back:
    ```js
    const load = useCallback(() => sessions.getDetails(db, id), [db, id]);
@@ -57,13 +57,18 @@ Status: design standard version 2, confirmed by the user on 2026-10-22 after tes
 | `accent` | `#34D399` | `#047857` | Emerald text and icons: selected tab and chip, "Default", "Parked", PASS |
 | `accentSoft` | `#123528` | `#D1FAE5` | Behind `accent`: selected chip, status pill, tonal button, "Coming soon" badge |
 | `danger` | `#F87171` | `#C62828` | Errors, archive and delete |
+| `warning` | `#FBBF24` | `#A14A07` | Amber text: the "Estimate" pill, "Overnight: check your receipt" |
+| `warningSoft` | `#3A2A0A` | `#FEF3C7` | Behind `warning`: the "Estimate" pill, the overnight highlight |
 | `shadow` | 1 px light ring | soft drop shadow | `boxShadow` on every card (shadows do not show on dark backgrounds, so dark mode uses a ring) |
 | `primaryGlow` | emerald glow | emerald glow | `boxShadow` under the round Park button only |
+| `backdrop` | `#000000` | `#000000` | Behind the camera and a full-screen photo (the same in both modes) |
+| `onBackdrop` | `#FFFFFF` | `#FFFFFF` | Text, icons and the shutter on `backdrop` |
+| `backdropSoft` | translucent black | translucent black | Round buttons over the camera preview (`BackdropButton`) |
 | `car.*` | | | The Home car drawing (`CarLogo`) only |
 
 Every `Text` gets a colour from the theme: a `Text` without one is black, which disappears in dark mode.
 
-**Spacing**: screen padding 16; gap between blocks 12 (`space`), 20 to 24 between sections; inside a card padding 16 (list rows 12 to 14 top and bottom) and gap 6 to 10.
+**Spacing**: screen padding 16; gap between blocks 12, written as the `space` token (a 12 inside a row, such as icon to text, stays a number), 20 to 24 between sections; inside a card padding 16 (list rows 12 to 14 top and bottom) and gap 6 to 10.
 
 **Shapes** (`radius` in `theme.js`): cards 16 (`radius.card`) with `boxShadow: c.shadow`; large buttons and inputs 12 (`radius.control`); chips, small buttons, status pills and icon buttons are pills (`radius.pill`); colour swatches are circles with a `border` outline. A list of settings or cars is one card with hairline dividers between rows; a list of records (History) is one card per record.
 
@@ -82,8 +87,13 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 - `ChipGroup`: one choice from a few options (up to about 12). Tapping the selected chip clears it.
 - `Field`: labelled text input on `surface`. Codes such as level and bay use `autoCapitalize="characters"`.
 - `ErrorText` for every error the user should see.
+- `RateForm`: edits one rate (Hourly or Flat) as typed strings; check it with `rateFromForm` and show the error with `ErrorText`, since the form shows none.
+- `SwitchRow`: a label, optional `muted` hint and a themed switch; the whole row toggles. It has no side padding, so wrap it in a padded View inside a card.
+- `EstimatePill`: the amber "Estimate" pill beside a fee that may differ from the receipt (overnight, or a borrowed rate). Never emerald.
+- `ListSection` and `ListRow` (`List.js`): the Settings card list. A row with `onPress` shows a chevron; one without is read-only with a `muted` label. Pass `first={false}` to every row after the first.
 - `icons.js`: line icons on a 24 grid, stroke 2, shapes from Lucide drawn with `react-native-svg`. Add new icons there; no icon library.
 - `CarLogo`: the Home car drawing; `active` turns its glow emerald.
+- `CameraCapture`: a full-screen camera in a `Modal` that asks for the permission and takes one photo; mount one per screen and pass the picture to `preparePhoto`. `PhotoStrip`: a row of 3:4 thumbnails, oldest (the pillar sign) first. `PhotoViewer`: full-screen photos, swiped, with an optional delete button. `BackdropButton`: the round icon button used over the camera and photos.
 - Delete, archive and other actions that lose data always ask first with `Alert.alert` (Cancel plus a `destructive` button).
 - Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`.
 - Planned features show as `muted` rows with the value "Soon", or a card with an `accentSoft` "Coming soon" badge.
@@ -97,4 +107,4 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 **Known gaps** (check on the phone):
 - `app.json` still has `"userInterfaceStyle": "light"`, so Android draws system dialogs (`Alert.alert`) and the launch screen light, even in dark mode. Changing it needs a rebuild.
 - With 3-button navigation, the system navigation bar icons may not follow the theme. `expo-navigation-bar` would fix it; ask before adding it.
-- Keyboard avoidance on long forms, and the tab bar at large font sizes, are untested.
+- Long forms (Park, Found my car, a place's rates) wrap their ScrollView in `KeyboardAvoidingView behavior="padding"` with `keyboardVerticalOffset={useHeaderHeight()}` (from `expo-router/react-navigation`), because Android draws edge to edge and no longer shrinks the window for the keyboard. Not yet checked on the phone (2026-10-22); the tab bar at large font sizes is untested too.

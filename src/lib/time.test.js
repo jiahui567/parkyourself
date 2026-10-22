@@ -1,4 +1,18 @@
-import { formatDate, formatDuration, formatTime, localDateKey, nextLocalMidnight } from './time';
+import {
+  addMonths,
+  formatDate,
+  formatDateKey,
+  formatDuration,
+  formatMinutes,
+  formatMonth,
+  formatMonthShort,
+  formatTime,
+  isDateKey,
+  localDateKey,
+  localMonthKey,
+  monthRange,
+  nextLocalMidnight,
+} from './time';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
 const at = (localDateTime) => new Date(localDateTime).getTime();
@@ -43,6 +57,62 @@ describe('formatTime', () => {
 describe('formatDate', () => {
   it('formats weekday, day, month and year', () => {
     expect(formatDate(at('2026-10-23T14:15'))).toBe('Fri, 23 Oct 2026');
+  });
+});
+
+describe('isDateKey', () => {
+  it.each(['2026-12-25', '2028-02-29'])('accepts %s', (text) => {
+    expect(isDateKey(text)).toBe(true);
+  });
+
+  it.each(['2026-02-30', '2027-02-29', '2026-13-01', '2026-1-05', '25/12/2026', '', null])('rejects %p', (text) => {
+    expect(isDateKey(text)).toBe(false);
+  });
+});
+
+describe('formatDateKey', () => {
+  it('formats a holiday date like formatDate', () => {
+    expect(formatDateKey('2026-12-25')).toBe('Fri, 25 Dec 2026');
+  });
+});
+
+describe('months', () => {
+  it("uses the phone's local month, not the UTC month", () => {
+    // 16:30 UTC on 31 October is 00:30 on 1 November in Malaysia.
+    expect(localMonthKey(Date.parse('2026-10-31T16:30:00Z'))).toBe('2026-11');
+  });
+
+  it.each([
+    ['2026-10', 1, '2026-11'],
+    ['2026-12', 1, '2027-01'],
+    ['2026-01', -1, '2025-12'],
+    ['2026-10', -11, '2025-11'],
+  ])('addMonths(%s, %i) -> %s', (key, n, expected) => {
+    expect(addMonths(key, n)).toBe(expected);
+  });
+
+  it('gives a month as local midnights, end exclusive', () => {
+    expect(monthRange('2026-12')).toEqual({ start: at('2026-12-01T00:00'), end: at('2027-01-01T00:00') });
+  });
+
+  it('formats a month', () => {
+    expect(formatMonth('2026-10')).toBe('Oct 2026');
+    expect(formatMonthShort('2026-10')).toBe('Oct');
+  });
+
+  it.each(['2026-13', '2026-00', '2026-1', 'Oct'])('rejects the month %p', (key) => {
+    expect(() => monthRange(key)).toThrow('Not a month');
+  });
+});
+
+describe('formatMinutes', () => {
+  it.each([
+    [30, '30 min'],
+    [60, '1 hour'],
+    [120, '2 hours'],
+    [90, '90 min'],
+  ])('%i -> %s', (minutes, text) => {
+    expect(formatMinutes(minutes)).toBe(text);
   });
 });
 

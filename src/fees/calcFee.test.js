@@ -1,7 +1,8 @@
-import { assertValidRate, calcDayFeeSen, calcStayFee } from './calcFee';
+import { assertValidRate, calcDayFeeSen, calcStayFee, stayDayTypes } from './calcFee';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur). 2026-10-23 is a
-// Friday, 2026-10-24 a Saturday, 2026-10-27 a Tuesday, 2026-10-28 a Wednesday.
+// Friday, 2026-10-24 a Saturday, 2026-10-27 a Tuesday, 2026-10-28 a Wednesday,
+// 2026-10-29 a Thursday.
 const at = (localDateTime) => new Date(localDateTime).getTime();
 const MINUTE = 60 * 1000;
 
@@ -75,6 +76,16 @@ describe('calcStayFee', () => {
     expect(result).toMatchObject({ feeSen: 700, isEstimate: false, overnight: false, withinGrace: false });
   });
 
+  it.each([
+    [10, 0],
+    [20, 500],
+  ])('gives a flat rate its free minutes too: %i min of RM 5.00 with 15 free costs %i sen', (minutes, fee) => {
+    const flat = { type: 'flat', flat_sen: 500, grace_minutes: 15, daily_cap_sen: null };
+    const start = at('2026-10-27T10:00');
+
+    expect(calcStayFee(start, start + minutes * MINUTE, { weekday: flat }).feeSen).toBe(fee);
+  });
+
   it('charges a started block in full, to the millisecond', () => {
     const start = at('2026-10-27T10:00');
 
@@ -146,6 +157,14 @@ describe('calcStayFee', () => {
 
   it('rejects times that are not epoch milliseconds', () => {
     expect(() => calcStayFee('2026-10-27', at('2026-10-27T10:00'), RATES)).toThrow('epoch milliseconds');
+  });
+});
+
+describe('stayDayTypes', () => {
+  it('gives the day type of each local day the stay covers, holidays included', () => {
+    const days = stayDayTypes(at('2026-10-27T22:00'), at('2026-10-29T10:00'), new Set(['2026-10-28']));
+
+    expect(days).toEqual(['weekday', 'holiday', 'weekday']);
   });
 });
 
