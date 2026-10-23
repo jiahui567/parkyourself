@@ -4,7 +4,9 @@ import {
   levelBayText,
   routeBackText,
   shareMessage,
+  spotLocation,
   spotText,
+  walkingDirectionsUrl,
   zoneSinceText,
 } from './sessionText';
 
@@ -131,5 +133,31 @@ describe('shareMessage', () => {
 describe('googleMapsUrl', () => {
   it('builds a Google Maps search link', () => {
     expect(googleMapsUrl(3.0512, 101.6789)).toBe('https://www.google.com/maps/search/?api=1&query=3.0512,101.6789');
+  });
+});
+
+describe('walkingDirectionsUrl', () => {
+  it('builds a Google Maps walking directions link', () => {
+    expect(walkingDirectionsUrl({ lat: 3.0512, lng: 101.6789 })).toBe(
+      'https://www.google.com/maps/dir/?api=1&destination=3.0512,101.6789&travelmode=walking'
+    );
+  });
+});
+
+describe('spotLocation', () => {
+  it.each([
+    {
+      rule: 'the location saved when parking comes first',
+      session: { lat: 3.0512, lng: 101.6789, place_lat: 3.1279, place_lng: 101.7238 },
+      location: { lat: 3.0512, lng: 101.6789 },
+    },
+    {
+      rule: "the place's location stands in for none",
+      session: { lat: null, lng: null, place_lat: 3.1279, place_lng: 101.7238 },
+      location: { lat: 3.1279, lng: 101.7238 },
+    },
+    { rule: 'neither gives null', session: { lat: null, lng: null, place_lat: null, place_lng: null }, location: null },
+  ])('$rule', ({ session, location }) => {
+    expect(spotLocation(session)).toEqual(location);
   });
 });

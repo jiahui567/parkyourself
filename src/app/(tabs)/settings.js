@@ -4,15 +4,18 @@ import { useCallback, useRef, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { Disclosure } from '../../components/Disclosure';
 import { ErrorText } from '../../components/ErrorText';
 import { ListRow, ListSection } from '../../components/List';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { exportDatabase, preferences, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
+import { useLocationPermission } from '../../hooks/useLocationPermission';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { formatMinutes } from '../../lib/time';
 import { askNotificationPermission, notificationPermission, syncNotifications } from '../../notify/notifications';
+import { allowLocationLabel, LOCATION_PURPOSE } from '../../text/locationText';
 import { EXTEND_OPTIONS, REMINDER_LEAD_OPTIONS } from '../../timer/timer';
 
 const MODE_OPTIONS = [
@@ -23,12 +26,8 @@ const MODE_OPTIONS = [
 const EXTEND_CHOICES = EXTEND_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 const LEAD_CHOICES = REMINDER_LEAD_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
-// Planned settings from PLAN.md, shown so the user can see what is coming.
-// GPS is on hold (PLAN.md, "Decisions made").
-const COMING_SOON = ['GPS location'];
-
-// Settings: appearance, cars, places and holidays, the timer, export, and
-// what is coming next.
+// Settings: appearance, cars, places and holidays, the timer, the location
+// and export.
 export default function Settings() {
   const db = useDatabase();
   const { mode, setMode, loadError } = useAppTheme();
@@ -52,6 +51,14 @@ export default function Settings() {
   const { data: permission, error: permissionError, reload: reloadPermission } = useFocusedLoad(loadPermission);
   useOnAppActive(reloadPermission);
   const [allowing, setAllowing] = useState(false);
+
+  // The timer choices are folded rows that show their value (Disclosure).
+  const [open, setOpen] = useState({ extend: false, lead: false });
+  const toggle = (part) => () => setOpen((current) => ({ ...current, [part]: !current[part] }));
+
+  const location = useLocationPermission();
+  const [allowingLocation, setAllowingLocation] = useState(false);
+  const [locationError, setLocationError] = useState(null);
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -92,6 +99,7 @@ export default function Settings() {
   };
 
   const leadMinutes = leadChoice ?? prefs?.reminderLeadMinutes;
+  const notificationsOff = Boolean(permission) && !permission.granted;
 
   // Like Extend, but a saved change also moves the reminders already set.
   const changeLead = async (next) => {
@@ -134,6 +142,19 @@ export default function Settings() {
     }
   };
 
+  // Only allowing is offered here; it is turned off in Android's own settings.
+  const allowLocation = async () => {
+    setAllowingLocation(true);
+    setLocationError(null);
+    try {
+      await location.allow();
+    } catch (e) {
+      setLocationError(e);
+    } finally {
+      setAllowingLocation(false);
+    }
+  };
+
   const startExport = async () => {
     if (exportingRef.current) return;
     exportingRef.current = true;
@@ -168,8 +189,12 @@ export default function Settings() {
       </ListSection>
 
       <ListSection title="Timer">
-        <View style={styles.padded}>
-          <Text style={[styles.label, styles.inset]}>Extend timer by</Text>
+        <Disclosure
+          label="Extend timer by"
+          value={extendMinutes != null ? formatMinutes(extendMinutes) : null}
+          open={open.extend}
+          onToggle={toggle('extend')}
+        >
           {extendMinutes != null && (
             <SegmentedControl
               options={EXTEND_CHOICES}
@@ -178,29 +203,53 @@ export default function Settings() {
               disabled={savingExtend}
             />
           )}
-          <Text style={[styles.hint, styles.inset]}>Added each time you tap Extend timer.</Text>
+          <Text style={styles.hint}>Added each time you tap Extend timer.</Text>
           <ErrorText error={extendError ?? prefsLoadError} />
-
-          <Text style={[styles.label, styles.inset, styles.nextControl]}>Remind me before the timer ends</Text>
+        </Disclosure>
+        {/* Notifications being off stays in sight on the folded row. */}
+        <Disclosure
+          label="Remind me before the timer ends"
+          value={leadMinutes != null ? formatMinutes(leadMinutes) : null}
+          hint={notificationsOff ? 'Notifications are off, so no reminder will ring.' : null}
+          open={open.lead}
+          onToggle={toggle('lead')}
+          first={false}
+        >
           {leadMinutes != null && (
             <SegmentedControl options={LEAD_CHOICES} value={leadMinutes} onChange={changeLead} disabled={savingLead} />
           )}
-          <Text style={[styles.hint, styles.inset]}>Another reminder rings when the timer ends.</Text>
-          {permission && !permission.granted && (
-            <View style={styles.inset}>
-              <Text style={styles.hint}>Notifications are off, so no reminder will ring.</Text>
-              <View style={styles.inlineAction}>
-                <Button
-                  title={permission.canAskAgain ? 'Allow notifications' : 'Open Android settings'}
-                  variant="tonal"
-                  size="small"
-                  onPress={allowNotifications}
-                  disabled={allowing}
-                />
-              </View>
+          <Text style={styles.hint}>Another reminder rings when the timer ends.</Text>
+          {notificationsOff && (
+            <View style={styles.inlineAction}>
+              <Button
+                title={permission.canAskAgain ? 'Allow notifications' : 'Open Android settings'}
+                variant="tonal"
+                size="small"
+                onPress={allowNotifications}
+                disabled={allowing}
+              />
             </View>
           )}
           <ErrorText error={leadError ?? permissionError} />
+        </Disclosure>
+      </ListSection>
+
+      <ListSection title="Location">
+        <ListRow label="Use my location" value={location.permission && (location.permission.granted ? 'On' : 'Off')} />
+        <View style={styles.rowNote}>
+          <Text style={styles.hint}>{LOCATION_PURPOSE}</Text>
+          {location.permission && !location.permission.granted && (
+            <View style={styles.inlineAction}>
+              <Button
+                title={allowLocationLabel(location.permission)}
+                variant="tonal"
+                size="small"
+                onPress={allowLocation}
+                disabled={allowingLocation}
+              />
+            </View>
+          )}
+          <ErrorText error={locationError ?? location.error} />
         </View>
       </ListSection>
 
@@ -215,12 +264,6 @@ export default function Settings() {
           <Text style={styles.hint}>Saves a copy you can send to Google Drive or email.</Text>
           <ErrorText error={exportError} />
         </View>
-      </ListSection>
-
-      <ListSection title="Coming soon">
-        {COMING_SOON.map((label, index) => (
-          <ListRow key={label} label={label} value="Soon" first={index === 0} />
-        ))}
       </ListSection>
 
       {__DEV__ && (
@@ -243,13 +286,8 @@ const createStyles = (c) =>
     padded: { padding: 12, gap: 8 },
     // Sits under a ListRow in the same card, lined up with the row's label.
     rowNote: { paddingHorizontal: 16, paddingBottom: 14, marginTop: -6, gap: 4 },
-    // Lines text up with the segments inside the control's track.
-    inset: { paddingHorizontal: 4 },
-    // Separates the reminder control from the Extend one in the same card.
-    nextControl: { marginTop: 12 },
     // A row, so the small pill sits at the start instead of the centre.
     inlineAction: { flexDirection: 'row', marginTop: 8 },
-    label: { fontWeight: '600', color: c.text },
     hint: { fontSize: 13, color: c.muted },
     footer: { color: c.muted, textAlign: 'center', fontSize: 13, lineHeight: 20 },
   });

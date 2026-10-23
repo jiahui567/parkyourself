@@ -115,7 +115,7 @@ export default function Holidays() {
 
       {rows.length === 0 ? (
         <Text style={styles.empty}>
-          No public holidays yet. Add one above, or switch on Public holiday when you park.
+          No public holidays yet. Add one above.
         </Text>
       ) : (
         <View style={styles.listCard}>

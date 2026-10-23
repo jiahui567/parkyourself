@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { hasMoreRateOptions } from '../fees';
-import { blockPriceLabel, firstPriceLabel } from '../text/rateText';
+import { hasMoreRateOptions, moreRateOptionsInUse } from '../fees';
+import { blockPriceLabel, firstPriceLabel, moreOptionsLabel } from '../text/rateText';
 import { Button } from './Button';
 import { Field } from './Field';
 import { SegmentedControl } from './SegmentedControl';
@@ -21,6 +21,8 @@ const TYPE_OPTIONS = [
 // Most car parks charge by the hour, which the form is prefilled with, so it
 // shows only the prices; the period lengths, free minutes and daily max wait
 // under "More options", which starts open when the rate already uses them.
+// "Fewer options" folds them away again, keeping what was typed; the
+// folded button then says how many are set.
 export function RateForm({ value, onChange, disabled = false }) {
   const [more, setMore] = useState(() => hasMoreRateOptions(value));
   const set = (key) => (text) => onChange({ ...value, [key]: text });
@@ -74,11 +76,14 @@ export function RateForm({ value, onChange, disabled = false }) {
           </View>
         </>
       )}
-      {!more && (
-        <View style={styles.sideActions}>
-          <Button title="More options" variant="secondary" size="small" onPress={() => setMore(true)} />
-        </View>
-      )}
+      <View style={styles.sideActions}>
+        <Button
+          title={moreOptionsLabel(more, moreRateOptionsInUse(value))}
+          variant="secondary"
+          size="small"
+          onPress={() => setMore((current) => !current)}
+        />
+      </View>
     </View>
   );
 }

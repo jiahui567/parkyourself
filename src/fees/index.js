@@ -16,6 +16,7 @@ export {
   holidayRate,
   holidayRateFromText,
   isRateFormEmpty,
+  moreRateOptionsInUse,
   planRateSave,
   rateFromForm,
   sameRate,

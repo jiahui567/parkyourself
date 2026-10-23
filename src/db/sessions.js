@@ -20,8 +20,12 @@ const code = (value) => text(value)?.toUpperCase() ?? null;
 
 // A session with its car and place names. The place join keeps deleted
 // places, so a past session still shows where it was after the place is gone.
+// The place's location stands in for a session saved without one, but only
+// while the place is live: keeping a deleted place's name is for display only.
 const DETAILS_SQL = `
-  SELECT s.*, v.name AS vehicle_name, p.name AS place_name
+  SELECT s.*, v.name AS vehicle_name, p.name AS place_name,
+    CASE WHEN p.deleted_at IS NULL THEN p.lat END AS place_lat,
+    CASE WHEN p.deleted_at IS NULL THEN p.lng END AS place_lng
   FROM parking_session s
   JOIN vehicle v ON v.id = s.vehicle_id
   LEFT JOIN place p ON p.id = s.place_id`;
@@ -31,6 +35,16 @@ const ACTIVE_SQL = "SELECT * FROM parking_session WHERE id = ? AND status = 'act
 function assertAccessType(access_type) {
   if (access_type != null && !ACCESS_TYPES.includes(access_type)) {
     throw new Error(`Unknown access type: ${access_type}`);
+  }
+}
+
+const inRange = (value, limit) => Number.isFinite(value) && Math.abs(value) <= limit;
+
+function assertLocation(location) {
+  if (location == null) return;
+  const accurate = Number.isFinite(location.accuracyM) && location.accuracyM >= 0;
+  if (!inRange(location.lat, 90) || !inRange(location.lng, 180) || !accurate) {
+    throw new Error('The location reading is not valid.');
   }
 }
 
@@ -53,6 +67,10 @@ export const sessions = {
   // ("Only this time"). public_holiday adds the parking day to the holiday list.
   // photo_files ([{ file_uri, ocr_text }]) are kept files (savingPhotos), the
   // pillar sign first, with the text OCR read from each (null when not read).
+  // zone_colour_hex is the colour read off the sign ('#1E5BD8'), kept with the
+  // confirmed name so the mapping can be improved (PLAN.md, "Pillar zone colour").
+  // location ({ lat, lng, accuracyM }, optional) is where the car is; a place
+  // with no location yet gets it too, so the next park there finds the place.
   async start(
     db,
     {
@@ -60,6 +78,7 @@ export const sessions = {
       level,
       bay,
       zone_colour_name,
+      zone_colour_hex = null,
       access_type,
       landmark,
       note,
@@ -70,9 +89,14 @@ export const sessions = {
       public_holiday = false,
       timer_ends_at = null,
       photo_files = [],
+      location = null,
     }
   ) {
     assertAccessType(access_type);
+    assertLocation(location);
+    if (zone_colour_hex != null && !/^#[0-9A-F]{6}$/i.test(zone_colour_hex)) {
+      throw new Error(`Not a hex colour: ${zone_colour_hex}`);
+    }
     const placeName = text(place_name);
     const entered = checkRates(rates);
     for (const dayType of save_rates) {
@@ -94,11 +118,15 @@ export const sessions = {
       let rate_snapshot = snapshotText(entered);
       if (placeName) {
         const place = await places.findByName(txn, placeName);
+        // Only a place's first location is kept (PLAN.md, data model), so
+        // one rough reading later cannot move a place that was found before.
+        const placeLocation = location && { lat: location.lat, lng: location.lng };
         if (place) {
           place_id = place.id;
-          await places.update(txn, place_id, { last_used_at: started_at });
+          const firstLocation = place.lat == null || place.lng == null ? placeLocation : null;
+          await places.update(txn, place_id, { last_used_at: started_at, ...firstLocation });
         } else {
-          place_id = await places.create(txn, { name: placeName, last_used_at: started_at });
+          place_id = await places.create(txn, { name: placeName, last_used_at: started_at, ...placeLocation });
         }
         for (const dayType of save_rates) await places.saveRate(txn, place_id, dayType, entered[dayType]);
         rate_snapshot = snapshotText(mergeRates(await places.getRates(txn, place_id), entered));
@@ -113,11 +141,15 @@ export const sessions = {
         level: code(level),
         bay: code(bay),
         zone_colour_name: text(zone_colour_name),
+        zone_colour_hex: zone_colour_hex == null ? null : zone_colour_hex.toUpperCase(),
         access_type: access_type ?? null,
         landmark: text(landmark),
         note: text(note),
         rate_snapshot,
         timer_ends_at,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        gps_accuracy_m: location?.accuracyM ?? null,
       });
       for (const { file_uri, ocr_text = null } of photo_files) {
         await photos.add(txn, { session_id: id, file_uri, ocr_text });

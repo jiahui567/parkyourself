@@ -48,6 +48,19 @@ export function googleMapsUrl(lat, lng) {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 }
 
+// Google Maps walking directions to a point, for Find's Open in Google Maps.
+export function walkingDirectionsUrl({ lat, lng }) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+}
+
+// Where the car is, { lat, lng }: the location saved when parking, else the
+// place's (sessions.getDetails), or null when neither is known.
+export function spotLocation(session) {
+  if (session.lat != null && session.lng != null) return { lat: session.lat, lng: session.lng };
+  if (session.place_lat != null && session.place_lng != null) return { lat: session.place_lat, lng: session.place_lng };
+  return null;
+}
+
 // The WhatsApp message from PLAN.md, "Share your spot". Lines with nothing to
 // say are left out.
 export function shareMessage({ vehicleName, placeName, session }) {
@@ -61,13 +74,14 @@ export function shareMessage({ vehicleName, placeName, session }) {
     access && `Took the ${access}`,
     session.landmark && `${access ? 'first' : 'First'} shop: ${session.landmark}`,
   ].filter(Boolean);
+  const location = spotLocation(session);
 
   return [
     `${vehicleName} is parked${placeName ? ` at ${placeName}` : ''}`,
     spot.length > 0 && spot.join(', '),
     route.length > 0 && route.join(', '),
     `Parked at ${formatTime(session.started_at)}`,
-    session.lat != null && session.lng != null && `Map: ${googleMapsUrl(session.lat, session.lng)}`,
+    location && `Map: ${googleMapsUrl(location.lat, location.lng)}`,
   ]
     .filter(Boolean)
     .join('\n');

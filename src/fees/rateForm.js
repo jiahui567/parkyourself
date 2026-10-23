@@ -36,16 +36,25 @@ export function isRateFormEmpty(form) {
   return prices.every((field) => blank(form?.[field]));
 }
 
-// True when the form holds something RateForm keeps under "More options":
+// How many fields RateForm keeps under "More options" hold something:
 // period lengths other than the prefilled hour (a cleared one too, which
-// rateFromForm refuses), free minutes or a daily max. The form then opens
-// with them shown, so a rule that changes the fee, or a field to fix, is
-// never hidden. Blank free minutes mean none.
-export function hasMoreRateOptions(form) {
+// rateFromForm refuses), free minutes or a daily max. Blank free minutes mean
+// none. Folded, the form's button shows the count, so a rule that changes the
+// fee, or a field to fix, is never hidden without a word.
+export function moreRateOptionsInUse(form) {
   const notPrefilled = (field) => String(form?.[field] ?? '').trim() !== EMPTY_RATE_FORM[field];
   const hasGrace = !blank(form?.graceMinutes) && notPrefilled('graceMinutes');
-  if (form?.type === 'flat') return hasGrace;
-  return notPrefilled('firstMinutes') || notPrefilled('blockMinutes') || hasGrace || !blank(form?.dailyCap);
+  const used =
+    form?.type === 'flat'
+      ? [hasGrace]
+      : [notPrefilled('firstMinutes'), notPrefilled('blockMinutes'), hasGrace, !blank(form?.dailyCap)];
+  return used.filter(Boolean).length;
+}
+
+// True when the form holds something under "More options"; the form then
+// starts with them shown.
+export function hasMoreRateOptions(form) {
+  return moreRateOptionsInUse(form) > 0;
 }
 
 // Whole minutes typed as digits only, or null.
@@ -132,7 +141,7 @@ export function holidayRate(sen) {
 
 export const HOLIDAY_AMOUNT_ERROR = 'Enter the public holiday amount, such as 8.00, or leave it empty.';
 
-// The public holiday amount as typed on Park or a place's rates. The amount
+// The public holiday amount as typed on a place's rates (Places). The amount
 // is optional, so blank is { rate: null, error: null }; text that is not an
 // amount is an error, never a guess.
 export function holidayRateFromText(text) {

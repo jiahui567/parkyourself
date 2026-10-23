@@ -23,7 +23,9 @@ const ICON_SIZE = 18;
 // gets the search text, trimmed, and '' once it is cleared or a row is tapped,
 // so the screen can ask about a name typed but never tapped. children are
 // drawn inside the chosen place's card, under its name (Park's rate row).
-export function PlacePicker({ value, onChange, onQueryChange, children }) {
+// The screen may also set value itself (Park, from the location); hint then
+// replaces the line under the chosen name, saying where it came from.
+export function PlacePicker({ value, onChange, onQueryChange, hint, children }) {
   const db = useDatabase();
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
@@ -33,6 +35,14 @@ export function PlacePicker({ value, onChange, onQueryChange, children }) {
   const [query, setQuery] = useState('');
   const [result, setResult] = useState(null); // { query, rows } of the last search
   const [error, setError] = useState(null);
+  // A place set by the screen while nothing was picked or typed shows as
+  // chosen, as if tapped. Adjusted while rendering, as React advises for
+  // state that follows a prop.
+  const [shownValue, setShownValue] = useState(value);
+  if (value !== shownValue) {
+    setShownValue(value);
+    if (value && mode === 'search' && query === '') setMode('chosen');
+  }
   const open = mode !== 'chosen';
   const typed = query.trim();
 
@@ -86,8 +96,14 @@ export function PlacePicker({ value, onChange, onQueryChange, children }) {
               <Text style={value ? styles.chosenName : styles.chosenNameMuted} numberOfLines={2}>
                 {value ? value.name : 'No place'}
               </Text>
-              {!value && <Text style={styles.hint}>Free or unknown parking, no fee</Text>}
-              {value && value.id == null && <Text style={styles.hint}>New place, saved when you park</Text>}
+              {hint ? (
+                <Text style={styles.hint}>{hint}</Text>
+              ) : (
+                <>
+                  {!value && <Text style={styles.hint}>Free or unknown parking, no fee</Text>}
+                  {value && value.id == null && <Text style={styles.hint}>New place, saved when you park</Text>}
+                </>
+              )}
             </View>
             {mode === 'chosen' ? (
               <Button title="Change" variant="secondary" size="small" onPress={() => setMode('change')} />

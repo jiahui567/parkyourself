@@ -8,6 +8,7 @@ import {
   holidayRate,
   holidayRateFromText,
   isRateFormEmpty,
+  moreRateOptionsInUse,
   planRateSave,
   rateFromForm,
   sameRate,
@@ -81,6 +82,17 @@ describe('rateFromForm', () => {
     const result = rateFromForm({ ...WEEKDAY_FORM, firstMinutes: '', blockPrice: '' });
 
     expect(result.error).toContain('price after the first period');
+  });
+});
+
+describe('moreRateOptionsInUse', () => {
+  it.each([
+    { rule: 'none on the empty form', form: EMPTY_RATE_FORM, count: 0 },
+    { rule: 'free minutes and a daily max', form: { ...EMPTY_RATE_FORM, graceMinutes: '15', dailyCap: '20' }, count: 2 },
+    { rule: 'all four', form: { ...EMPTY_RATE_FORM, firstMinutes: '30', blockMinutes: '30', graceMinutes: '15', dailyCap: '20' }, count: 4 },
+    { rule: "only a flat rate's free minutes", form: { ...EMPTY_RATE_FORM, type: 'flat', graceMinutes: '10', dailyCap: '20' }, count: 1 },
+  ])('$rule', ({ form, count }) => {
+    expect(moreRateOptionsInUse(form)).toBe(count);
   });
 });
 

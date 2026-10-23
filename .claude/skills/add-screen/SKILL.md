@@ -52,6 +52,9 @@ Status: design standard version 3. Version 2 (dark and light theme, bottom tabs,
 - **Quiet visuals.** No decoration, gradients or extra colours; one emerald accent; secondary text in `muted`; hairlines between rows rather than boxes in boxes; generous spacing (the Spacing rules below).
 - **Small edits save themselves.** Where a screen has no Save for it (Find's way back), a chip saves on tap and a field when it is left. Anything that loses data still asks first.
 - 2026-10-22: Design every screen simple, minimal and modern, by the Principles above, because the user found the redesign that applied them (folded optional rows, way back on Find, gallery in the camera, History by month) clearly better than a form with every field open.
+- 2026-10-23: Anything that unfolds extra fields can be folded back the same way (a "More options" button becomes "Fewer options"), because the user opened More options on the rate form and could not hide it again.
+- 2026-10-23: The one main action is in sight when the screen opens. On a screen that scrolls, pin it in a footer under the ScrollView (Find's Found my car, with the safe-area inset below it), because the user should not have to scroll to it when back at the car.
+- 2026-10-23: Settings choices (the timer's Extend and reminder lengths) are folded `Disclosure` rows that show the chosen value and open on tap, because the user wants Settings short, with a choice shown only when opened.
 
 **Theme**: dark mode is the default. The user picks Dark or Light in Settings; the choice is saved in the `setting` table under `theme` and applies to the whole app at once.
 
@@ -93,14 +96,14 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 
 **Components** (in `src/components/`):
 - `Button`: variants `primary`, `secondary` (grey), `tonal` (soft emerald) and `danger` (red outline); sizes `large` (full width) and `small` (a pill sized to its label); optional `icon`.
-  - `large` `primary` is for the screen's one main action, placed last.
+  - `large` `primary` is for the screen's one main action, placed last, or pinned in a footer under the ScrollView when the screen scrolls.
   - 2026-10-22: Only a screen's one main action (Save, Found my car) is a full-width `Button`. Side actions in lists use `size="small"` pills or an `IconButton` (archive, delete), and "Add" buttons are small `tonal` pills, because the user found full-width list buttons too big and long and wants a sharp, elegant look.
 - `IconButton`: round, 36 px with a 48 px touch area, icon only. Always pass `label` ("Archive My Myvi") for screen readers; `tone="danger"` for archive and delete.
 - `SegmentedControl`: one of two to four options with one always selected (Dark / Light).
 - `ChipGroup`: one choice from a few options (up to about 12). Tapping the selected chip clears it. When a row label outside the chips says what they are (Park's "Level" and "Bay" rows of photo codes), give each option an `accessibilityLabel` ("Level G3").
 - `Field`: labelled text input on `surface`. Codes such as level and bay use `autoCapitalize="characters"`. Under a row that already names it (a `Disclosure`), leave out `label` and pass `accessibilityLabel`.
 - `ErrorText` for every error the user should see.
-- `RateForm`: edits one rate (Hourly or Flat) as typed strings; check it with `rateFromForm` and show the error with `ErrorText`, since the form shows none. It shows only the prices; period lengths, free minutes and daily max are under "More options", which starts open when the rate uses them (decided when it mounts, so give a form that can switch day type a `key`).
+- `RateForm`: edits one rate (Hourly or Flat) as typed strings; check it with `rateFromForm` and show the error with `ErrorText`, since the form shows none. It shows only the prices; period lengths, free minutes and daily max are under "More options", which starts open when the rate uses them and "Fewer options" folds back (decided when it mounts, so give a form that can switch day type a `key`).
 - `Disclosure`: a card row (label, optional icon, a short `value` at the end or a `muted` `hint` under the label, a chevron) that opens to show its children. The screen keeps `open`, so it can open the row itself for an error inside. Put rows in a card with `overflow: 'hidden'`; pass `first={false}` to every row after the first.
   - Use it for every optional part of a form (Principles, "Essentials first, the rest folded").
 - `SwitchRow`: a label, optional `muted` hint and a themed switch; the whole row toggles. It has no side padding, so wrap it in a padded View inside a card.

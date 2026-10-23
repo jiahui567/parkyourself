@@ -149,3 +149,16 @@ describe('places.saveDetails', () => {
     expect((await places.get(db, id)).name).toBe('Pavilion');
   });
 });
+
+describe('places.listLocated', () => {
+  it('lists live places that have a location', async () => {
+    await places.create(db, { name: 'Sunway Velocity', lat: 3.1279, lng: 101.7238 });
+    await places.create(db, { name: 'No pin' });
+    const gone = await places.create(db, { name: 'Gone', lat: 3.1, lng: 101.7 });
+    await places.remove(db, gone);
+
+    expect(await places.listLocated(db)).toEqual([
+      expect.objectContaining({ name: 'Sunway Velocity', lat: 3.1279, lng: 101.7238 }),
+    ]);
+  });
+});

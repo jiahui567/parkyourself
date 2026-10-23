@@ -6,8 +6,8 @@ import { holidayRateFromText, rateFromForm } from './rateForm';
 const OTHER_DAY_TYPE = { weekday: 'weekend', weekend: 'weekday' };
 
 // The day type whose rate the Park form shows: 'weekday' or 'weekend'. A
-// public holiday (already in the list, or switched on) shows the weekend
-// rate, because a holiday without a fixed amount is charged at it.
+// public holiday (a date in the holiday list) shows the weekend rate,
+// because a holiday without a fixed amount is charged at it.
 export function rateDayTypeFor(todayType, holidayOn) {
   return todayType === 'holiday' || holidayOn ? 'weekend' : todayType;
 }
@@ -20,8 +20,8 @@ export function offersSameEveryDay(saved, dayType) {
 }
 
 // The rates typed on Park, { [dayType]: rate }, for planRateSave and
-// sessions.start. form is the RateForm shown for dayType; holidayAmount (typed
-// RM) counts only while the holiday is on. Returns { entered, error }: error
+// sessions.start. form is the RateForm shown for dayType; holidayAmount (RM
+// text, the place's saved amount on Park) counts only on a public holiday. Returns { entered, error }: error
 // is a sentence for the user, and then entered is null.
 export function enteredRates({ saved, dayType, form, sameEveryDay = false, holidayOn = false, holidayAmount = '' }) {
   const { rate, error } = rateFromForm(form);

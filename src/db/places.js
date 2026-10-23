@@ -83,6 +83,13 @@ export const places = {
     );
   },
 
+  // Every place with a saved location, for finding the one the car is at.
+  listLocated(db) {
+    return db.getAllAsync(
+      'SELECT id, name, lat, lng FROM place WHERE deleted_at IS NULL AND lat IS NOT NULL AND lng IS NOT NULL'
+    );
+  },
+
   // Every place by name, with how many sessions were parked there.
   listWithVisits(db) {
     return db.getAllAsync(

@@ -25,6 +25,13 @@ const typedPeriodText = (typed) => {
   return /^\d+$/.test(trimmed) && Number(trimmed) > 0 ? periodText(Number(trimmed)) : 'period';
 };
 
+// RateForm's fold button: 'Fewer options' while open; closed, 'More options',
+// with how many hidden fields are set ('More options · 2 set').
+export function moreOptionsLabel(open, inUse) {
+  if (open) return 'Fewer options';
+  return inUse > 0 ? `More options · ${inUse} set` : 'More options';
+}
+
 export function firstPriceLabel(firstMinutes) {
   return `First ${typedPeriodText(firstMinutes)} (RM)`;
 }

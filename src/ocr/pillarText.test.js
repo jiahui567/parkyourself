@@ -1,11 +1,19 @@
 import {
   codeRows,
+  fillFromSign,
   fillsOther,
+  isNotSignLine,
   pickCode,
   pillarCandidates,
+  readSign,
   shouldReadNextPhoto,
   suggestionsFromPhotos,
+  zoneFromPhotos,
 } from './pillarText';
+
+// An OCR line as readText.js gives it: text and its box, height h px.
+const line = (text, h, y = 0) => ({ text, box: { x: 100, y, width: h * text.length * 0.6, height: h } });
+const photo = (...lines) => ({ text: lines.map((l) => l.text).join('\n'), lines });
 
 describe('pillarCandidates', () => {
   it.each([
@@ -140,5 +148,168 @@ describe('fillsOther', () => {
     { codes: ['B2', 'C14', '7'], fills: false },
   ])('is $fills for $codes', ({ codes, fills }) => {
     expect(fillsOther(codes)).toBe(fills);
+  });
+});
+
+describe('isNotSignLine', () => {
+  it.each([
+    { rule: 'a car plate', text: 'WXY 1234', not: true },
+    { rule: 'a car plate with a letter after', text: 'VBA 123 A', not: true },
+    { rule: 'an old one-letter plate', text: 'W 1234 A', not: true },
+    { rule: 'an old one-letter plate without spaces', text: 'W1234', not: true },
+    { rule: 'a mobile number', text: '012-345 6789', not: true },
+    { rule: 'a range of bays', text: 'B2 C101-C120', not: false },
+    { rule: 'a range of numbered bays', text: 'LOT 1201-1250', not: false },
+    { rule: 'the ground floor', text: 'GF 12', not: false },
+    { rule: 'a double-letter zone', text: 'AA 12', not: false },
+    { rule: 'a phone number', text: 'Call 03-2786 8888', not: true },
+    { rule: 'a hotline without a word', text: '1300 88 1234', not: true },
+    { rule: 'a price', text: 'Only RM5 per entry', not: true },
+    { rule: 'a web address', text: 'www.pavilion-kl.com', not: true },
+    { rule: 'an ad', text: '50% OFF ALL ITEMS', not: true },
+    { rule: 'a level and bay', text: 'B2 C14', not: false },
+    { rule: 'a level word and code', text: 'LEVEL B2', not: false },
+    { rule: 'a level that looks like plate letters', text: 'LG 12', not: false },
+    { rule: 'a Malay zone word and number', text: 'ZON 3', not: false },
+    { rule: 'a bay code', text: 'C 14', not: false },
+  ])('$rule: $text', ({ text, not }) => {
+    expect(isNotSignLine(text)).toBe(not);
+  });
+});
+
+describe('readSign', () => {
+  it('reads the big sign and drops the car plate and the ad beside it', () => {
+    const sign = readSign(photo(line('B2', 120, 100), line('C14', 90, 240), line('WXY 1234', 40, 600), line('CALL 03-2786 8888', 20, 700)));
+
+    expect(sign.levels).toEqual(['B2']);
+    expect(sign.bays).toEqual(['C14']);
+    expect(sign.box).toEqual(line('B2', 120, 100).box);
+  });
+
+  it('leaves out small print far smaller than the sign', () => {
+    const sign = readSign(photo(line('C14', 100), line('Lot 7 reserved', 20)));
+
+    expect(sign.bays).toEqual(['C14']);
+  });
+
+  it('puts bigger codes first', () => {
+    expect(readSign(photo(line('A3', 50), line('D20', 110))).bays).toEqual(['D20', 'A3']);
+  });
+
+  it('puts a code beside a level word first, also from the line above', () => {
+    expect(readSign(photo(line('G', 80), line('ARAS', 60), line('B1', 80))).levels).toEqual(['B1', 'G']);
+  });
+
+  it('weighs a long line of notice text down', () => {
+    const sign = readSign(photo(line('Do not leave valuables in car 24 hours', 60), line('17', 60)));
+
+    expect(sign.bays).toEqual(['17', '24']);
+  });
+
+  it('reads plain text line by line when there are no boxes', () => {
+    expect(readSign('LEVEL B3\nZONE D-20\nWXY 1234')).toMatchObject({ levels: ['B3'], bays: ['D20'], box: null });
+  });
+
+  it('finds nothing in an empty read', () => {
+    expect(readSign({ text: '', lines: [] })).toEqual({ levels: [], bays: [], box: null, colour: null });
+  });
+
+  describe('colour', () => {
+    it.each([
+      { rule: 'an English colour beside ZONE', text: 'B2\nBLUE ZONE C14', colour: 'Blue' },
+      { rule: 'a Malay colour beside ZON', text: 'ZON BIRU\nB2', colour: 'Blue' },
+      { rule: 'a colour under ZONE', text: 'ZONE\nHIJAU', colour: 'Green' },
+      { rule: 'pink in Malay, not red', text: 'ZON MERAH JAMBU', colour: 'Pink' },
+      { rule: 'a colour on a line with a code', text: 'YELLOW B2', colour: 'Yellow' },
+      { rule: 'a colour on a line of its own', text: 'B2 C14\nORANGE', colour: 'Orange' },
+      { rule: 'grey spelled the American way', text: 'GRAY ZONE', colour: 'Grey' },
+      { rule: 'no colour word', text: 'B2 C14', colour: null },
+      { rule: 'a colour in a brand name', text: 'B2\nRED BULL ENERGY', colour: null },
+      { rule: 'a colour in an ad', text: 'B2\nRED SALE 50% OFF', colour: null },
+      { rule: 'a brand under the ZONE line', text: 'ZONE C\nRED BULL', colour: null },
+    ])('$rule', ({ text, colour }) => {
+      expect(readSign(text).colour).toBe(colour);
+    });
+
+    it('prefers a colour beside ZONE over one alone', () => {
+      expect(readSign('RED\nZONE GREEN').colour).toBe('Green');
+    });
+  });
+});
+
+describe('suggestionsFromPhotos with reads', () => {
+  it('ranks the codes of a read with boxes', () => {
+    expect(suggestionsFromPhotos([photo(line('A3', 50), line('L2', 40), line('D20', 110))])).toEqual({
+      levels: ['L2'],
+      bays: ['D20', 'A3'],
+    });
+  });
+});
+
+describe('fillFromSign', () => {
+  const empty = { level: '', bay: '' };
+
+  it('fills the empty fields with the likeliest level and bay', () => {
+    expect(fillFromSign(empty, { levels: ['B2'], bays: ['C14', 'A3'] })).toEqual({ level: 'B2', bay: 'C14' });
+  });
+
+  it('never replaces what was typed', () => {
+    expect(fillFromSign({ level: 'B3', bay: ' ' }, { levels: ['B2'], bays: ['C14'] })).toEqual({ level: 'B3', bay: 'C14' });
+  });
+
+  it('fills a single code as the bay', () => {
+    expect(fillFromSign(empty, { levels: [], bays: ['C14'] })).toEqual({ level: '', bay: 'C14' });
+  });
+
+  it('leaves two codes without a level for the user to tap', () => {
+    expect(fillFromSign(empty, { levels: [], bays: ['G3', 'A2'] })).toEqual(empty);
+  });
+
+  it('leaves two readings of the same characters for the user to tap', () => {
+    expect(fillFromSign(empty, pillarCandidates('M 12'))).toEqual(empty);
+  });
+
+  it('keeps the other fields', () => {
+    expect(fillFromSign({ ...empty, note: 'Near lift' }, { levels: ['B2'], bays: [] })).toEqual({
+      level: 'B2',
+      bay: '',
+      note: 'Near lift',
+    });
+  });
+});
+
+describe('zoneFromPhotos', () => {
+  const sampledBlue = { name: 'Blue', hex: '#1E5BD8' };
+
+  it('takes the colour the sign names, with its sampled hex', () => {
+    expect(zoneFromPhotos([{ read: 'ZONE GREEN', sampled: sampledBlue }])).toEqual({ name: 'Green', hex: '#1E5BD8' });
+  });
+
+  it('takes the sampled colour when the sign names none', () => {
+    expect(zoneFromPhotos([{ read: 'B2 C14', sampled: sampledBlue }])).toEqual(sampledBlue);
+  });
+
+  it('keeps the hex of a sampled colour too plain to name, without a name', () => {
+    expect(zoneFromPhotos([{ read: 'B2', sampled: { name: null, hex: '#808080' } }])).toEqual({
+      name: null,
+      hex: '#808080',
+    });
+  });
+
+  it('prefers a named sampled colour over a plain one', () => {
+    const plain = { read: 'B2', sampled: { name: null, hex: '#808080' } };
+
+    expect(zoneFromPhotos([plain, { read: null, sampled: sampledBlue }])).toEqual(sampledBlue);
+  });
+
+  it('looks through every photo', () => {
+    expect(zoneFromPhotos([{ read: null, sampled: null }, { read: 'ZON KUNING', sampled: null }])).toEqual({
+      name: 'Yellow',
+      hex: null,
+    });
+  });
+
+  it('has nothing to suggest without photos', () => {
+    expect(zoneFromPhotos([])).toBeNull();
   });
 });

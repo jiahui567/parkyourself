@@ -1,6 +1,6 @@
 # Park Yourself: build plan
 
-Last updated: 2026-10-22. Status: M0 built; the M1 screens run on the phone and are being tested. M2, M3 (notifications), M5 (share), M6, the M8 Settings screen, the M1 pillar photos and car rename, M4 OCR, and the 2026-10-22 redesign of Park, Find and History (folded optional parts, way back on Find, photos from the gallery, History by month) are built and not yet checked on the phone. M7 (GPS) is on hold. Working name in earlier drafts: Parking Saver.
+Last updated: 2026-10-23. Status: M0 to M7 are done, checked on the phone by the user on 2026-10-23. M8 is in progress: Settings and Export database are built; the app icon, dark system dialogs and the release APK are left. Working name in earlier drafts: Parking Saver.
 
 An Android app (iPhone later) that remembers where you parked: a photo of the pillar sign, the level, bay number and zone colour read from that photo, the first shop you saw after leaving the lift or escalator, and a note. It remembers each car park's rates (weekday, weekend, and an optional fixed public holiday amount), calculates the fee, reminds you before paid parking runs out, lets you share your spot with someone, and shows your monthly parking spend. It supports several cars. All data stays on the phone.
 
@@ -24,18 +24,18 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Look and theme | Decided 2026-10-22. Clean, minimal look in the style of Apple Health and the Tesla app: charcoal and white, emerald only for the main action and positive states such as Parked. Dark mode by default; Light can be picked in Settings and is saved on the phone. Bottom tab bar: Home, History, Spending, Settings. Colours, type and components are in `.claude/skills/add-screen/SKILL.md`. Decided 2026-10-22: every screen is simple, minimal and modern, by the Principles in that skill (essentials first, optional parts folded, ask when the user knows, fewer fields to type) |
 | Data | Version 1: stored only on the phone (SQLite). No account, no server. Version 2 adds optional cloud sync and sharing (see "Version 2: Park Yourself Cloud") |
 | Database IDs and deletes | Prepared for version 2 from day one: every row has a UUID text id made on the phone, an `updated_at` time, and is soft-deleted (`deleted_at`) instead of removed, so sync can be added later without rewriting the data layer |
-| GPS | Optional, off by default. One reading when you park, only if you switch it on for that session. No continuous or background tracking. On hold since 2026-10-22: the design is being rethought, so M7 waits |
+| GPS | Redesigned 2026-10-23. Optional through Android's location permission, which the app asks for only when you tap Allow location (on Park or in Settings). Once allowed, Park reads the location when it opens and uses it to fill in the place and to save where the car is; a per-park switch leaves it unsaved. No continuous or background tracking. See "Location" |
 | Floor detection (barometer) | Dropped. Not accurate enough to trust |
 | Pillar photo | Core feature. On-device OCR reads the level and bay number from the photo. Decided 2026-10-22: a session can have several photos. The first is the pillar photo; the others help you remember the place. OCR reads the first photo, and reads the next only if the first gives no level or bay. Also decided 2026-10-22: a photo can be picked from the gallery, with a button beside the camera's shutter (`expo-image-picker`, Android's own photo picker, no storage permission) |
 | Pillar zone colour | Many malls colour their pillars by zone. The app suggests the colour from the photo, you confirm it, and it is saved as data (name and hex) so it shows as a big swatch, in the notification and in the share message |
 | Route note | Core feature. Record whether you used the lift, escalator or stairs, and the first shop you saw when you came out. Decided 2026-10-22: added on Find while parked, as you walk out, not on Park, because you have not seen the shop yet when you save at the car |
 | Free-text note | Always available. On Park it is a folded row (2026-10-22) |
 | Park form | Decided 2026-10-22: at the car, parking takes a place, a photo and Save. Everything optional is a folded row that shows its value and opens when tapped: the rate (under the place), the timer and the note |
-| Place search | Decided 2026-10-22: saved places only, searched on the phone, for now. You usually tap Park in a basement with weak or no signal, so the local search must stay the main path. Online suggestions (type "pavi", get matching malls) are to be designed with M7: their real value is the place's location, and they need a provider choice (Google Places: best Malaysian coverage, API key and billing; OpenStreetMap: free, weaker coverage) and a change to the privacy rule, since what you type is sent out |
+| Place search | Decided 2026-10-22: saved places only, searched on the phone, for now. You usually tap Park in a basement with weak or no signal, so the local search must stay the main path. Decided 2026-10-23: with the location allowed, Park fills in a saved place near you, and for a new place looks its name up online with Android's geocoder (no API key; it sends the location to Google). Online suggestions while typing (type "pavi", get matching malls) are still not planned: they need a provider (Google Places: API key and billing; OpenStreetMap: free, weaker coverage) and send what you type |
 | Photos | Stay on the phone only, in version 2 too; never uploaded, to avoid cloud storage cost. Kept until you delete them. Delete button per photo and per session |
 | Vehicles | Cars only, no motorbike type and no plate number. You can add more than one car. Each session belongs to one car. One active session per car |
 | Saved places | Type a place name such as "Pavilion Bukit Jalil" the first time. The rate you enter is saved to that place. Next time you pick the place and the rate fills in. A deleted place keeps its name on past sessions (History, Find, Spending); the place picker and the Places list skip it |
-| Rates | Saved per place for weekday and weekend. A "same rate every day" shortcut saves both at once. A rate is optional when parking: a rate form left empty saves no rate and no fee is calculated; a half-filled form is an error. Decided 2026-10-22: the rate form shows only the two prices (first hour, each hour after); the period lengths, free minutes and daily max are under **More options**, which starts open when a saved rate uses them |
+| Rates | Saved per place for weekday and weekend. A "same rate every day" shortcut saves both at once. A rate is optional when parking: a rate form left empty saves no rate and no fee is calculated; a half-filled form is an error. Decided 2026-10-22: the rate form shows only the two prices (first hour, each hour after); the period lengths, free minutes and daily max are under **More options**, which starts open when a saved rate uses them; **Fewer options** folds them away again (2026-10-23) |
 | Public holidays | Use the weekend rate by default. Optionally, a place can have a fixed public holiday amount (for example RM 8.00 per entry), which is used instead. Holiday dates are typed as `YYYY-MM-DD` (no date picker library), with a "Today" shortcut and an optional name |
 | Stays over midnight | Rare, and every car park has its own rules, so the app does not model them. It shows a clearly labelled estimate (each day charged at that day's rate and added) and you confirm the real amount paid from your receipt when you end the session. Per-car-park overnight rules are a later idea |
 | Fee | Calculated live while parked. When you end the session you can type the amount you actually paid if it differs (validation discount, lost ticket). The amount paid is stored only when it differs from the calculated fee; with no calculated fee (no place or no rate), a typed amount is stored and an empty field stores nothing |
@@ -54,13 +54,13 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 2. Pick the place: recent places are listed first, or search ("bukit" finds Pavilion Bukit Jalil), or type a new name. The rate shows as one folded line under the place (for example `Weekday rate · RM 3.00 first hour, then RM 2.00 per hour`, or `Not set · optional`); tap it to open the form. A rate that needs checking when you tap Save opens it for you.
    - **Saved place with a rate for today's day type:** the rate fills in.
    - **New place, or no rate yet for today's day type:** open the rate line and enter the rate. It is saved to the place automatically, without asking. Tick **Same rate every day** to save it for weekday and weekend at once. If you don't know the rate, leave it closed or empty: no rate is saved and no fee is calculated.
-   - **You change a filled-in rate:** the app asks "Update the saved weekend rate for Pavilion Bukit Jalil?" with **Yes, update**, **Only this time** or **Cancel** (back to the form, nothing saved). Either of the first two parks with the rate you typed. The same rule applies to the public holiday amount.
-   - **Today is a public holiday:** tap the **Public holiday** toggle. Today (the local date you park) is added to your holiday list when you save, and the place's fixed public holiday amount is used if you saved one, otherwise the weekend rate. You can type a fixed amount here too; it is saved to the place. If today is already in your holiday list, the toggle is on and cannot be switched off here; remove the date in Settings > Public holidays. A saved amount fills in and is still used if you empty the field; remove it in Settings > Places to use the weekend rate.
+   - **You change a filled-in rate:** the app asks "Update the saved weekend rate for Pavilion Bukit Jalil?" with **Yes, update**, **Only this time** or **Cancel** (back to the form, nothing saved). Either of the first two parks with the rate you typed.
+   - **Today is a public holiday:** decided 2026-10-23, Park has no Public holiday switch or amount. When today is in your holiday list (Settings > Public holidays), the rate line says **Public holiday rate** and the place's fixed public holiday amount is used if you saved one (in Settings > Places), otherwise the weekend rate. A holiday not in the list is charged as a normal day.
    - **No place** is allowed for free or unknown parking; no fee is calculated.
    - **A name typed but not picked:** Save asks first, `Park at "Pavilion" as a new place?` (or `Park at "Pavilion Bukit Jalil"?` when it matches a saved place), with **Use it**, **No place** or **Cancel**, so a fee is never lost by forgetting to tap the place. **Use it** parks there with the place's saved rates (none for a new place; Found my car then asks for the rate). The same question comes up when a place was picked, then **Change** was tapped and a different name typed but not picked; its buttons are then **Use it**, **Keep "Pavilion"** (the place picked before) and **Cancel**.
 3. Take a photo of the pillar or level sign, or pick one with the gallery button beside the shutter. OCR reads the codes on the sign (for example `B2` and `C14`) and offers each one in a Level row and a Bay row. With two codes, one tap does both: tap `C14` as the bay and `B2` becomes the level, or the other way round; tapping the other row swaps them. The fields stay editable.
 4. Confirm the zone colour: the app suggests one (for example **Blue**). Tap the pillar in the photo to pick its colour exactly, choose another colour chip, or choose **None**.
-5. Optional, each a folded row: **Timer** (`Off` until you open it and pick 30 min, 1, 2, 3 or 4 hours from when you save), **Note**, and later "Save GPS".
+5. Optional, each a folded row: **Timer** (`Off` until you open it and pick 30 min, 1, 2, 3 or 4 hours from when you save), **Note**, and **Location** (`Off` with an Allow location button until allowed; then the reading's accuracy, such as `±12 m`, and a **Save where I parked** switch). With the location allowed, the place in step 2 is filled in for you (see "Location").
 6. Tap **Save**. The ongoing notification appears: `My Myvi · Pavilion Bukit Jalil · B2 C14 Blue · since 2:15 PM`.
 
 **Walking out** (decided 2026-10-22)
@@ -75,7 +75,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 - Tap **Navigate** (notification or app). The Find screen shows the photo, the level and bay in large text on a swatch of the zone colour, and the route back in reverse:
   `Find Starbucks → take the escalator beside it → B2 → blue zone, pillar C14`
 - **Share** sends the parking info, or one photo, to someone (see "Share your spot").
-- If GPS was saved for this session, **Open in Google Maps** gives walking directions to the car park.
+- If a location was saved for this session (or its place has one), **Open in Google Maps** gives walking directions to it.
 - Tap **Found my car**. A summary screen shows the duration and the calculated fee, with an **Amount paid** field prefilled with that fee. Its end time is fixed when the summary opens, so the fee shown is the fee saved. Change the amount if you paid a different amount, then confirm. The session moves to history.
 - If the stay went past midnight, the fee is labelled **Estimate** on the Find screen, and the summary highlights the Amount paid field with "Overnight: check your receipt".
 
@@ -85,8 +85,8 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 |---|---|
 | Tab bar | Home, History, Spending and Settings, at the bottom of every main screen. Park, Find, Vehicles and the other detail screens open above it |
 | Home | One vehicle at a time: a drawing of a car at the top (glowing emerald when parked), the vehicle's name, and a **Parked** or **Not parked** status. When parked, a card with the level and bay on the zone colour, the start time, the way back and (from M2) the fee so far. A round **Park** button at the bottom centre, which becomes **Find** when that vehicle is parked. With several vehicles, chips at the top switch between them and a green dot marks each parked one |
-| Park | Vehicle, place picker with the rate as a folded line under the place (opens to the rate form and the public holiday toggle), camera with a gallery button, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), Timer and Note as folded rows, GPS switch |
-| Find | Level and bay on the zone colour swatch; while parked, the Way back card (how you left and the first shop, saved as you go; open until one is given), afterwards the reverse route; photos (tap to zoom, share or delete one) and Add photo while parked, elapsed time, live fee, Extend timer, Share, Open in Google Maps (if GPS saved), Found my car |
+| Park | Vehicle, place picker with the rate as a folded line under the place (opens to the rate form), camera with a gallery button, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), Timer, Note and Location as folded rows |
+| Find | Level and bay on the zone colour swatch; while parked, the Way back card (how you left and the first shop, saved as you go; open until one is given), afterwards the reverse route; photos (tap to zoom, share or delete one) and Add photo while parked, elapsed time, live fee, Extend timer, Share, Open in Google Maps (while parked, when the session or its place has a location), and Found my car pinned at the bottom so it shows without scrolling. The level reads "Level B2" and the bay is its code alone ("C14"), decided 2026-10-23 |
 | Found my car | Summary opened from Find (`/session/end/<id>`): the stay's times, duration and fee (with the Estimate label), a form for each missing rate (optional), Amount paid, Save. Back to Home afterwards |
 | History | Past sessions in months, newest first. Each month's header shows its total and number of sessions, and opens that month on Spending. Each card leads with the place, then the date, time and duration, the level/bay with the zone colour, the car (only with several cars) and the amount paid. Tap to view details and photo. Delete photo or session. Filters by vehicle, place and month are not built yet (2026-10-22); Spending opens one place's or car's sessions for a month instead |
 | Spending | Month switcher, monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart (tap a bar to pick that month). Tap a place or vehicle to open that month's sessions |
@@ -94,7 +94,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Places | Saved places with visit count. Tap to edit the weekday rate, weekend rate and public holiday amount, rename or delete |
 | Public holidays | Your holiday dates, by date. Add a date typed as `YYYY-MM-DD` (with a "Today" shortcut) and an optional name; delete a date |
 | Vehicles | Add, edit, set default, archive (archived vehicles keep their history) |
-| Settings | Appearance (Dark or Light), Cars, Places, Public holidays, Extend timer by (15, 30 or 60 min, default 30), Remind me before the timer ends (5, 10, 15 or 30 min, default 10) with an Allow notifications button when they are off, Export database. "GPS location" is listed under Coming soon. Development builds also link to Database check |
+| Settings | Appearance (Dark or Light), Cars, Places, Public holidays, Extend timer by (15, 30 or 60 min, default 30) and Remind me before the timer ends (5, 10, 15 or 30 min, default 10) as folded rows showing their value (2026-10-23), with an Allow notifications button when they are off, Location (On or Off, what it does, and Allow location while off; it is turned off in Android settings), Export database. Development builds also link to Database check |
 
 ## Saved places and rates
 
@@ -108,7 +108,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
   | Public holiday | Optional fixed amount per entry | Weekend rate is used |
 
 - **Day type:** Monday to Friday is a weekday, Saturday and Sunday are the weekend, and any date in your public holiday list is a public holiday (even on a weekend).
-- **Public holiday list:** dates you add in Settings (typed as `YYYY-MM-DD`), or by tapping the Public holiday toggle when parking. Stored on the phone; no internet calendar.
+- **Public holiday list:** dates you add in Settings (typed as `YYYY-MM-DD`). Park no longer adds one (2026-10-23). Stored on the phone; no internet calendar.
 - **Optional rate:** a rate form left empty when parking saves no rate, and the fee is unknown. A form with only some prices typed is an error, shown under the form.
 - **Auto-save:** a rate entered for a combination that has none is saved without asking. Changing a saved rate asks first (Yes, update / Only this time / Cancel), because a one-off promotion should not overwrite the normal rate. The same rule applies to the public holiday amount.
 - **Rates change over time:** each session keeps a copy of the rates it used (`rate_snapshot`): all the place's saved rates when you park, with the rates typed on Park in place of the saved ones for those day types, also after "Only this time". Updating a place's rate later never changes past fees or monthly totals.
@@ -201,10 +201,23 @@ Write these as Jest tests before the fee screens.
   Map: https://www.google.com/maps/search/?api=1&query=3.0512,101.6789
   ```
 
-  The Map line appears only if GPS was saved. The person receiving it needs nothing installed.
+  The Map line appears only if the session or its place has a location. The person receiving it needs nothing installed.
 - **A photo:** the share button in the full-screen photo view sends that photo on its own. The message and the photo go separately, because React Native's built-in `Share` cannot send text and an image together on Android; that would need `react-native-share`.
 - **QR code:** dropped on 2026-10-22.
 - **Later, when friends have the app:** a link such as `parkyourself://spot?...` that imports the spot into their app.
+
+## Location
+
+Decided 2026-10-23. Optional: nothing is read until you allow Android's location permission, which the app asks for only when you tap **Allow location** on Park's Location row or in Settings. After Android stops asking, the button opens the app's Android settings instead. Turning it off is done in Android settings too.
+
+- **When it is read.** Only while Park is open, once, when it opens: first the phone's last known position (at most 5 minutes old, and still there in a basement with no signal), then a fresh reading if one comes within 10 seconds. The more precise one is kept. **Try again** reads again. No background or continuous tracking.
+- **Usable reading.** Accurate to 200 m or better. A rougher one is neither saved nor used to fill in the place.
+- **Filling in the place.** Once, and only while you have not picked or typed a place yourself:
+  1. A saved place with a location within 300 m of you (the nearest one) is picked, with its rates.
+  2. Otherwise Android's geocoder looks up a name online (`reverseGeocodeAsync`): the building or shop name (for example "Sunway Velocity Mall"), or else the street, for parking by the road. House numbers and plus codes are skipped. It becomes a new place, shown as "Found from your location, saved when you park"; tap **Change** if it is wrong. This sends the location to Google (accepted 2026-10-23, AGENTS.md "Privacy"). With no signal the lookup fails, the Location row says so, and you pick the place as before.
+- **Saving.** With **Save where I parked** on (the default once allowed), the reading is saved on the session (`lat`, `lng`, `gps_accuracy_m`). A place gets its location the first time a session there is saved with one, and keeps it, so the next park there finds it offline.
+- **Walking back.** While parked, Find shows **Open in Google Maps** with walking directions to the saved location, or to the place's location when the session has none. Useful for open-air and street parking with no pillar. The share message's Map line uses the same location.
+- Later idea: a "Save location here" on Find's way back card, for a precise point at the mall entrance when the basement had no signal.
 
 ## Monthly spending
 
@@ -232,21 +245,27 @@ LIMIT 12;
 - Run text recognition on the device (Google ML Kit). Reading needs no internet. Google's ML Kit data disclosure says it also collects per-installation identifiers and diagnostics and usage analytics and sends them to Google over HTTPS; there is no opt-out for text recognition. Accepted on 2026-10-22 as the one exception to "no analytics"; recorded in AGENTS.md, Privacy.
 - Shrink the photo first (about 1280 px wide) to save space and speed up OCR.
 - Parse the recognised text for:
-  - Level: `B1`–`B9`, `P1`–`P9`, `L1`–`L20`, `LG`, `UG`, `G`, `M`, `LL`
+  - Level: `B1`–`B9`, `P1`–`P9`, `L1`–`L20`, `LG`, `UG`, `G`, `M`, `LL`, and `GF` (ground floor) and `RF` (roof), added 2026-10-23
   - Bay: a zone letter plus number (`C14`, `C-14`, `C 14`) or a number on its own
 - Show every candidate as a chip. You tap one for Level and one for Bay. The fields stay editable, and you can skip OCR and type them.
 - Decided 2026-10-22, after a sign reading `G3 A2` gave two bay chips and no level: the patterns cannot always tell a level from a bay, so every code read is offered in both rows, the likelier ones first. With exactly two codes, tapping one fills the other field with the code left over, when that field is empty or held the code just tapped (so tapping the other row swaps them). Not when the two are readings of the same characters (`M 12` gives `M` and `M12`). Any other typed value is never replaced.
+- Decided 2026-10-23, after real photos picked up car plates and ads beside the pillar: the parser reads each line ML Kit found, with its size on the photo, and:
+  - drops lines that are clearly not the sign: car plates (two or three letters then three or four digits, such as `WXY 1234`, or one letter with four digits or a letter after, such as `W 1234 A`; not `LG 12`, `ZON 3` or a zone such as `AA 12`), phone numbers (9 or more digits in one run, so a bay range such as `C101-C120` or `1201-1250` stays), prices (`RM5`), web addresses, and ad words (SALE, PROMO, OFF, CALL, `%`);
+  - leaves out small print: codes in text under 35% of the height of the biggest code;
+  - ranks the rest by text size, doubled beside a sign word on the same line or the line above (LEVEL, ARAS, TINGKAT, FLOOR for a level; ZONE, ZON, BAY, LOT, PETAK, PILLAR, TIANG for a bay), halved on a line of more than five words (a notice) and for a four-digit number (a year or an ad's number).
+- The likeliest level and bay fill the Level and Bay fields when they are empty, with "Filled in below from the photo. Check it, or tap another code." The bay is filled only when the sign also gave a level or a single code (`G3 A2` is left for you to tap), and nothing is filled from two readings of the same characters (`M 12`). Every code on the sign is offered as a chip; lines dropped as not the sign, and small print, give no chips. A typed value is never replaced. Removing a photo keeps what it filled in.
 - Save the raw OCR text with the photo, so the parser can be improved later using your real photos.
 
 ## Pillar zone colour
 
 The photo itself is always saved in full colour. This feature also records the zone colour as data, because data can be shown big on the Find screen, printed in the notification and the share message, searched in history, and (in version 2) synced to family, while the photo never leaves the phone.
 
-**How the colour is picked**
-1. **Suggestion:** after the photo, the app takes the most vibrant colour in the photo and preselects the nearest named colour.
-2. **Tap to pick (most accurate):** you tap the pillar in the photo. The app crops about 40 × 40 px around your tap and takes the main colour of that crop.
-3. **Confirm:** colour chips (Red, Orange, Yellow, Green, Blue, Purple, Pink, Brown, Grey, White, Black, None). The suggested one is highlighted; tap another to change it.
-4. Save both the confirmed name (`Blue`) and the picked hex value (`#1E5BD8`) on the session.
+**How the colour is picked** (decided 2026-10-23; the zone colour chip is filled in when it is still empty and you have not picked one, with "Suggested from the photo. Tap another colour if it is wrong.")
+1. **Words on the sign:** a colour word in English or Malay (RED/MERAH, ORANGE/OREN/JINGGA, YELLOW/KUNING, GREEN/HIJAU, BLUE/BIRU, PURPLE/UNGU, PINK/MERAH JAMBU, BROWN/COKLAT, GREY/KELABU, WHITE/PUTIH, BLACK/HITAM). Beside ZONE or ZON (or under it) comes first, then on a line with a code, then a line of colour words alone. Words in a brand name or an ad ("RED BULL", "RED SALE") are not used.
+2. **Suggestion from the paint:** when the sign names no colour, the app crops the panel around the likeliest code (its OCR box widened by most of its height) and takes that crop's main colour with `react-native-image-colors`, then the nearest named colour. Only a clear colour is suggested: White, Grey and Black are too easily bare concrete or a white light. The paint is read even when the sign names its colour, and its hex is saved with the session whatever name you pick. (Replaces "the most vibrant colour in the photo", which is as likely an ad or a car.)
+3. **Tap to pick:** dropped on 2026-10-23. The colour now fills in from the sign, and the chips correct it, so tapping the pillar in the photo is not needed. (It would have cropped about 40 × 40 px around the tap.)
+4. **Confirm:** colour chips (Red, Orange, Yellow, Green, Blue, Purple, Pink, Brown, Grey, White, Black, None). The suggested one is highlighted; tap another to change it.
+5. Save both the confirmed name (`Blue`) and the picked hex value (`#1E5BD8`) on the session.
 
 Basement lighting (yellow or dim lights) shifts colours, which is why you always confirm the name. The name is what the app shows and shares; the hex is kept so the mapping can be improved later.
 
@@ -431,11 +450,11 @@ Never edit a migration that has already run on your phone; add a new one.
 | Camera, photo resize, crop | `expo-camera`, `expo-image-manipulator`, `expo-file-system` |
 | Photo from the gallery | `expo-image-picker` (added 2026-10-22): Android's photo picker, which needs no storage permission. The picked photo is a copy in the app's cache, so preparing it never touches the gallery. Its microphone permission is blocked in `app.json`; its camera permission is left alone, as `expo-camera` needs it |
 | OCR | `expo-mlkit-ocr` 0.2.7, pinned (chosen 2026-10-22): an Expo module for Google ML Kit text recognition with the bundled Latin model, so it reads on the phone with no model download (ML Kit's usage metrics: see "OCR for the pillar sign"). On iOS its config plugin, as added, uses Apple Vision instead of ML Kit; set `["expo-mlkit-ocr", { "iosEngine": "mlkit" }]` if the iPhone build should use ML Kit |
-| Zone colour | `react-native-image-colors` (uses Android's Palette to find the main and most vibrant colours; check at M4) |
+| Zone colour | `react-native-image-colors` 2.6 (added 2026-10-23; an Expo module using Android's Palette, on the phone, no network). Native code, so the phone needs a fresh `npx expo run:android` |
 | Notifications | `expo-notifications` (chosen 2026-10-22 over Notifee, see "Notifications") |
 | Share spot | React Native's built-in `Share` for the message, `expo-sharing` for a photo (2026-10-22: no extra library; text and image are not sent together) |
 | Charts | `react-native-gifted-charts` with `react-native-svg` and its peer dependency `expo-linear-gradient` (both added at M6, 2026-10-22; native code, so the phone needs a fresh `npx expo run:android`) |
-| Optional GPS | `expo-location`, foreground one-shot reading only |
+| Location | `expo-location` (2026-10-23): foreground only, with background location and the foreground service off in `app.json`; Android's geocoder names a new place. Native config, so the phone needs a fresh `npx expo run:android` |
 | Export database | `expo-sharing` |
 | Laptop DB view | Android Studio Database Inspector (see below) |
 | Tests | Jest, starting with the fee calculator test cases |
@@ -573,24 +592,26 @@ Notes:
 
 Version 1 is finished when M0 to M8 are done.
 
-- [ ] **M0 Setup**: Expo project (JavaScript), dev build running on the phone, SQLite with the `user_version` migration list and `foreign_keys` on, `db/` data layer following the data layer rules (UUIDs, `updated_at`, soft delete), tables visible in Android Studio Database Inspector
-- [ ] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, bottom tab bar, Home (one vehicle at a time with the round Park button), Park screen with photo, level/bay typed by hand, note; Find screen with the way back (access type and first shop, added while parked) and reverse route; Found my car; History with delete
+- [x] **M0 Setup**: Expo project (JavaScript), dev build running on the phone, SQLite with the `user_version` migration list and `foreign_keys` on, `db/` data layer following the data layer rules (UUIDs, `updated_at`, soft delete), tables visible in Android Studio Database Inspector
+- [x] **M1 Vehicles, park and find (manual)**: first-run vehicle setup, Vehicles screen, bottom tab bar, Home (one vehicle at a time with the round Park button), Park screen with photo, level/bay typed by hand, note; Find screen with the way back (access type and first shop, added while parked) and reverse route; Found my car; History with delete
   - 2026-10-22: pillar photos built (several per session, Add photo on Find while parked, full-screen view, delete one); to check on the phone after `npx expo run:android`. Renaming a car (Cars → pencil → Rename car) built the same day.
   - 2026-10-22: redesign after first use on the phone: Park's optional parts folded (rate, timer, note), the way back moved to Find, photos from the gallery, History in months with totals and place-first cards; to check on the phone after `npx expo run:android` (`expo-image-picker` is native).
-- [ ] **M2 Places, rates and fees**: place picker with search and recent places, weekday and weekend rates saved per place, optional fixed public holiday amount, update-rate prompt, public holiday list and toggle, overnight stays shown as Estimate, amount paid, Jest tests for every row of the fee test table
+- [x] **M2 Places, rates and fees**: place picker with search and recent places, weekday and weekend rates saved per place, optional fixed public holiday amount, update-rate prompt, public holiday list (the toggle on Park was removed 2026-10-23), overnight stays shown as Estimate, amount paid, Jest tests for every row of the fee test table
   - 2026-10-22: built with Jest tests; to check on the phone.
-- [ ] **M3 Notifications**: ongoing notification per parked vehicle with Navigate and Extend timer, timer reminders, permission prompts, tested with the screen locked
+- [x] **M3 Notifications**: ongoing notification per parked vehicle with Navigate and Extend timer, timer reminders, permission prompts, tested with the screen locked
   - 2026-10-22: built with `expo-notifications`: the ongoing notification (start time and timer end, no fee), Navigate and Extend timer (both open the app), reminders before and at the end, the permission asked when Find first opens after parking, the reminder lead time in Settings. To check on the phone after `npx expo run:android`, including with the screen locked.
-- [ ] **M4 OCR and zone colour**: pillar photo → level and bay chips, raw OCR text saved; colour suggestion, tap-to-pick, colour chips, Jest tests for the hex-to-name table
+- [x] **M4 OCR and zone colour**: pillar photo → level and bay chips, raw OCR text saved; colour suggestion, colour chips, Jest tests for the hex-to-name table (tap-to-pick dropped 2026-10-23)
   - 2026-10-22: dependencies approved: an ML Kit OCR wrapper and `react-native-image-colors`.
   - 2026-10-22: OCR built with `expo-mlkit-ocr`: the first photo is read (the next only if it gave nothing), level and bay chips fill the fields, the raw text is saved with the photo. Colour suggestion and tap-to-pick are not built yet.
-- [ ] **M5 Share spot**: share the parking info as a message, or a photo, through the share sheet (QR code dropped 2026-10-22)
+  - 2026-10-23: the parser ranks by text size and drops plates, phone numbers and ads; the likeliest level and bay fill the empty fields; the zone colour is suggested from a colour word on the sign, else from the paint around the code (`react-native-image-colors`), and its hex is saved. Checked on the phone. Tap-to-pick dropped: the colour fills in from the sign.
+- [x] **M5 Share spot**: share the parking info as a message, or a photo, through the share sheet (QR code dropped 2026-10-22)
   - 2026-10-22: built without an extra library: Share on Find (message), share in the photo view (photo).
-- [ ] **M6 Monthly spending**: Spending screen, breakdown by place and vehicle, 12-month chart, tap through to sessions
+- [x] **M6 Monthly spending**: Spending screen, breakdown by place and vehicle, 12-month chart, tap through to sessions
   - 2026-10-22: built with Jest tests; to check on the phone after `npx expo run:android` (the chart has native code).
-- [ ] **M7 Optional GPS**: per-session switch, one-shot reading, Open in Google Maps, map link in the share message
+- [x] **M7 Location**: permission asked only from Allow location, one reading when Park opens, the place filled in (a saved place near you, else a name from Android's geocoder), the location saved with the session and on a place's first visit, Open in Google Maps with walking directions on Find, map link in the share message
   - 2026-10-22: on hold while the GPS design is rethought.
   - 2026-10-22: online place search is to be designed with it (see "Decisions made", Place search).
+  - 2026-10-23: redesigned and built (see "Location"), and checked on the phone.
 - [ ] **M8 Polish**: Settings, export database, app icon, signed APK for your phone. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
   - 2026-10-22: Settings (Places, Public holidays, Extend timer by) and Export database are built; to check on the phone. App icon, signed APK and the dark system dialogs are still to do.
 

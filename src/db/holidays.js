@@ -19,7 +19,7 @@ export const holidays = {
   },
 
   // Adds a date and returns its id. A date already in the list is not an
-  // error (the Park toggle may add it again); it keeps its row and gains the
+  // error (sessions.start's public_holiday may add it again); it keeps its row and gains the
   // name if it had none. Takes the connection it is given and opens no
   // transaction, so sessions.start can call it inside its own.
   async add(db, { holiday_date, name = null }) {

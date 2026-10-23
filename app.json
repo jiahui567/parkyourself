@@ -44,12 +44,22 @@
         }
       ],
       "./plugins/withCmakeVersion",
+      "./plugins/withImageColorsJvmTarget",
       "expo-mlkit-ocr",
       "expo-status-bar",
       [
         "expo-image-picker",
         {
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Park Yourself uses your location while you park, to fill in the place and save where the car is.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false,
+          "isIosBackgroundLocationEnabled": false
         }
       ]
     ]

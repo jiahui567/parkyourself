@@ -1,5 +1,5 @@
 import { calcStayFee } from '../fees';
-import { blockPriceLabel, firstPriceLabel, missingRateText, rateSummary } from './rateText';
+import { blockPriceLabel, firstPriceLabel, missingRateText, moreOptionsLabel, rateSummary } from './rateText';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur). 2026-10-24 is a Saturday.
 const at = (localDateTime) => new Date(localDateTime).getTime();
@@ -73,5 +73,19 @@ describe('price labels', () => {
   ])('follow a period typed as "$minutes"', ({ minutes, first, block }) => {
     expect(firstPriceLabel(minutes)).toBe(first);
     expect(blockPriceLabel(minutes)).toBe(block);
+  });
+});
+
+describe('moreOptionsLabel', () => {
+  it('folds back while open', () => {
+    expect(moreOptionsLabel(true, 2)).toBe('Fewer options');
+  });
+
+  it('says how many hidden fields are set', () => {
+    expect(moreOptionsLabel(false, 2)).toBe('More options · 2 set');
+  });
+
+  it('is plain with nothing hidden', () => {
+    expect(moreOptionsLabel(false, 0)).toBe('More options');
   });
 });

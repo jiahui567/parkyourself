@@ -512,3 +512,98 @@ describe('sessions.listHistory filters', () => {
     expect(rows.map((s) => s.id)).toEqual([ids.axiaPavilion, ids.myviPavilion]);
   });
 });
+
+describe('sessions.start with a location', () => {
+  const HERE = { lat: 3.1279, lng: 101.7238, accuracyM: 15 };
+  const placeLocation = async (name) => {
+    const { lat, lng } = await places.findByName(db, name);
+    return { lat, lng };
+  };
+
+  it('saves the reading on the session and gives a new place its location', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, place_name: 'Sunway Velocity', location: HERE });
+
+    expect(await sessions.get(db, id)).toMatchObject({ lat: 3.1279, lng: 101.7238, gps_accuracy_m: 15 });
+    expect(await placeLocation('Sunway Velocity')).toEqual({ lat: 3.1279, lng: 101.7238 });
+  });
+
+  it('gives a saved place without a location this one', async () => {
+    await places.create(db, { name: 'Sunway Velocity' });
+    await sessions.start(db, { vehicle_id: myvi, place_name: 'sunway velocity', location: HERE });
+
+    expect(await placeLocation('Sunway Velocity')).toEqual({ lat: 3.1279, lng: 101.7238 });
+  });
+
+  it("keeps a place's first location", async () => {
+    await places.create(db, { name: 'Sunway Velocity', lat: 3.1, lng: 101.7 });
+    const id = await sessions.start(db, { vehicle_id: myvi, place_name: 'Sunway Velocity', location: HERE });
+
+    expect(await placeLocation('Sunway Velocity')).toEqual({ lat: 3.1, lng: 101.7 });
+    expect((await sessions.get(db, id)).lat).toBe(3.1279);
+  });
+
+  it('saves a location with no place, for parking by the road', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, location: HERE });
+
+    expect(await sessions.get(db, id)).toMatchObject({ place_id: null, lat: 3.1279, lng: 101.7238 });
+  });
+
+  it('saves no location when none is given', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, place_name: 'Mid Valley' });
+
+    expect(await sessions.get(db, id)).toMatchObject({ lat: null, lng: null, gps_accuracy_m: null });
+    expect(await placeLocation('Mid Valley')).toEqual({ lat: null, lng: null });
+  });
+
+  it.each([
+    ['a latitude out of range', { ...HERE, lat: 91 }],
+    ['a longitude that is not a number', { ...HERE, lng: Number.NaN }],
+    ['no accuracy', { ...HERE, accuracyM: null }],
+  ])('refuses %s and writes nothing', async (_, location) => {
+    await expect(sessions.start(db, { vehicle_id: myvi, place_name: 'Mid Valley', location })).rejects.toThrow(
+      'location reading is not valid'
+    );
+    expect(await liveRows('parking_session')).toBe(0);
+    expect(await liveRows('place')).toBe(0);
+  });
+});
+
+describe('sessions.getDetails location', () => {
+  it("includes the place's location, for a session saved without one", async () => {
+    await places.create(db, { name: 'Sunway Velocity', lat: 3.1279, lng: 101.7238 });
+    const id = await sessions.start(db, { vehicle_id: myvi, place_name: 'Sunway Velocity' });
+
+    expect(await sessions.getDetails(db, id)).toMatchObject({ lat: null, place_lat: 3.1279, place_lng: 101.7238 });
+  });
+
+  it("leaves out a deleted place's location, keeping only its name", async () => {
+    const place = await places.create(db, { name: 'Sunway Velocity', lat: 3.1279, lng: 101.7238 });
+    const id = await sessions.start(db, { vehicle_id: myvi, place_name: 'Sunway Velocity' });
+    await places.remove(db, place);
+
+    expect(await sessions.getDetails(db, id)).toMatchObject({
+      place_name: 'Sunway Velocity',
+      place_lat: null,
+      place_lng: null,
+    });
+  });
+});
+
+describe('sessions.start zone colour hex', () => {
+  it('keeps the colour read off the sign, in capitals', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, zone_colour_name: 'Blue', zone_colour_hex: '#1e5bd8' });
+
+    expect(await sessions.get(db, id)).toMatchObject({ zone_colour_name: 'Blue', zone_colour_hex: '#1E5BD8' });
+  });
+
+  it('stores no hex when none was read', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, zone_colour_name: 'Blue' });
+
+    expect((await sessions.get(db, id)).zone_colour_hex).toBeNull();
+  });
+
+  it('refuses text that is not a hex colour and writes nothing', async () => {
+    await expect(sessions.start(db, { vehicle_id: myvi, zone_colour_hex: 'blue' })).rejects.toThrow('Not a hex colour');
+    expect(await liveRows('parking_session')).toBe(0);
+  });
+});

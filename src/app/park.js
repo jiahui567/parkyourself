@@ -10,7 +10,7 @@ import { ChipGroup } from '../components/ChipGroup';
 import { Disclosure } from '../components/Disclosure';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
-import { CameraIcon, NoteIcon, TimerIcon } from '../components/icons';
+import { CameraIcon, MapPinIcon, NoteIcon, TimerIcon } from '../components/icons';
 import { PhotoStrip } from '../components/PhotoStrip';
 import { PhotoViewer } from '../components/PhotoViewer';
 import { PlacePicker } from '../components/PlacePicker';
@@ -38,13 +38,32 @@ import {
   ratesToSave,
 } from '../fees';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
+import { useParkLocation } from '../hooks/useParkLocation';
+import { isUsableReading } from '../lib/geo';
 import { indexAfterRemoval } from '../lib/listIndex';
 import { typedPlaceToConfirm } from '../lib/placeName';
 import { formatMinutes } from '../lib/time';
-import { codeRows, pickCode, shouldReadNextPhoto, suggestionsFromPhotos } from '../ocr/pillarText';
+import { placeForReading, shouldFillPlace } from '../location/autoPlace';
+import { lookUpPlaceName } from '../location/readLocation';
+import {
+  codeRows,
+  fillFromSign,
+  pickCode,
+  readSign,
+  shouldReadNextPhoto,
+  suggestionsFromPhotos,
+  zoneFromPhotos,
+} from '../ocr/pillarText';
 import { readPhotoText } from '../ocr/readText';
 import {
-  holidayAmountHint,
+  allowLocationLabel,
+  autoPlaceHint,
+  LOCATION_PURPOSE,
+  locationHint,
+  locationRowValue,
+} from '../text/locationText';
+import {
+  holidayRateHint,
   keepPlaceLabel,
   parkRateRowText,
   photoCodesHint,
@@ -53,6 +72,7 @@ import {
 } from '../text/parkText';
 import { addPhotoLabel } from '../text/photoText';
 import { TIMER_OPTIONS, timerEndFrom } from '../timer/timer';
+import { sampleSignColour } from '../zone/photoColour';
 import { ZONE_COLOURS } from '../zone/zoneColour';
 
 const ZONE_OPTIONS = ZONE_COLOURS.map((c) => ({ value: c.name, label: c.name, swatch: c.swatch }));
@@ -60,10 +80,10 @@ const TIMER_CHIPS = TIMER_OPTIONS.map((minutes) => ({ value: minutes, label: for
 
 // How the user left the car park and the first shop they saw are added on
 // Find as they walk out: at the car, when Save is tapped, they are not known yet.
-const EMPTY_FORM = { level: '', bay: '', zone_colour_name: null, note: '' };
+const EMPTY_FORM = { level: '', bay: '', zone_colour_name: null, zone_colour_hex: null, note: '' };
 const NO_SAVED_RATES = { weekday: null, weekend: null, holiday: null };
 // The optional parts start folded, so parking takes a place, a photo and Save.
-const ALL_CLOSED = { rate: false, timer: false, note: false };
+const ALL_CLOSED = { rate: false, timer: false, note: false, location: false };
 
 // Only the Save handler reads the clock. The React Compiler lint cannot tell
 // that handler from render code, so the read lives outside the component.
@@ -90,18 +110,23 @@ export default function Park() {
   // What is typed in the picker's search box, trimmed: a name never tapped.
   const [typedPlace, setTypedPlace] = useState('');
   // The chosen place's saved rates and its rate card as typed. form is
-  // placeRatesFormFrom's: weekday and weekend keep their own form, so switching
-  // Public holiday on and off never loses what was typed. null: no place, or
+  // placeRatesFormFrom's: weekday and weekend keep their own form, so a day
+  // change while Park is open never loses what was typed. null: no place, or
   // its rates are loading.
   const [rateInput, setRateInput] = useState(null);
   const [ratesError, setRatesError] = useState(null);
-  const [holidaySwitch, setHolidaySwitch] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState(null);
   const [open, setOpen] = useState(ALL_CLOSED);
-  // Prepared photos in the cache, the pillar sign first: [{ uri, ocrText }],
-  // ocrText null for a photo OCR did not read. They are kept in the app's
-  // storage only when the car is parked.
+  // Prepared photos in the cache, the pillar sign first: [{ uri, read, sampled }],
+  // read the OCR result (readText.js), null for a photo OCR did not read, and
+  // sampled the colour read off the sign's paint ({ name, hex }) or null. They
+  // are kept in the app's storage only when the car is parked.
   const [taken, setTaken] = useState([]);
+  // Set once the user picks a zone colour chip: from then on a photo never
+  // replaces their choice, None included.
+  const zoneTouched = useRef(false);
+  // True while the zone colour shown is the one the photo suggested.
+  const [zoneFromPhoto, setZoneFromPhoto] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   // null, 'preparing' (shrinking the photo) or 'reading' (OCR).
   const [photoStep, setPhotoStep] = useState(null);
@@ -122,6 +147,20 @@ export default function Park() {
   // True while a question is looked up or open. Save stays enabled behind it,
   // so a quick second tap must not open a second question on top.
   const asking = useRef(false);
+  // The location, when allowed (PLAN.md, "Location"): it fills in the place
+  // and is saved with the session unless switched off.
+  const gps = useParkLocation();
+  const [saveLocation, setSaveLocation] = useState(true);
+  const [allowing, setAllowing] = useState(false);
+  const [locationError, setLocationError] = useState(null);
+  // True while the chosen place is the one the location filled in.
+  const [placeFromLocation, setPlaceFromLocation] = useState(false);
+  // Set once the user picks or types a place: from then on the location
+  // never replaces their choice.
+  const placeTouched = useRef(false);
+  // The place is filled in once (autoPlace.js); busy while it is looked up.
+  const filling = useRef({ busy: false, done: false });
+  const fillPlace = useRef(null);
 
   const setField = (field) => (value) => setForm((current) => ({ ...current, [field]: value }));
   const updateRateInput = (change) => setRateInput((current) => current && { ...current, ...change(current) });
@@ -129,8 +168,25 @@ export default function Park() {
   // A rate to check opens its row, so the user does not have to find it.
   const openRate = () => setOpen((current) => ({ ...current, rate: true }));
 
+  // What the photos read fills the level, bay and zone colour still empty
+  // (PLAN.md, "OCR for the pillar sign"); the chips stay to change them.
+  // A chip the user picked is never replaced; the hex is the photo's colour
+  // and is kept whatever name is picked.
+  const fillFromPhotos = (photos) => {
+    const zone = zoneFromPhotos(photos);
+    const name = zoneTouched.current ? null : zone?.name;
+    if (name && form.zone_colour_name == null) setZoneFromPhoto(true);
+    setForm((current) => {
+      let next = fillFromSign(current, suggestionsFromPhotos(photos.map((photo) => photo.read)));
+      if (name && current.zone_colour_name == null) next = { ...next, zone_colour_name: name };
+      if (zone?.hex && current.zone_colour_hex == null) next = { ...next, zone_colour_hex: zone.hex };
+      return next;
+    });
+  };
+
   // OCR reads the first photo, and the next only while the ones before gave
-  // no level or bay. A photo OCR cannot read is still kept.
+  // no level or bay. A photo OCR cannot read is still kept. When the sign
+  // names no colour, its paint is read around the likeliest code.
   const addPhoto = async (picture) => {
     setCameraOpen(false);
     setPhotoStep('preparing');
@@ -143,17 +199,42 @@ export default function Park() {
       setPhotoStep(null);
       return;
     }
-    let ocrText = null;
-    if (shouldReadNextPhoto(taken.map((photo) => photo.ocrText))) {
+    let read = null;
+    let sampled = null;
+    if (shouldReadNextPhoto(taken.map((photo) => photo.read))) {
       setPhotoStep('reading');
       try {
-        ocrText = await readPhotoText(uri);
+        read = await readPhotoText(uri);
       } catch (e) {
         setPhotoError(new Error(`Could not read the sign: ${String(e?.message ?? e)}. Type the level and bay below.`));
       }
+      // The paint is read even when the sign names its colour, so the hex
+      // saved beside a name is that photo's own.
+      const sign = read && readSign(read);
+      if (sign?.box) {
+        try {
+          sampled = await sampleSignColour(uri, sign.box);
+        } catch (e) {
+          // Only worth saying when the colour now has to be picked by hand.
+          if (!sign.colour && !zoneTouched.current) {
+            setPhotoError(new Error(`Could not read the zone colour: ${String(e?.message ?? e)}. Pick it below.`));
+          }
+        }
+      }
     }
-    setTaken((current) => [...current, { uri, ocrText }]);
+    // taken is still the current list: the strip and Add photo are disabled
+    // while a photo is prepared or read, so nothing changed it meanwhile.
+    const photos = [...taken, { uri, read, sampled }];
+    setTaken(photos);
+    fillFromPhotos(photos);
     setPhotoStep(null);
+  };
+
+  const pickZone = (name) => {
+    zoneTouched.current = true;
+    setZoneFromPhoto(false);
+    // A hex read off the photo stays with any name: it is the photo's colour.
+    setField('zone_colour_name')(name);
   };
 
   const confirmRemovePhoto = (index) =>
@@ -193,6 +274,58 @@ export default function Park() {
     }
   };
 
+  // Fills in the place from the reading kept once reading has finished.
+  // fillPlace is set after every render, so it always calls this render's choosePlace.
+  useEffect(() => {
+    fillPlace.current = async ({ reading, finding }) => {
+      const fill = filling.current;
+      if (fill.busy || !shouldFillPlace({ touched: placeTouched.current, filled: fill.done, finding, reading })) return;
+      fill.busy = true;
+      try {
+        const next = await placeForReading(reading, {
+          listSavedPlaces: () => places.listLocated(db),
+          lookUpName: lookUpPlaceName,
+        });
+        if (next && !placeTouched.current) {
+          fill.done = true;
+          setLocationError(null);
+          setPlaceFromLocation(true);
+          choosePlace(next);
+        }
+      } catch (e) {
+        setLocationError(new Error(`Could not name this place: ${String(e?.message ?? e)}. Pick or type it above.`));
+      } finally {
+        fill.busy = false;
+      }
+    };
+  });
+  useEffect(() => {
+    fillPlace.current({ reading: gps.reading, finding: gps.finding });
+  }, [gps.reading, gps.finding]);
+
+  // The user's own choice, which the location never replaces.
+  const pickPlace = (next) => {
+    placeTouched.current = true;
+    setPlaceFromLocation(false);
+    choosePlace(next);
+  };
+  const typePlace = (text) => {
+    if (text) placeTouched.current = true;
+    setTypedPlace(text);
+  };
+
+  const allowLocation = async () => {
+    setAllowing(true);
+    setLocationError(null);
+    try {
+      await gps.allow();
+    } catch (e) {
+      setLocationError(e);
+    } finally {
+      setAllowing(false);
+    }
+  };
+
   if (loadError) return <ErrorText error={loadError} />;
   if (loading) return null;
   if (!data.car) return <ErrorText error={new Error('This car no longer exists.')} />;
@@ -200,17 +333,19 @@ export default function Park() {
   const { car, holidayDates } = data;
   const todayType = dayTypeOf(formDay, holidayDates);
   const todayIsHoliday = todayType === 'holiday';
-  const holidayOn = todayIsHoliday || holidaySwitch;
-  const rateDayType = rateDayTypeFor(todayType, holidayOn);
+  // A public holiday is a date in the holiday list (Settings > Public
+  // holidays); Park has no switch for it (PLAN.md, "User flow").
+  const rateDayType = rateDayTypeFor(todayType, todayIsHoliday);
   const hasSavedRate = Boolean(rateInput?.saved[rateDayType]);
   // A chosen place's rates must be loaded first: without them every typed
   // rate would count as new and replace a saved one without asking.
   const canSave = !saving && !photoStep && (!place || rateInput != null);
-  const ocrTexts = taken.map((photo) => photo.ocrText);
-  const suggestions = suggestionsFromPhotos(ocrTexts);
+  const reads = taken.map((photo) => photo.read);
+  const suggestions = suggestionsFromPhotos(reads);
   const hasSuggestions = suggestions.levels.length > 0 || suggestions.bays.length > 0;
-  const readNothing = !hasSuggestions && ocrTexts.some((text) => text != null);
+  const readNothing = !hasSuggestions && reads.some((read) => read != null);
   const rows = codeRows(suggestions);
+  const filledFromPhoto = rows.level.includes(form.level) || rows.bay.includes(form.bay);
   const codeChips = (codes, name) => codes.map((code) => ({ value: code, label: code, accessibilityLabel: `${name} ${code}` }));
   const pick = (field) => (code) =>
     setForm((current) => ({ ...current, ...pickCode(current, field, code, rows.level) }));
@@ -219,18 +354,19 @@ export default function Park() {
     parkRateRowText({
       dayType: rateDayType,
       form: rateInput.form[rateDayType],
-      holidayOn,
+      holidayOn: todayIsHoliday,
       holidayAmount: rateInput.form.holidayAmount,
       savedHoliday: rateInput.saved.holiday,
     });
   const note = form.note.trim();
+  const locationAllowed = Boolean(gps.permission?.granted);
+  const locationToSave = locationAllowed && saveLocation && isUsableReading(gps.reading) ? gps.reading : null;
 
   const start = async ({
     started_at,
     place_name = place?.name ?? null,
     rates,
     save_rates,
-    public_holiday = Boolean(place) && holidaySwitch && !todayIsHoliday,
   }) => {
     setSaving(true);
     setSaveError(null);
@@ -243,10 +379,10 @@ export default function Park() {
           place_name,
           rates,
           save_rates,
-          public_holiday,
           timer_ends_at: timerMinutes ? timerEndFrom(started_at, timerMinutes) : null,
           // The raw text is kept, so the parser can be improved with real photos.
-          photo_files: keptUris.map((file_uri, i) => ({ file_uri, ocr_text: taken[i].ocrText })),
+          photo_files: keptUris.map((file_uri, i) => ({ file_uri, ocr_text: taken[i].read?.text ?? null })),
+          location: locationToSave,
         })
       );
       router.replace(`/session/${id}`);
@@ -292,7 +428,7 @@ export default function Park() {
       dayType: rateDayType,
       form: rateInput.form[rateDayType],
       sameEveryDay: rateInput.sameEveryDay,
-      holidayOn,
+      holidayOn: todayIsHoliday,
       holidayAmount: rateInput.form.holidayAmount,
     });
     if (error) {
@@ -318,9 +454,9 @@ export default function Park() {
   // without a word: with no place chosen the car parked with no place,
   // and after Change it parked at the place chosen before. "Use it" parks at
   // the typed place with no typed rate in both cases: the chosen place's rate
-  // card (and its Public holiday switch) is for that place. A
-  // saved place's saved rates still go into the snapshot (sessions.start), and
-  // a new place's rate is asked for at Found my car, so no rate question follows.
+  // card is for that place. A saved place's saved rates still go into the
+  // snapshot (sessions.start), and a new place's rate is asked for at Found my
+  // car, so no rate question follows.
   const askTypedPlace = async (started_at, typed) => {
     asking.current = true;
     let saved;
@@ -340,7 +476,7 @@ export default function Park() {
       {
         text: 'Use it',
         onPress: () =>
-          start({ started_at, place_name: saved?.name ?? typed, rates: null, save_rates: [], public_holiday: false }),
+          start({ started_at, place_name: saved?.name ?? typed, rates: null, save_rates: [] }),
       },
     ]);
   };
@@ -368,7 +504,12 @@ export default function Park() {
       >
         <Stack.Screen options={{ title: `Park ${car.name}` }} />
 
-        <PlacePicker value={place} onChange={choosePlace} onQueryChange={setTypedPlace}>
+        <PlacePicker
+          value={place}
+          onChange={pickPlace}
+          onQueryChange={typePlace}
+          hint={placeFromLocation && place ? autoPlaceHint(place.id == null) : null}
+        >
           {place && rateInput && (
             <Disclosure
               label={rateRow.label}
@@ -377,6 +518,7 @@ export default function Park() {
               onToggle={toggle('rate')}
               first={false}
             >
+              {todayIsHoliday && <Text style={styles.hint}>{holidayRateHint(rateInput.saved.holiday)}</Text>}
               <Text style={styles.hint}>
                 {hasSavedRate
                   ? 'Filled in from your saved rate.'
@@ -396,32 +538,6 @@ export default function Park() {
                   value={rateInput.sameEveryDay}
                   onValueChange={(sameEveryDay) => updateRateInput(() => ({ sameEveryDay }))}
                 />
-              )}
-              <View style={styles.divider} />
-              <SwitchRow
-                label="Public holiday"
-                hint={
-                  todayIsHoliday
-                    ? 'Today is in your holiday list. Remove it in Settings > Public holidays.'
-                    : 'Adds today to your public holiday list.'
-                }
-                value={holidayOn}
-                onValueChange={setHolidaySwitch}
-                disabled={todayIsHoliday}
-              />
-              {holidayOn && (
-                <>
-                  <Field
-                    label="Public holiday amount (RM, per entry)"
-                    value={rateInput.form.holidayAmount}
-                    onChangeText={(holidayAmount) =>
-                      updateRateInput((current) => ({ form: { ...current.form, holidayAmount } }))
-                    }
-                    placeholder="Optional"
-                    keyboardType="decimal-pad"
-                  />
-                  <Text style={styles.hint}>{holidayAmountHint(Boolean(rateInput.saved.holiday))}</Text>
-                </>
               )}
             </Disclosure>
           )}
@@ -456,7 +572,7 @@ export default function Park() {
         {hasSuggestions && (
           <View style={styles.section}>
             <Text style={styles.label}>From the photo</Text>
-            <Text style={styles.hint}>{photoCodesHint(rows.level)}</Text>
+            <Text style={styles.hint}>{photoCodesHint(rows.level, filledFromPhoto)}</Text>
             <View style={styles.codeRow}>
               <Text style={styles.codeLabel}>Level</Text>
               <View style={styles.codeChips}>
@@ -502,7 +618,10 @@ export default function Park() {
 
         <View style={styles.section}>
           <Text style={styles.label}>Zone colour</Text>
-          <ChipGroup options={ZONE_OPTIONS} value={form.zone_colour_name} onChange={setField('zone_colour_name')} />
+          {zoneFromPhoto && form.zone_colour_name && (
+            <Text style={styles.hint}>Suggested from the photo. Tap another colour if it is wrong.</Text>
+          )}
+          <ChipGroup options={ZONE_OPTIONS} value={form.zone_colour_name} onChange={pickZone} />
         </View>
 
         <View style={styles.listCard}>
@@ -534,6 +653,44 @@ export default function Park() {
               autoFocus
             />
           </Disclosure>
+          <Disclosure
+            icon={MapPinIcon}
+            label="Location"
+            value={locationRowValue({ ...gps, saveOn: saveLocation })}
+            open={open.location}
+            onToggle={toggle('location')}
+            first={false}
+          >
+            {locationAllowed ? (
+              <>
+                <SwitchRow
+                  label="Save where I parked"
+                  hint={locationHint({ ...gps, saveOn: saveLocation })}
+                  value={saveLocation}
+                  onValueChange={setSaveLocation}
+                />
+                {!gps.finding && !isUsableReading(gps.reading) && (
+                  <View style={styles.sideActions}>
+                    <Button title="Try again" variant="tonal" size="small" onPress={gps.retry} />
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={styles.hint}>{LOCATION_PURPOSE}</Text>
+                <View style={styles.sideActions}>
+                  <Button
+                    title={allowLocationLabel(gps.permission)}
+                    variant="tonal"
+                    size="small"
+                    onPress={allowLocation}
+                    disabled={allowing || !gps.permission}
+                  />
+                </View>
+              </>
+            )}
+            <ErrorText error={locationError ?? gps.error} />
+          </Disclosure>
         </View>
 
         <View style={styles.section}>
@@ -559,7 +716,6 @@ const createStyles = (c) =>
     codeLabel: { width: 44, paddingTop: 9, fontWeight: '600', color: c.muted },
     codeChips: { flex: 1 },
     listCard: { backgroundColor: c.card, borderRadius: radius.card, overflow: 'hidden', boxShadow: c.shadow },
-    divider: { height: StyleSheet.hairlineWidth, backgroundColor: c.border },
     // A row, so the small pill sits at the start instead of stretching.
     sideActions: { flexDirection: 'row' },
   });

@@ -4,18 +4,15 @@ An Android app that remembers where you parked and what it will cost.
 
 Take a photo of the pillar sign and the app reads the level, bay number and zone colour. Add the first shop you saw after the lift or escalator, and the app shows you the way back. It remembers each car park's weekday, weekend and public holiday rates, calculates the fee while you are away, reminds you before paid parking runs out, lets you share your spot through WhatsApp, and shows your monthly parking spend.
 
-All data stays on the phone. No account, no server. An optional cloud sync is planned for version 2. The one thing that reaches the internet by itself is Google ML Kit, which reads the pillar sign: it sends Google anonymous usage metrics (see "Tech stack", OCR).
+All data stays on the phone. No account, no server. An optional cloud sync is planned for version 2. Two things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); and, only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place.
 
 ## Status
 
 | | |
 |---|---|
-| Built | **M0 Setup**: Expo SDK 58 project, development build on Android, SQLite data layer with migrations, UUID ids, soft delete, and a self-test screen |
-| M1 in testing | Screens: Home (one car at a time, round Park button), Add a car (first run), Park (level, bay, zone colour, note), Find (way back, Found my car), History, Cars (default, rename, archive) and Settings, behind a bottom tab bar. Dark mode by default, Light in Settings. Data functions for cars and sessions are tested in CI. Running on the phone as a development build. The pillar photos (built 2026-10-22, not yet on the phone): several per session on Park, shown on Find and in History, tap to view full screen, share or delete one, Add photo while parked. Renaming a car (built 2026-10-22). Redesign (built 2026-10-22, not yet on the phone): Park's rate, timer and note fold away, the way back is added on Find while parked, photos can come from the gallery, and History is grouped by month with totals |
-| Built, not yet on the phone | **M2 Places, rates and fees** (place picker, weekday/weekend rates, public holiday amount and list, live fee, overnight Estimate, Amount paid), **M3 Notifications** (timer on Park, Extend timer on Find; an ongoing notification per parked car with the start time and Navigate and Extend timer buttons, which open the app; reminders before and at the timer's end; the reminder lead time in Settings), **M4 OCR** (the first photo is read on the phone with `expo-mlkit-ocr`; level and bay chips fill the fields), **M5 Share** (the parking info as a message from Find, or one photo from the photo view; no QR code), **M6 Monthly spending** (Spending tab with the 12-month chart, tap through to a month's sessions) and the **M8 Settings** screen (Places, Public holidays, Extend timer by, Export database). Needs a fresh `npx expo run:android`: the chart and OCR have native code, and the camera and notification permissions are set in `app.json` |
-| Built ahead | **M4 colour logic**: zone colour names from a hex (`src/zone/`), covered by Jest tests. The colour suggestion from the photo and tap-to-pick are not built yet |
-| On hold | **M7 GPS**, while its design is rethought |
-| Next | Rebuild with `npx expo run:android`, run the new screens, photos, OCR, sharing and notifications on the phone and fix what shows up; then the rest of M4 (colour from the photo) and M8 |
+| Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
+| In progress | **M8 Polish**: Settings and Export database are built; the app icon, dark system dialogs and a release APK for the phone are left |
+| Next | Build a release APK (see "Release APK"), use the app day to day, then finish M8. Version 2 (cloud) starts after M8 |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -29,7 +26,8 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
 - **Share:** the parking info as a message, or one photo, through WhatsApp or any app.
 - **Monthly spending:** totals by month, place and car.
-- **Several cars**, optional one-shot GPS, works fully offline.
+- **Location (optional):** fills in the place when you park and gives walking directions back in Google Maps, for open-air and street parking too.
+- **Several cars**, and everything except naming a new place from the location works offline.
 - **Look:** clean and minimal, dark mode by default with a Light option in Settings, and a bottom tab bar for Home, History, Spending and Settings.
 
 ## Tech stack
@@ -45,7 +43,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | OCR | `expo-mlkit-ocr` 0.2.7 (pinned): Google ML Kit's bundled Latin text model, read on the phone with no model download. ML Kit sends Google per-installation identifiers and diagnostics and usage metrics, with no opt-out; accepted on 2026-10-22 (AGENTS.md, Privacy) |
 | Sharing and export | React Native's `Share` for the parking info; `expo-sharing` for a photo and for Export database |
 | Notifications | `expo-notifications` |
-| Location (optional) | `expo-location` |
+| Location (optional) | `expo-location`, foreground only; native config in `app.json`, so run `npx expo run:android` again after pulling it in |
 | Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
 | Charts | `react-native-gifted-charts` with `expo-linear-gradient` (its gradient peer dependency), for the Spending tab's 12-month bar chart. `expo-linear-gradient` has native code: after pulling it in, run `npx expo run:android` again |
 | Theme | Own dark and light colour sets in `src/components/theme.js`; the choice is saved in the `setting` table. Design rules in the `add-screen` skill |
@@ -54,7 +52,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
 | CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
 
-Added at the milestone that needs it: `react-native-image-colors` (the rest of M4, approved). M5 needs no extra library; the QR code was dropped.
+`react-native-image-colors` (approved for M4) was added on 2026-10-23 for the zone colour. M5 needs no extra library; the QR code was dropped.
 
 ## Project structure
 
@@ -123,7 +121,8 @@ park-yourself/
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
 ├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
-│   └── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
+│   ├── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
+│   └── withImageColorsJvmTarget.js  Config plugin: builds react-native-image-colors' Kotlin for Java 17
 ├── scripts/
 │   └── pull-db.js           Copies the phone's database to db-snapshot/
 ├── assets/                  App icons and splash image
@@ -226,7 +225,25 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 - `android/` is generated by Expo (Continuous Native Generation). Do not edit it by hand; change `app.json` or add a config plugin in `plugins/`.
 - `plugins/withCmakeVersion.js` points the Android build at CMake 3.31.6, whose Ninja handles Windows long paths. Without it, React Native's C++ build fails with `ninja: error: mkdir`.
+- `plugins/withImageColorsJvmTarget.js` sets `react-native-image-colors`' Kotlin target to Java 17. The library sets none for the current Android Gradle Plugin, and the build otherwise fails with "Inconsistent JVM-target compatibility" (Java 17, Kotlin 21).
 - The Android package is `com.parkyourself.app`. Changing it later installs a separate app that cannot see the old database.
+
+## Release APK
+
+A release build has the JavaScript inside it, so the app runs without the laptop or `npx expo start`.
+
+1. Back up first: in the app, Settings → Export database, and save the copy somewhere safe.
+2. Run `npm run lint` and `npm test`.
+3. Connect the phone by USB with USB debugging on, as for the development build.
+4. Build and install it: `npx expo run:android --variant release`. It replaces the development build on the phone and keeps its data: both have the package `com.parkyourself.app` and are signed with the same key.
+   - To only build the file: `cd android; .\gradlew.bat assembleRelease`. The APK is `android\app\build\outputs\apk\release\app-release.apk`; install it with `adb install -r` and that path, or copy it to the phone.
+5. Unplug the phone and open Park Yourself.
+
+Good to know:
+- The release build is signed with Android's shared debug key (`android/app/debug.keystore`, the same in every prebuild). That is fine for your own phone, not for Google Play or for giving the app to others; those need your own release key (part of M8).
+- Android only updates an app with a build signed by the same key. A build signed with another key has to be installed after an uninstall, which deletes the app's data, so export the database first.
+- `npm run db:pull` and Android Studio's Database Inspector need a debuggable build. With the release build installed, use Settings → Export database instead.
+- To go back to developing, run `npx expo run:android`: the development build replaces the release build and keeps the data.
 
 ## Troubleshooting
 

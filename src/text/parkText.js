@@ -9,9 +9,10 @@ const NOT_FINISHED = 'Not finished · tap to check it';
 // Park's folded rate row: its label, and a hint with the rate the form holds,
 // so the rate can be checked without opening it. dayType is the form shown
 // (rateDayTypeFor). Either part not finished makes the row say so, checked in
-// enteredRates' order, as Save would refuse it. With holidayOn, the public
-// holiday amount is shown (the one typed, else savedHoliday, the place's saved
-// one), as the fee uses it; the weekend form only when there is neither.
+// enteredRates' order, as Save would refuse it. With holidayOn (today is in
+// the holiday list), the public holiday amount is shown (holidayAmount, the
+// saved one prefilled, else savedHoliday), as the fee uses it; the weekend
+// form only when there is neither.
 // { label: 'Weekday rate', hint: 'RM 3.00 first hour, then RM 2.00 per hour' }
 export function parkRateRowText({ dayType, form, holidayOn = false, holidayAmount = '', savedHoliday = null }) {
   const label = holidayOn ? 'Public holiday rate' : `${dayTypeLabel(dayType)} rate`;
@@ -45,20 +46,22 @@ export function rateUpdateQuestion(changed, placeName) {
 }
 
 // The line under Park's "From the photo", for the codes read (codeRows): one
-// tap does both when fillsOther, and a single code is either one.
-export function photoCodesHint(codes) {
+// tap does both when fillsOther, and a single code is either one. filled: the
+// level or bay below holds a code from the photo (fillFromSign filled it in).
+export function photoCodesHint(codes, filled = false) {
+  if (filled) return 'Filled in below from the photo. Check it, or tap another code.';
   if (fillsOther(codes)) return 'Tap the level or the bay, and the other code fills in.';
   if (codes.length === 1) return 'Tap it as the level or the bay, and type the other below.';
   return 'Tap the level and the bay, or type them below.';
 }
 
-// The line under Park's public holiday amount. An emptied field still uses a
-// saved amount (rate_snapshot keeps the place's saved rates), so with one
-// saved the hint says where to remove it instead.
-export function holidayAmountHint(hasSavedAmount) {
-  return hasSavedAmount
-    ? 'Filled in from your saved amount. To use the weekend rate instead, remove it in Settings > Places.'
-    : 'With no amount, a public holiday uses the weekend rate above.';
+// The line in Park's rate row on a date in the holiday list, which Park does
+// not change (PLAN.md, "User flow"): a saved amount (savedHoliday, a
+// place_rate) is used instead of the form, so the line says so.
+export function holidayRateHint(savedHoliday) {
+  return savedHoliday
+    ? `Today is a public holiday: ${rateSummary(savedHoliday)} is used. Change it in Settings > Places.`
+    : 'Today is a public holiday, so the weekend rate below is used.';
 }
 
 // The picker row that adds a typed name: 'Add "Sunway Pyramid" as a new place'.

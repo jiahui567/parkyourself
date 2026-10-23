@@ -1,12 +1,13 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../components/Button';
 import { CameraCapture } from '../../components/CameraCapture';
 import { ErrorText } from '../../components/ErrorText';
 import { EstimatePill } from '../../components/EstimatePill';
-import { CameraIcon, ShareIcon, TimerIcon } from '../../components/icons';
+import { CameraIcon, MapPinIcon, ShareIcon, TimerIcon } from '../../components/icons';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { PhotoViewer } from '../../components/PhotoViewer';
 import { radius, space } from '../../components/theme';
@@ -34,7 +35,7 @@ import { syncNotifications } from '../../notify/notifications';
 import { endedFeeText, extendTimerText, stayTimesText } from '../../text/findText';
 import { addPhotoLabel } from '../../text/photoText';
 import { missingRateText } from '../../text/rateText';
-import { routeBackText, shareMessage } from '../../text/sessionText';
+import { routeBackText, shareMessage, spotLocation, walkingDirectionsUrl } from '../../text/sessionText';
 import { timerStatusText } from '../../text/timerText';
 import { swatchFor, textColourOn } from '../../zone/zoneColour';
 
@@ -47,6 +48,7 @@ export default function SessionScreen() {
   const db = useDatabase();
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
   // extendedAt: set when Extend timer on a notification opened this screen.
   const { id, extendedAt } = useLocalSearchParams();
   const load = useCallback(async () => {
@@ -98,6 +100,7 @@ export default function SessionScreen() {
   const timerText = active ? timerStatusText(session.timer_ends_at, now) : null;
   const paid = active ? null : endedFeeText(session);
   const photoUris = sessionPhotos.map((photo) => photo.file_uri);
+  const location = active ? spotLocation(session) : null;
 
   const run = async (action) => {
     setBusy(true);
@@ -191,6 +194,17 @@ export default function SessionScreen() {
     }
   };
 
+  // Walking directions in Google Maps, to where the car was saved or else to
+  // its place. Opened only when the user taps it (AGENTS.md, "Privacy").
+  const openMaps = async () => {
+    setActionError(null);
+    try {
+      await Linking.openURL(walkingDirectionsUrl(location));
+    } catch (e) {
+      setActionError(e);
+    }
+  };
+
   // Alert, because the viewer covers the screen's own error line.
   const sharePhotoAt = async (index) => {
     try {
@@ -207,119 +221,158 @@ export default function SessionScreen() {
     ]);
 
   return (
-    // handled: with the keyboard up for the shop, a tap on a chip or button
-    // still works instead of only closing the keyboard.
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <View style={styles.screen}>
       <Stack.Screen options={{ title: session.vehicle_name }} />
+      {/* handled: with the keyboard up for the shop, a tap on a chip or button
+          still works instead of only closing the keyboard. */}
+      <ScrollView style={styles.screen} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-      <View style={[styles.spot, spotColours]}>
-        {session.level || session.bay ? (
-          <>
-            {session.level && <Text style={[styles.level, spotTextStyle]}>{session.level}</Text>}
-            {session.bay && <Text style={[styles.bay, spotTextStyle]}>Bay {session.bay}</Text>}
-          </>
+        <View style={[styles.spot, spotColours]}>
+          {session.level || session.bay ? (
+            <>
+              {/* "Level" is what people look for on the signs; the bay is the
+                  code on the pillar, so it needs no word. */}
+              {session.level && (
+                <Text style={[styles.level, spotTextStyle]} numberOfLines={1} adjustsFontSizeToFit>
+                  Level {session.level}
+                </Text>
+              )}
+              {session.bay && (
+                <Text style={[styles.bay, spotTextStyle]} accessibilityLabel={`Bay ${session.bay}`}>
+                  {session.bay}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={[styles.bay, spotTextStyle]}>No level or bay recorded</Text>
+          )}
+          {session.zone_colour_name && <Text style={spotTextStyle}>{session.zone_colour_name} zone</Text>}
+        </View>
+
+        {active ? (
+          <WayBackCard session={session} route={route} onSave={saveWayBack} error={wayBackError} />
         ) : (
-          <Text style={[styles.bay, spotTextStyle]}>No level or bay recorded</Text>
+          route && (
+            <View style={styles.card}>
+              <Text style={styles.label}>Way back</Text>
+              <Text style={styles.route}>{route}</Text>
+            </View>
+          )
         )}
-        {session.zone_colour_name && <Text style={spotTextStyle}>{session.zone_colour_name} zone</Text>}
-      </View>
 
-      {active ? (
-        <WayBackCard session={session} route={route} onSave={saveWayBack} error={wayBackError} />
-      ) : (
-        route && (
+        {(photoUris.length > 0 || active) && (
           <View style={styles.card}>
-            <Text style={styles.label}>Way back</Text>
-            <Text style={styles.route}>{route}</Text>
+            <Text style={styles.label}>Photos</Text>
+            <PhotoStrip uris={photoUris} onOpen={setViewing} />
+            <ErrorText error={photoError} />
+            {active && (
+              <View style={styles.sideActions}>
+                <Button
+                  title={addPhotoLabel(photoUris.length)}
+                  variant="tonal"
+                  size="small"
+                  icon={CameraIcon}
+                  onPress={() => setCameraOpen(true)}
+                  disabled={busy}
+                />
+              </View>
+            )}
           </View>
-        )
-      )}
+        )}
+        <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
+        <PhotoViewer
+          uris={photoUris}
+          index={viewing}
+          onClose={() => setViewing(null)}
+          onShare={sharePhotoAt}
+          onDelete={confirmDeletePhoto}
+        />
 
-      {(photoUris.length > 0 || active) && (
         <View style={styles.card}>
-          <Text style={styles.label}>Photos</Text>
-          <PhotoStrip uris={photoUris} onOpen={setViewing} />
-          <ErrorText error={photoError} />
-          {active && (
-            <View style={styles.sideActions}>
+          {session.place_name && <Text style={styles.label}>{session.place_name}</Text>}
+          <Text style={styles.body}>
+            {active
+              ? `${formatDate(session.started_at)}, ${formatTime(session.started_at)}`
+              : stayTimesText(session.started_at, session.ended_at)}
+          </Text>
+          <Text style={styles.muted}>{active ? 'Parked for ' : 'Parked '}{formatDuration(durationMs)}</Text>
+          {timerText && <Text style={styles.body}>{timerText}</Text>}
+          {session.note && <Text style={styles.body}>{session.note}</Text>}
+        </View>
+
+        {fee?.feeSen != null && (
+          <View style={styles.card}>
+            <View style={styles.feeHeader}>
+              <Text style={styles.label}>Fee so far</Text>
+              {fee.isEstimate && <EstimatePill />}
+            </View>
+            <Text style={styles.fee}>{formatRM(fee.feeSen)}</Text>
+            {missingRate && <Text style={styles.muted}>{missingRate}</Text>}
+          </View>
+        )}
+
+        {paid && (
+          <View style={styles.card}>
+            <Text style={styles.paid}>{paid.paid}</Text>
+            {paid.calculated && <Text style={styles.muted}>{paid.calculated}</Text>}
+          </View>
+        )}
+
+        {active && (
+          <View style={styles.sideActions}>
+            <Button
+              title={extendTimerText(session.timer_ends_at, prefs.extendMinutes)}
+              variant="tonal"
+              size="small"
+              icon={TimerIcon}
+              onPress={extend}
+              disabled={busy}
+            />
+            <Button title="Share" variant="tonal" size="small" icon={ShareIcon} onPress={shareSpot} disabled={busy} />
+            {location && (
               <Button
-                title={addPhotoLabel(photoUris.length)}
+                title="Open in Google Maps"
                 variant="tonal"
                 size="small"
-                icon={CameraIcon}
-                onPress={() => setCameraOpen(true)}
+                icon={MapPinIcon}
+                onPress={openMaps}
                 disabled={busy}
               />
-            </View>
-          )}
-        </View>
-      )}
-      <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
-      <PhotoViewer
-        uris={photoUris}
-        index={viewing}
-        onClose={() => setViewing(null)}
-        onShare={sharePhotoAt}
-        onDelete={confirmDeletePhoto}
-      />
-
-      <View style={styles.card}>
-        {session.place_name && <Text style={styles.label}>{session.place_name}</Text>}
-        <Text style={styles.body}>
-          {active
-            ? `${formatDate(session.started_at)}, ${formatTime(session.started_at)}`
-            : stayTimesText(session.started_at, session.ended_at)}
-        </Text>
-        <Text style={styles.muted}>{active ? 'Parked for ' : 'Parked '}{formatDuration(durationMs)}</Text>
-        {timerText && <Text style={styles.body}>{timerText}</Text>}
-        {session.note && <Text style={styles.body}>{session.note}</Text>}
-      </View>
-
-      {fee?.feeSen != null && (
-        <View style={styles.card}>
-          <View style={styles.feeHeader}>
-            <Text style={styles.label}>Fee so far</Text>
-            {fee.isEstimate && <EstimatePill />}
+            )}
           </View>
-          <Text style={styles.fee}>{formatRM(fee.feeSen)}</Text>
-          {missingRate && <Text style={styles.muted}>{missingRate}</Text>}
-        </View>
-      )}
+        )}
 
-      {paid && (
-        <View style={styles.card}>
-          <Text style={styles.paid}>{paid.paid}</Text>
-          {paid.calculated && <Text style={styles.muted}>{paid.calculated}</Text>}
-        </View>
-      )}
-
+        {!active && (
+          <>
+            <ErrorText error={actionError ?? notifyError} />
+            <Button title="Delete" variant="danger" onPress={confirmDelete} disabled={busy} />
+          </>
+        )}
+      </ScrollView>
+      {/* Found my car stays in sight below the scrolling content, so it never
+          has to be scrolled to when the user is back at the car. */}
       {active && (
-        <View style={styles.sideActions}>
-          <Button
-            title={extendTimerText(session.timer_ends_at, prefs.extendMinutes)}
-            variant="tonal"
-            size="small"
-            icon={TimerIcon}
-            onPress={extend}
-            disabled={busy}
-          />
-          <Button title="Share" variant="tonal" size="small" icon={ShareIcon} onPress={shareSpot} disabled={busy} />
+        <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+          <ErrorText error={actionError ?? notifyError} />
+          <Button title="Found my car" onPress={() => router.push(`/session/end/${session.id}`)} disabled={busy} />
         </View>
       )}
-
-      <ErrorText error={actionError ?? notifyError} />
-      {active ? (
-        <Button title="Found my car" onPress={() => router.push(`/session/end/${session.id}`)} disabled={busy} />
-      ) : (
-        <Button title="Delete" variant="danger" onPress={confirmDelete} disabled={busy} />
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
 const createStyles = (c) =>
   StyleSheet.create({
+    screen: { flex: 1 },
     container: { padding: 16, gap: space },
+    footer: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      gap: 8,
+      backgroundColor: c.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
     spot: { borderRadius: radius.card, padding: 24, alignItems: 'center', gap: 4, boxShadow: c.shadow },
     level: { fontSize: 56, fontWeight: '800' },
     bay: { fontSize: 28, fontWeight: '700' },

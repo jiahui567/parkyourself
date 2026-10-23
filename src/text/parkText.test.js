@@ -1,7 +1,7 @@
 import { EMPTY_RATE_FORM, holidayRate } from '../fees';
 import {
   addPlaceLabel,
-  holidayAmountHint,
+  holidayRateHint,
   keepPlaceLabel,
   parkRateRowText,
   photoCodesHint,
@@ -32,15 +32,15 @@ describe('rateUpdateQuestion', () => {
   });
 });
 
-describe('holidayAmountHint', () => {
-  it('says where to remove a saved amount, since emptying the field still uses it', () => {
-    expect(holidayAmountHint(true)).toBe(
-      'Filled in from your saved amount. To use the weekend rate instead, remove it in Settings > Places.'
+describe('holidayRateHint', () => {
+  it('says a saved amount is used and where to change it', () => {
+    expect(holidayRateHint(holidayRate(800))).toBe(
+      'Today is a public holiday: RM 8.00 per entry is used. Change it in Settings > Places.'
     );
   });
 
-  it('says the weekend rate is used when no amount is saved', () => {
-    expect(holidayAmountHint(false)).toBe('With no amount, a public holiday uses the weekend rate above.');
+  it('says the weekend rate is used with no amount', () => {
+    expect(holidayRateHint(null)).toBe('Today is a public holiday, so the weekend rate below is used.');
   });
 });
 
@@ -129,5 +129,9 @@ describe('photoCodesHint', () => {
     ['two readings of the same characters', ['M', 'M12']],
   ])('asks for both taps with %s', (rule, codes) => {
     expect(photoCodesHint(codes)).toBe('Tap the level and the bay, or type them below.');
+  });
+
+  it('says the fields were filled in from the photo', () => {
+    expect(photoCodesHint(['B2', 'C14'], true)).toBe('Filled in below from the photo. Check it, or tap another code.');
   });
 });

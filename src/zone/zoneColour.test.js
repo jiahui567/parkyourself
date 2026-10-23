@@ -1,4 +1,4 @@
-import { ZONE_COLOURS, hexToColourName, swatchFor, textColourOn } from './zoneColour';
+import { hexToColourName, isChromatic, signCropRect, swatchFor, textColourOn, ZONE_COLOURS } from './zoneColour';
 
 describe('hexToColourName', () => {
   it.each([
@@ -49,5 +49,50 @@ describe('textColourOn', () => {
 
   it.each(['Red', 'Green', 'Blue', 'Purple', 'Brown', 'Black'])('uses white text on %s', (name) => {
     expect(textColourOn(swatchFor(name))).toBe('#FFFFFF');
+  });
+});
+
+describe('isChromatic', () => {
+  it.each([
+    ['Blue', true],
+    ['Brown', true],
+    ['Grey', false],
+    ['White', false],
+    ['Black', false],
+    [null, false],
+  ])('%s is %s', (name, chromatic) => {
+    expect(isChromatic(name)).toBe(chromatic);
+  });
+});
+
+describe('signCropRect', () => {
+  const PHOTO = { width: 1280, height: 960 };
+
+  it('widens the text box to take in the panel behind it', () => {
+    expect(signCropRect({ x: 500, y: 300, width: 200, height: 100 }, PHOTO)).toEqual({
+      originX: 440,
+      originY: 240,
+      width: 320,
+      height: 220,
+    });
+  });
+
+  it('keeps the crop inside the photo', () => {
+    expect(signCropRect({ x: 10, y: 900, width: 100, height: 50 }, PHOTO)).toEqual({
+      originX: 0,
+      originY: 870,
+      width: 140,
+      height: 90,
+    });
+  });
+
+  it('gives null for a box outside the photo', () => {
+    expect(signCropRect({ x: 2000, y: 100, width: 100, height: 50 }, PHOTO)).toBeNull();
+  });
+
+  it('gives null without a usable box or size', () => {
+    expect(signCropRect(null, PHOTO)).toBeNull();
+    expect(signCropRect({ x: 0, y: 0, width: 0, height: 10 }, PHOTO)).toBeNull();
+    expect(signCropRect({ x: 0, y: 0, width: 10, height: 10 }, null)).toBeNull();
   });
 });
