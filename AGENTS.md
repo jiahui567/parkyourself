@@ -21,6 +21,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 npx expo install <package>  # always use instead of npm install: resolves SDK-compatible versions
 npx expo start              # start the dev server
 npx expo run:android        # build and install the development build on the phone
+npm run release             # build and install the release build (runs without the laptop)
 npm run lint                # lint src/ and test/ (add -- --no-cache if a result looks stale)
 npm test                    # Jest tests (time zone pinned to Asia/Kuala_Lumpur in jest.config.js)
 npm test -- --coverage      # also writes a coverage report to coverage/ (git-ignored)

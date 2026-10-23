@@ -181,6 +181,7 @@ The first build takes a while. After that:
 |---|---|
 | `npm start` | Starts the Expo dev server |
 | `npm run android` | Builds and installs the development build on the connected phone |
+| `npm run release` | Builds and installs the release build on the connected phone, which runs without the laptop (see "Release APK") |
 | `npm run lint` | Runs ESLint on `src/` and `test/`, including import order and the 120-character limit for code lines. Add `-- --no-cache` if a result looks stale |
 | `npm test` | Runs the Jest tests: rules, display text, the data layer on Node's SQLite, and a load check of every screen. No phone needed. `npm test -- --coverage` also writes a coverage report to `coverage/`, which git ignores |
 | `npm run db:pull` | Copies the database (and its `-wal` file) from the phone into `db-snapshot/` |
@@ -235,7 +236,7 @@ A release build has the JavaScript inside it, so the app runs without the laptop
 1. Back up first: in the app, Settings → Export database, and save the copy somewhere safe.
 2. Run `npm run lint` and `npm test`.
 3. Connect the phone by USB with USB debugging on, as for the development build.
-4. Build and install it: `npx expo run:android --variant release`. It replaces the development build on the phone and keeps its data: both have the package `com.parkyourself.app` and are signed with the same key.
+4. Build and install it: `npm run release` (short for `npx expo run:android --variant release`). It replaces the development build on the phone and keeps its data: both have the package `com.parkyourself.app` and are signed with the same key.
    - To only build the file: `cd android; .\gradlew.bat assembleRelease`. The APK is `android\app\build\outputs\apk\release\app-release.apk`; install it with `adb install -r` and that path, or copy it to the phone.
 5. Unplug the phone and open Park Yourself.
 
