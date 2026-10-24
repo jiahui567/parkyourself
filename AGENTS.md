@@ -28,13 +28,20 @@ npm test -- --coverage      # also writes a coverage report to coverage/ (git-ig
 npm run db:pull             # copy the phone's database into db-snapshot/
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
+npx supabase start          # version 2: start local Supabase (Docker Desktop must be running); stop with npx supabase stop
+npx supabase db reset       # rebuild the local Supabase database from supabase/migrations/
+npx supabase test db        # pgTAP tests in supabase/tests/ against local Supabase
+npx supabase db push --linked  # push new migrations to hosted dev (run with --dry-run first)
+npm run carparks:sql        # write a Supabase migration from src/carparks/carParkList.json (after every list change)
 ```
+
+- Version 2 server: SQL in `supabase/` follows PLAN.md, "Version 2" (environments, migration checklist, explicit `GRANT`s). Never change a hosted Supabase schema in its dashboard. The app picks its server from `.env.development.local` in development builds and `.env.production.local` in release builds (copy `.env.example`); never put a secret key or the database password in an env file.
 
 ## Navigation
 
 - Expo Router for all navigation. Routes live in `src/app/`: every file there is a screen, and `_layout.js` files define navigators.
 - Main sections are bottom tabs in `src/app/(tabs)/` (Home, History, Spending, Settings), listed in `(tabs)/_layout.js`. Detail screens (Park, Find, Found my car, Sessions, Places, Public holidays, Cars, Add a car, Rename car) live outside `(tabs)` and open above the tab bar from the root stack.
-- Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/` (`zoneColour.js` holds the tested rules; `photoColour.js` is the only code that calls `react-native-image-colors`), OCR in `src/ocr/` (`pillarText.js` reads the sign (level, bay, a colour word) and is tested; `readText.js` is the only code that calls `expo-mlkit-ocr`), timer rules in `src/timer/`, spending totals in `src/spending/`, notifications in `src/notify/` (`plan.js` decides what to show and is tested; `notifications.js` is the only code that calls `expo-notifications`), location in `src/location/` (`readLocation.js` is the only code that calls `expo-location`; its rules are in `src/lib/geo.js`, tested), and small pure helpers that belong to no single feature (money, time, place names) in `src/lib/`. Only `src/db/` and `src/fees/` have an `index.js`; import other modules by file.
+- Keep non-route code outside `src/app/`, and never put tests or helpers there (every file in it becomes a route): shared components in `src/components/`, hooks in `src/hooks/`, data access in `src/db/`, display text in `src/text/`, zone colours in `src/zone/` (`zoneColour.js` holds the tested rules; `photoColour.js` is the only code that calls `react-native-image-colors`), OCR in `src/ocr/` (`pillarText.js` reads the sign (level, bay, a colour word) and is tested; `readText.js` is the only code that calls `expo-mlkit-ocr`), timer rules in `src/timer/`, spending totals in `src/spending/`, notifications in `src/notify/` (`plan.js` decides what to show and is tested; `notifications.js` is the only code that calls `expo-notifications`), location in `src/location/` (`readLocation.js` is the only code that calls `expo-location`; its rules are in `src/lib/geo.js`, tested), the version 2 server in `src/cloud/` (`supabase.js` is the only code that calls `@supabase/supabase-js`), the car park list in `src/carparks/` (`carParkList.json` is the one source of the data, researched from the web: give every entry a `source_url` and `checked_on`, add a rate change as new rows with a later `effective_from` instead of editing old ones, bump `version`, then run `npm run carparks:sql` for the server; the app downloads it daily through `src/cloud/carParkUpdates.js`), and small pure helpers that belong to no single feature (money, time, place names) in `src/lib/`. Only `src/db/` and `src/fees/` have an `index.js`; import other modules by file.
 - Screens stay thin: rules and text live in the tested modules above; a screen only loads, shows and saves. Load data with `useFocusedLoad` so it refreshes when the user comes back to the screen. The one exception is the Database check screen's self-test (`debug.js`): it builds a throwaway database, so it runs with `useEffect` once when the screen opens and again only when asked.
 - Import `Link`, `router` and `useLocalSearchParams` from `expo-router`.
 
@@ -42,7 +49,7 @@ npx expo install --fix      # fix incompatible package versions
 
 - Only `src/db/` runs SQL. Screens import functions from `src/db/index.js`. Components take their data as props; the two exceptions, `AppThemeProvider` (the theme setting) and `PlacePicker` (live place search), also call `src/db/index.js`.
 - Synced tables (`vehicle`, `place`, `place_rate`, `public_holiday`, `parking_session`): ids come from `newId()`, writes go through the helpers in `src/db/core.js`, rows are soft-deleted (`deleted_at`) and never `DELETE`d, and every read skips deleted rows. The one exception is display only: a session keeps showing its place's name after the place is deleted.
-- `photo` and `setting` are local-only and never sync.
+- `photo`, `setting`, `car_park` and `car_park_rate` are local-only and never sync. The car park tables are a copy of reference data, replaced whole by `carParks.refresh` from a download (which always wins) or the built-in copy.
 - A schema change is a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. Add a `src/db/selfTest.js` check for every new data rule.
 - Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`.
 - Always bind values with `?`. Never build SQL text from user input.
@@ -59,7 +66,7 @@ npx expo install --fix      # fix incompatible package versions
 
 ## Privacy (local-first)
 
-- No network calls except ones the user starts: Share, and Open in Google Maps. One exception, chosen by the user on 2026-10-23: once the location is allowed, Park looks up a new place's name with Android's geocoder (`lookUpPlaceName` in `src/location/readLocation.js`), which sends the location to Google. Add no other.
+- No network calls except ones the user starts: Share, Open in Google Maps, and (development builds only) Check connection on the Database check screen, which reads the version 2 test server. One exception, chosen by the user on 2026-10-23: once the location is allowed, Park looks up a new place's name with Android's geocoder (`lookUpPlaceName` in `src/location/readLocation.js`), which sends the location to Google. A second exception, chosen by the user on 2026-10-24: at most once a day, when the app opens, it downloads the public car park list from Supabase (`downloadCarParkList` in `src/cloud/supabase.js`); it sends no personal data, only the request itself (Supabase sees the phone's IP address). Add no other.
 - No analytics, ads or crash-reporting SDKs without asking. One exception, accepted by the user on 2026-10-22: Google ML Kit (`expo-mlkit-ocr`, used for OCR) sends Google per-installation identifiers and diagnostics and usage metrics over HTTPS, with no opt-out (Google's ML Kit data disclosure). Do not add another library that does this without asking.
 - Photos never leave the phone unless the user shares one (`sharePhoto`, from the photo view).
 - Never commit `db-snapshot/` or any real parking data.

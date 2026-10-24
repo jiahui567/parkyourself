@@ -2,11 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 
 import { ErrorText } from '../../components/ErrorText';
 import { IconButton } from '../../components/IconButton';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../components/icons';
 import { ListSection } from '../../components/List';
+import { CountUpText, enterUp } from '../../components/motion';
 import { radius } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { sessions, useDatabase } from '../../db';
@@ -36,6 +38,7 @@ const SCREEN_PADDING = 16;
 const CARD_PADDING = 16;
 const CHART_HEIGHT = 140;
 const CHART_SECTIONS = 4;
+const BARS_GROW_MS = 500;
 
 // Spending (PLAN.md, "Monthly spending"): a month's total, sessions and time
 // parked, the last 12 months as bars, and totals by place and by car that
@@ -45,6 +48,7 @@ export default function Spending() {
   const styles = useThemedStyles(createStyles);
   const { colours } = useAppTheme();
   const { width } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
   // Refreshed each minute, so Next month unlocks when a new month starts.
   const currentMonth = localMonthKey(useNow(60 * 1000));
   // month is the one shown; end is the chart's last month (see chartWindowEnd).
@@ -110,9 +114,14 @@ export default function Spending() {
           <Text style={styles.muted}>{emptyMonthText(month)}</Text>
         ) : (
           <>
-            <Text style={styles.total} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-              {formatRM(summary.totalSen)}
-            </Text>
+            <CountUpText
+              value={summary.totalSen}
+              format={formatRM}
+              style={styles.total}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            />
             <Text style={styles.muted}>{monthStatsText(summary)}</Text>
           </>
         )}
@@ -143,6 +152,8 @@ export default function Spending() {
               rulesThickness={1}
               rulesColor={colours.border}
               xAxisLabelTextStyle={styles.chartLabel}
+              isAnimated={!reduceMotion}
+              animationDuration={BARS_GROW_MS}
               disablePress
               disableScroll
               showScrollIndicator={false}
@@ -165,6 +176,7 @@ export default function Spending() {
               <TotalRow
                 key={group.id ?? 'none'}
                 first={index === 0}
+                index={index}
                 name={placeLabel(group)}
                 group={group}
                 onPress={() => openSessions({ placeId: group.id ?? 'none' })}
@@ -177,6 +189,7 @@ export default function Spending() {
               <TotalRow
                 key={group.id}
                 first={index === 0}
+                index={index}
                 name={group.name}
                 group={group}
                 onPress={() => openSessions({ vehicleId: group.id })}
@@ -191,24 +204,26 @@ export default function Spending() {
 }
 
 // A place or car with its total and sessions, in the list-row look of
-// ListRow; it opens that month's sessions.
-function TotalRow({ name, group, onPress, first, styles }) {
+// ListRow; it opens that month's sessions. Rows fade up one after another.
+function TotalRow({ name, group, onPress, first, index, styles }) {
   const { colours } = useAppTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, !first && styles.rowDivider, pressed && styles.rowPressed]}
-    >
-      <View style={styles.rowNames}>
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          {name}
-        </Text>
-        <Text style={styles.rowHint}>{sessionCountText(group.sessions)}</Text>
-      </View>
-      <Text style={styles.rowTotal}>{formatRM(group.totalSen)}</Text>
-      <ChevronRightIcon size={18} color={colours.muted} />
-    </Pressable>
+    <Animated.View entering={enterUp(index)}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, !first && styles.rowDivider, pressed && styles.rowPressed]}
+      >
+        <View style={styles.rowNames}>
+          <Text style={styles.rowLabel} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.rowHint}>{sessionCountText(group.sessions)}</Text>
+        </View>
+        <Text style={styles.rowTotal}>{formatRM(group.totalSen)}</Text>
+        <ChevronRightIcon size={18} color={colours.muted} />
+      </Pressable>
+    </Animated.View>
   );
 }
 

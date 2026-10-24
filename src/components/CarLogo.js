@@ -1,7 +1,20 @@
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 
 import { useAppTheme } from './ThemeProvider';
+
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+// One slow breath in, one out.
+const BREATH_MS = 1600;
 
 const VIEW_WIDTH = 320;
 const VIEW_HEIGHT = 128;
@@ -11,10 +24,22 @@ const BODY =
   'Q302 65 304 80 L304 89 Q304 94 299 94 L270 94 A28 28 0 0 0 214 94 L110 94 A28 28 0 0 0 54 94 Z';
 
 // The car drawn on Home, seen from the side. active (parked) turns the glow
-// under it emerald; otherwise the glow is neutral grey.
-export function CarLogo({ width, active = false }) {
+// under it emerald; otherwise the glow is neutral grey. breathe lets an active
+// glow fade slowly in and out; turn it off while the drawing is not on screen.
+export function CarLogo({ width, active = false, breathe = false }) {
   const { colours } = useAppTheme();
   const car = colours.car;
+  const reduceMotion = useReducedMotion();
+  const breath = useSharedValue(1);
+  useEffect(() => {
+    if (active && breathe && !reduceMotion) {
+      breath.set(withRepeat(withTiming(0.5, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }), -1, true));
+    } else {
+      breath.set(withTiming(1, { duration: 200 }));
+    }
+    return () => cancelAnimation(breath);
+  }, [active, breathe, reduceMotion, breath]);
+  const glowProps = useAnimatedProps(() => ({ opacity: breath.get() }));
   // Gradient ids must be unique on the page and safe inside url(#...). React's
   // id format has changed between versions (':r0:', '«r0»', '_r_0_'), so keep
   // only characters that are always safe.
@@ -39,7 +64,7 @@ export function CarLogo({ width, active = false }) {
         </RadialGradient>
       </Defs>
 
-      <Ellipse cx="162" cy="110" rx="150" ry="14" fill={`url(#glow${id})`} />
+      <AnimatedEllipse cx="162" cy="110" rx="150" ry="14" fill={`url(#glow${id})`} animatedProps={glowProps} />
       <Ellipse cx="162" cy="106" rx="128" ry="5" fill={car.shadow} opacity={0.35} />
 
       <Path d={BODY} fill={`url(#body${id})`} stroke={car.edge} strokeWidth={1} />

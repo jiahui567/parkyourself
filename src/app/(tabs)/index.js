@@ -1,11 +1,24 @@
-import { Redirect, router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CarLogo } from '../../components/CarLogo';
 import { ErrorText } from '../../components/ErrorText';
 import { FindIcon } from '../../components/icons';
+import { Burst, ENTER_MS, playBurst, PressScale, useBurst } from '../../components/motion';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { holidays, sessions, useDatabase, vehicles } from '../../db';
@@ -13,6 +26,7 @@ import { feeSoFar } from '../../fees';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
+import { homeCarMove } from '../../lib/motion';
 import { formatDuration } from '../../lib/time';
 import { syncNotifications } from '../../notify/notifications';
 import { feeSoFarText } from '../../text/findText';
@@ -21,6 +35,8 @@ import { timerStatusText } from '../../text/timerText';
 import { swatchFor } from '../../zone/zoneColour';
 
 const PARK_BUTTON_SIZE = 96;
+const DRIVE_SPRING = { damping: 14, stiffness: 110 };
+const DRIVE_OFF_MS = 420;
 
 // Home: one car at a time, drawn large, with where it is parked and a round
 // Park (or Find) button at the bottom. With several cars, chips at the top
@@ -32,6 +48,8 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(null);
+  // Set by Found my car, so the car drives off with a small celebration.
+  const { foundAt, foundCarId } = useLocalSearchParams();
   const load = useCallback(async () => {
     const [cars, active, holidayDates] = await Promise.all([
       vehicles.list(db),
@@ -89,7 +107,11 @@ export default function Home() {
         )}
 
         <View style={styles.hero}>
-          <CarLogo width={Math.min(340, width - 48)} active={Boolean(session)} />
+          <HeroCar
+            look={{ carId: car.id, parked: Boolean(session), foundAt, foundCarId }}
+            width={Math.min(340, width - 48)}
+            screenWidth={width}
+          />
           <View style={styles.nameBlock}>
             <View style={styles.overlineRow}>
               <View style={styles.hairline} />
@@ -100,30 +122,40 @@ export default function Home() {
               {car.name}
             </Text>
           </View>
+          {/* Keyed by car and state, so the pill and the card fade in again when either changes. */}
           {session ? (
-            <View style={[styles.status, styles.statusParked]}>
+            <Animated.View
+              key={`parked-${car.id}`}
+              entering={FadeIn.duration(ENTER_MS)}
+              style={[styles.status, styles.statusParked]}
+            >
               <View style={styles.parkedDot} />
               <Text style={styles.statusParkedText}>
                 Parked · {formatDuration(Math.max(0, now - session.started_at))}
               </Text>
-            </View>
+            </Animated.View>
           ) : (
-            <View style={styles.status}>
+            <Animated.View key={`free-${car.id}`} entering={FadeIn.duration(ENTER_MS)} style={styles.status}>
               <Text style={styles.statusText}>Not parked</Text>
-            </View>
+            </Animated.View>
           )}
         </View>
 
         {session ? (
-          <SpotCard session={session} now={now} holidayDates={data.holidayDates} styles={styles} />
+          <Animated.View key={`spot-${session.id}`} entering={FadeInDown.duration(ENTER_MS).delay(80)}>
+            <SpotCard session={session} now={now} holidayDates={data.holidayDates} styles={styles} />
+          </Animated.View>
         ) : (
-          <Text style={styles.hint}>Tap Park when you leave the car. We&apos;ll keep the way back for you.</Text>
+          <Animated.Text key={`hint-${car.id}`} entering={FadeIn.duration(ENTER_MS)} style={styles.hint}>
+            Tap Park when you leave the car. We&apos;ll keep the way back for you.
+          </Animated.Text>
         )}
         <ErrorText error={notifyError} />
       </View>
 
       <View style={styles.bottom}>
-        <Pressable
+        <PressScale
+          scaleTo={0.9}
           accessibilityRole="button"
           accessibilityLabel={session ? `Find ${car.name}` : `Park ${car.name}`}
           onPress={() =>
@@ -131,7 +163,7 @@ export default function Home() {
               ? router.push(`/session/${session.id}`)
               : router.push({ pathname: '/park', params: { vehicleId: car.id } })
           }
-          style={({ pressed }) => [styles.parkRing, pressed && styles.pressed]}
+          style={styles.parkRing}
         >
           <View style={styles.parkButton}>
             {session ? (
@@ -141,9 +173,58 @@ export default function Home() {
             )}
             <Text style={styles.parkLabel}>{session ? 'Find' : 'Park'}</Text>
           </View>
-        </Pressable>
+        </PressScale>
       </View>
     </ScrollView>
+  );
+}
+
+// The car drawing. When this car is parked it drives in from the left; after
+// Found my car it drives off to the right, a small burst marks it, and it
+// rolls back in, ready for next time. homeCarMove (tested) decides; each move
+// plays once. The glow breathes only while Home is on screen.
+function HeroCar({ look, width, screenWidth }) {
+  const reduceMotion = useReducedMotion();
+  const drive = useSharedValue(0);
+  const burst = useBurst();
+  const lastLook = useRef(null);
+  const [onScreen, setOnScreen] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setOnScreen(true);
+      return () => setOnScreen(false);
+    }, [])
+  );
+
+  const { carId, parked, foundAt, foundCarId } = look;
+  useEffect(() => {
+    const now = { carId, parked, foundAt, foundCarId };
+    const move = homeCarMove(lastLook.current, now);
+    lastLook.current = now;
+    if (!move || reduceMotion) return;
+    if (move === 'in') {
+      drive.set(-screenWidth);
+      drive.set(withSpring(0, DRIVE_SPRING));
+      return;
+    }
+    drive.set(
+      withSequence(
+        withTiming(screenWidth, { duration: DRIVE_OFF_MS, easing: Easing.in(Easing.quad) }),
+        withTiming(-screenWidth, { duration: 0 }),
+        withDelay(250, withSpring(0, DRIVE_SPRING))
+      )
+    );
+    playBurst(burst);
+  }, [carId, parked, foundAt, foundCarId, reduceMotion, screenWidth, drive, burst]);
+  const driveStyle = useAnimatedStyle(() => ({ transform: [{ translateX: drive.get() }] }));
+
+  return (
+    <View>
+      <Animated.View style={driveStyle}>
+        <CarLogo width={width} active={parked} breathe={parked && onScreen} />
+      </Animated.View>
+      <Burst progress={burst} />
+    </View>
   );
 }
 

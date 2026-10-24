@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { places, useDatabase } from '../db';
+import { carParks, places, useDatabase } from '../db';
 import { isNewPlaceName } from '../lib/placeName';
-import { addPlaceLabel } from '../text/parkText';
+import { addPlaceLabel, listedPlaceHint } from '../text/parkText';
 import { Button } from './Button';
 import { ErrorText } from './ErrorText';
 import { MapPinIcon, PlusIcon, SearchIcon, XIcon } from './icons';
@@ -13,12 +13,15 @@ import { useAppTheme, useThemedStyles } from './ThemeProvider';
 // Short lists keep the long Park form short.
 const RECENT_LIMIT = 5;
 const MATCH_LIMIT = 8;
+const LISTED_LIMIT = 5;
 const ICON_SIZE = 18;
 
 // Picks where the car is parked: recent places first, matches while typing,
 // a typed name as a new place, or No place (free or unknown parking).
-// value: { id, name } for a saved place, { id: null, name } for a new one, or
-// null for no place. onChange gets the same shape. Nothing is picked until the
+// value: { id, name } for a saved place, { id: null, name } for a new one,
+// { id: null, name, carParkId } for one from the built-in car park list (M11,
+// offered while typing, after your saved places), or null for no place.
+// onChange gets the same shape. Nothing is picked until the
 // user taps a row, so a blank picker means no place. onQueryChange (optional)
 // gets the search text, trimmed, and '' once it is cleared or a row is tapped,
 // so the screen can ask about a name typed but never tapped. children are
@@ -33,7 +36,7 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
   // with the current choice kept until another row is tapped).
   const [mode, setMode] = useState(value == null ? 'search' : 'chosen');
   const [query, setQuery] = useState('');
-  const [result, setResult] = useState(null); // { query, rows } of the last search
+  const [result, setResult] = useState(null); // { query, rows, listed } of the last search
   const [error, setError] = useState(null);
   // A place set by the screen while nothing was picked or typed shows as
   // chosen, as if tapped. Adjusted while rendering, as React advises for
@@ -49,10 +52,13 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
   useEffect(() => {
     if (!open) return undefined;
     let cancelled = false;
-    places.search(db, typed, { limit: typed ? MATCH_LIMIT : RECENT_LIMIT }).then(
-      (rows) => {
+    Promise.all([
+      places.search(db, typed, { limit: typed ? MATCH_LIMIT : RECENT_LIMIT }),
+      typed ? carParks.search(db, typed, { limit: LISTED_LIMIT }) : [],
+    ]).then(
+      ([rows, listed]) => {
         if (cancelled) return;
-        setResult({ query: typed, rows });
+        setResult({ query: typed, rows, listed });
         setError(null);
       },
       (e) => {
@@ -79,8 +85,10 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
   };
 
   const rows = result?.rows ?? [];
+  const listed = result?.listed ?? [];
   // Only offer to add once the list shows matches for exactly what is typed.
-  const canAdd = result?.query === typed && isNewPlaceName(rows, typed);
+  const canAdd = result?.query === typed && isNewPlaceName([...rows, ...listed], typed);
+  const noMatches = rows.length === 0 && listed.length === 0;
 
   return (
     <View style={styles.picker}>
@@ -101,7 +109,11 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
               ) : (
                 <>
                   {!value && <Text style={styles.hint}>Free or unknown parking, no fee</Text>}
-                  {value && value.id == null && <Text style={styles.hint}>New place, saved when you park</Text>}
+                  {value && value.id == null && (
+                    <Text style={styles.hint}>
+                      {value.carParkId ? 'From the car park list, saved when you park' : 'New place, saved when you park'}
+                    </Text>
+                  )}
                 </>
               )}
             </View>
@@ -163,15 +175,31 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
                 </Text>
               </Row>
             ))}
+            {listed.map((carPark, index) => (
+              <Row
+                key={carPark.id}
+                first={rows.length === 0 && index === 0}
+                onPress={() => choose({ id: null, name: carPark.name, carParkId: carPark.id })}
+                styles={styles}
+              >
+                <MapPinIcon size={ICON_SIZE} color={colours.muted} />
+                <View style={styles.rowText}>
+                  <Text style={styles.name} numberOfLines={2}>
+                    {carPark.name}
+                  </Text>
+                  <Text style={styles.hint}>{listedPlaceHint(carPark)}</Text>
+                </View>
+              </Row>
+            ))}
             {canAdd && (
-              <Row first={rows.length === 0} onPress={() => choose({ id: null, name: typed })} styles={styles}>
+              <Row first={noMatches} onPress={() => choose({ id: null, name: typed })} styles={styles}>
                 <PlusIcon size={ICON_SIZE} color={colours.accent} />
                 <Text style={styles.addText} numberOfLines={2}>
                   {addPlaceLabel(typed)}
                 </Text>
               </Row>
             )}
-            <Row first={rows.length === 0 && !canAdd} onPress={() => choose(null)} styles={styles}>
+            <Row first={noMatches && !canAdd} onPress={() => choose(null)} styles={styles}>
               <View style={styles.iconSpace} />
               <View style={styles.rowText}>
                 <Text style={styles.noPlace}>No place</Text>

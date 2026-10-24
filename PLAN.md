@@ -24,7 +24,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Look and theme | Decided 2026-10-22. Clean, minimal look in the style of Apple Health and the Tesla app: charcoal and white, emerald only for the main action and positive states such as Parked. Dark mode by default; Light can be picked in Settings and is saved on the phone. Bottom tab bar: Home, History, Spending, Settings. Colours, type and components are in `.claude/skills/add-screen/SKILL.md`. Decided 2026-10-22: every screen is simple, minimal and modern, by the Principles in that skill (essentials first, optional parts folded, ask when the user knows, fewer fields to type) |
 | Data | Version 1: stored only on the phone (SQLite). No account, no server. Version 2 adds optional cloud sync and sharing (see "Version 2: Park Yourself Cloud") |
 | Database IDs and deletes | Prepared for version 2 from day one: every row has a UUID text id made on the phone, an `updated_at` time, and is soft-deleted (`deleted_at`) instead of removed, so sync can be added later without rewriting the data layer |
-| GPS | Redesigned 2026-10-23. Optional through Android's location permission, which the app asks for only when you tap Allow location (on Park or in Settings). Once allowed, Park reads the location when it opens and uses it to fill in the place and to save where the car is; a per-park switch leaves it unsaved. No continuous or background tracking. See "Location" |
+| GPS | Redesigned 2026-10-23, simplified 2026-10-24 (M9). Optional: one switch in Settings, **Use location when parking**, which asks Android's permission when turned on. While on and allowed, Park reads the location when it opens and uses it to fill in the place and to save where the car is. No per-park switch, no continuous or background tracking. See "Location" |
 | Floor detection (barometer) | Dropped. Not accurate enough to trust |
 | Pillar photo | Core feature. On-device OCR reads the level and bay number from the photo. Decided 2026-10-22: a session can have several photos. The first is the pillar photo; the others help you remember the place. OCR reads the first photo, and reads the next only if the first gives no level or bay. Also decided 2026-10-22: a photo can be picked from the gallery, with a button beside the camera's shutter (`expo-image-picker`, Android's own photo picker, no storage permission) |
 | Pillar zone colour | Many malls colour their pillars by zone. The app suggests the colour from the photo, you confirm it, and it is saved as data (name and hex) so it shows as a big swatch, in the notification and in the share message |
@@ -49,7 +49,12 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 **First run**
 1. Add your first car: a name such as "My Myvi". It becomes the default car.
 
-**Parking**
+**Parking** (camera first, decided 2026-10-24, milestone M9: the goal is that Park needs no typing at all; everything is filled in and only the note is optional)
+- Tap **Park** on Home: the camera opens at once. Take the photo of the pillar sign (or pick one with the gallery button), and the Park form opens behind it already filled in: place and rate from the location (when **Use location when parking** is on in Settings), level, bay and zone colour from the photo. **Skip photo** (top right of the camera) opens the form with no photo, for open-air or street parking; closing the camera (X or Back) returns to Home with nothing saved.
+- **Save** is pinned at the bottom of the form, like Found my car, so it is in sight without scrolling. Everything stays editable; **Note** is the one optional folded row.
+- The timer and the location are set once in Settings, not on each park: **Timer when parking** (an hours-and-minutes wheel since M10; 0 h 00 m is Off, the default) starts on every park; **Use location when parking** reads the location each time Park opens, fills in the place and saves where the car is. On Find, **Extend timer** still adds time and **Stop timer** drops the timer for this park.
+- Steps 2 to 5 below describe the parts of the form; where they mention Park's Timer and Location rows, those moved to Settings as above.
+
 1. Open the app and tap the round **Park** button on Home. The default vehicle shows first; with several vehicles, tap another one's chip at the top to switch.
 2. Pick the place: recent places are listed first, or search ("bukit" finds Pavilion Bukit Jalil), or type a new name. The rate shows as one folded line under the place (for example `Weekday rate · RM 3.00 first hour, then RM 2.00 per hour`, or `Not set · optional`); tap it to open the form. A rate that needs checking when you tap Save opens it for you.
    - **Saved place with a rate for today's day type:** the rate fills in.
@@ -85,8 +90,8 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 |---|---|
 | Tab bar | Home, History, Spending and Settings, at the bottom of every main screen. Park, Find, Vehicles and the other detail screens open above it |
 | Home | One vehicle at a time: a drawing of a car at the top (glowing emerald when parked), the vehicle's name, and a **Parked** or **Not parked** status. When parked, a card with the level and bay on the zone colour, the start time, the way back and (from M2) the fee so far. A round **Park** button at the bottom centre, which becomes **Find** when that vehicle is parked. With several vehicles, chips at the top switch between them and a green dot marks each parked one |
-| Park | Vehicle, place picker with the rate as a folded line under the place (opens to the rate form), camera with a gallery button, OCR result chips, level and bay fields, zone colour chips (tap photo to pick), Timer, Note and Location as folded rows |
-| Find | Level and bay on the zone colour swatch; while parked, the Way back card (how you left and the first shop, saved as you go; open until one is given), afterwards the reverse route; photos (tap to zoom, share or delete one) and Add photo while parked, elapsed time, live fee, Extend timer, Share, Open in Google Maps (while parked, when the session or its place has a location), and Found my car pinned at the bottom so it shows without scrolling. The level reads "Level B2" and the bay is its code alone ("C14"), decided 2026-10-23 |
+| Park | Opens on the camera (gallery button, Skip photo, X back to Home). Then: place picker with the rate as a folded line under the place (opens to the rate form) and a muted line when the location filled it in or could not, photos with Add photo, OCR result chips, level and bay fields, zone colour chips, Note as a folded row, and Save pinned at the bottom (M9, 2026-10-24; the Timer and Location rows moved to Settings) |
+| Find | Level and bay on the zone colour swatch; while parked, the Way back card (how you left and the first shop, saved as you go; open until one is given), afterwards the reverse route; photos (tap to zoom, share or delete one) and Add photo while parked, elapsed time, live fee, Set timer (the wheel in a sheet, counting from now; M10), Extend timer, Stop timer (when there is one; asks first; M9), Share, Open in Google Maps (while parked, when the session or its place has a location), and Found my car pinned at the bottom so it shows without scrolling. The level reads "Level B2" and the bay is its code alone ("C14"), decided 2026-10-23 |
 | Found my car | Summary opened from Find (`/session/end/<id>`): the stay's times, duration and fee (with the Estimate label), a form for each missing rate (optional), Amount paid, Save. Back to Home afterwards |
 | History | Past sessions in months, newest first. Each month's header shows its total and number of sessions, and opens that month on Spending. Each card leads with the place, then the date, time and duration, the level/bay with the zone colour, the car (only with several cars) and the amount paid. Tap to view details and photo. Delete photo or session. Filters by vehicle, place and month are not built yet (2026-10-22); Spending opens one place's or car's sessions for a month instead |
 | Spending | Month switcher, monthly total, number of sessions, hours parked, breakdown by place and by vehicle, 12-month bar chart (tap a bar to pick that month). Tap a place or vehicle to open that month's sessions |
@@ -94,7 +99,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Places | Saved places with visit count. Tap to edit the weekday rate, weekend rate and public holiday amount, rename or delete |
 | Public holidays | Your holiday dates, by date. Add a date typed as `YYYY-MM-DD` (with a "Today" shortcut) and an optional name; delete a date |
 | Vehicles | Add, edit, set default, archive (archived vehicles keep their history) |
-| Settings | Appearance (Dark or Light), Cars, Places, Public holidays, Extend timer by (15, 30 or 60 min, default 30) and Remind me before the timer ends (5, 10, 15 or 30 min, default 10) as folded rows showing their value (2026-10-23), with an Allow notifications button when they are off, Location (On or Off, what it does, and Allow location while off; it is turned off in Android settings), Export database. Development builds also link to Database check |
+| Settings | Appearance (Dark or Light), Cars, Places, Public holidays, Timer when parking (an hours-and-minutes wheel, 0 h 00 m is Off and the default; M9, wheel M10), Use location when parking (a switch; turning it on asks Android's permission; M9), Extend timer by (15, 30 or 60 min, default 30) and Remind me before the timer ends (5, 10, 15 or 30 min, default 10) as folded rows showing their value (2026-10-23), with an Allow notifications button when they are off, Export database. Development builds also link to Database check |
 
 ## Saved places and rates
 
@@ -208,14 +213,17 @@ Write these as Jest tests before the fee screens.
 
 ## Location
 
-Decided 2026-10-23. Optional: nothing is read until you allow Android's location permission, which the app asks for only when you tap **Allow location** on Park's Location row or in Settings. After Android stops asking, the button opens the app's Android settings instead. Turning it off is done in Android settings too.
+Changed 2026-10-24 (M9): one switch in Settings, **Use location when parking**, replaces Park's Location row and its **Save where I parked** switch. Turning it on asks for Android's permission; while it is on (and allowed), every park reads the location, fills in the place and saves where the car is; off, nothing is read. Park shows a muted line under the place: found from your location, finding, not allowed in Android settings, too rough, not found, or no name found (pick the place). While the place is still empty and no reading is under way, a **Try again** button under the place reads again (for example near the entrance). After Android stops asking, turning the switch on opens the app's Android settings instead, and the switch's hint says so.
+
+Decided 2026-10-23, still true:
 
 - **When it is read.** Only while Park is open, once, when it opens: first the phone's last known position (at most 5 minutes old, and still there in a basement with no signal), then a fresh reading if one comes within 10 seconds. The more precise one is kept. **Try again** reads again. No background or continuous tracking.
 - **Usable reading.** Accurate to 200 m or better. A rougher one is neither saved nor used to fill in the place.
 - **Filling in the place.** Once, and only while you have not picked or typed a place yourself:
   1. A saved place with a location within 300 m of you (the nearest one) is picked, with its rates.
-  2. Otherwise Android's geocoder looks up a name online (`reverseGeocodeAsync`): the building or shop name (for example "Sunway Velocity Mall"), or else the street, for parking by the road. House numbers and plus codes are skipped. It becomes a new place, shown as "Found from your location, saved when you park"; tap **Change** if it is wrong. This sends the location to Google (accepted 2026-10-23, AGENTS.md "Privacy"). With no signal the lookup fails, the Location row says so, and you pick the place as before.
-- **Saving.** With **Save where I parked** on (the default once allowed), the reading is saved on the session (`lat`, `lng`, `gps_accuracy_m`). A place gets its location the first time a session there is saved with one, and keeps it, so the next park there finds it offline.
+  2. Otherwise (M11) the nearest car park in the built-in list within 300 m: your saved place of the same name if you have one (also when it has no location of its own), else a new place with all the list's rates, marked "Nearby, from the car park list". No lookup online.
+  3. Otherwise Android's geocoder looks up a name online (`reverseGeocodeAsync`): the building or shop name (for example "Sunway Velocity Mall"), or else the street, for parking by the road. House numbers and plus codes are skipped. It becomes a new place, shown as "Found from your location, saved when you park"; tap **Change** if it is wrong. This sends the location to Google (accepted 2026-10-23, AGENTS.md "Privacy"). With no signal the lookup fails, Park says so under the place, and you pick the place as before.
+- **Saving.** While Use location when parking is on, a usable reading is saved on the session (`lat`, `lng`, `gps_accuracy_m`). A place gets its location the first time a session there is saved with one, and keeps it, so the next park there finds it offline.
 - **Walking back.** While parked, Find shows **Open in Google Maps** with walking directions to the saved location, or to the place's location when the session has none. Useful for open-air and street parking with no pillar. The share message's Map line uses the same location.
 - Later idea: a "Save location here" on Find's way back card, for a precise point at the mall entrance when the basement had no signal.
 
@@ -405,7 +413,43 @@ CREATE TABLE setting (
   key             TEXT PRIMARY KEY,
   value           TEXT
 );
+
+-- v2 (M11, 2026-10-24). Local only, never synced: a copy of the car park list
+-- (M12: downloaded from Supabase daily, or the copy built into the app until a
+-- download has worked). Replaced whole, rows deleted for real, when the list's
+-- version or content changed (setting car_park_list_version holds the source,
+-- version and a fingerprint); the built-in copy never replaces a download. A
+-- failure keeps the old list and never stops the app; Database check shows it.
+-- checked_on is when the source was read; since v3 each rate has its own
+-- effective_from (car_park_rate below).
+CREATE TABLE car_park (
+  id              TEXT PRIMARY KEY,           -- stable slug, 'sunway-pyramid'
+  name            TEXT NOT NULL,
+  area            TEXT,
+  lat             REAL,
+  lng             REAL,
+  source_url      TEXT NOT NULL,
+  checked_on      TEXT NOT NULL,              -- 'YYYY-MM-DD'
+  notes           TEXT                        -- what the rates leave out
+);
+
+-- v3 (M12): rate history. The place_rate fee columns, so the fee code reads
+-- both the same way; per day type the app uses the row with the latest
+-- effective_from not after today (src/carparks/ratesInEffect.js).
+CREATE TABLE car_park_rate (
+  car_park_id     TEXT NOT NULL REFERENCES car_park(id) ON DELETE CASCADE,
+  day_type        TEXT NOT NULL CHECK (day_type IN ('weekday','weekend','holiday')),
+  effective_from  TEXT,                       -- 'YYYY-MM-DD', or null: since before it was first checked
+  type            TEXT NOT NULL CHECK (type IN ('hourly','flat')),
+  first_minutes INTEGER, first_sen INTEGER, block_minutes INTEGER, block_sen INTEGER,
+  grace_minutes INTEGER NOT NULL DEFAULT 0, daily_cap_sen INTEGER, flat_sen INTEGER,
+  CHECK (day_type <> 'holiday' OR type = 'flat')
+);
+CREATE UNIQUE INDEX car_park_rate_unique
+  ON car_park_rate (car_park_id, day_type, COALESCE(effective_from, ''));
 ```
+
+Using the list: a listed car park becomes a place only when you park there, with all its rates (weekday, weekend and holiday, not only today's) copied into `place_rate` as if typed, and from then on the saved place (your rates) wins: search and the location skip listed car parks whose name is already a saved place.
 
 **Data layer rules** (all in one `db/` folder; screens never write SQL themselves):
 - Run `PRAGMA foreign_keys = ON;` every time the app opens the database.
@@ -612,12 +656,29 @@ Version 1 is finished when M0 to M8 are done.
   - 2026-10-22: on hold while the GPS design is rethought.
   - 2026-10-22: online place search is to be designed with it (see "Decisions made", Place search).
   - 2026-10-23: redesigned and built (see "Location"), and checked on the phone.
-- [ ] **M8 Polish**: Settings, export database, app icon, signed APK for your phone. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
+- [ ] **M8 Polish**: Settings, export database, app icon, animations, a loading animation. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
+  - 2026-10-24 (decided by the user): M8 is finished before version 2 continues past C0. The signed release APK moves out of M8: it is built once version 2 is ready (C9). Added to M8:
+    - **Animations** with `react-native-reanimated` (and `react-native-worklets`), everywhere they help: Home (Park button spring, the car driving in with a glow pulse when parked and driving off on Found my car, status and spot fading in), folding rows and chips (Disclosure opens and closes smoothly with the chevron turning, a small pop on a picked chip, More options sliding), lists and Spending (cards fading up in turn, bars growing, the total counting up) and moments (a check mark when Park saves, a small celebration on Found my car, level and bay chips popping in as OCR reads them). Every animation is short and is skipped when the phone's Reduce motion setting is on.
+    - **Loading animation**: Android draws the first frame itself (a still icon on charcoal). Then, on a cold start only, a cute car drives in and reverses into a bay while the P sign lights up emerald, for about 1 second, then fades into Home. A tap skips it; not shown when returning from another app.
+    - **App icon**: designed from the app's look (an emerald P parking sign with the car, on charcoal), approved by the user before it goes in; the same drawing is used for the launch screen.
+  - 2026-10-24: the icon was approved for now; the user wants a better one later. The launch screen (`expo-splash-screen`, approved) is charcoal with the icon's sign and car in both phone modes, so it flows into the loading animation. Built: the animations, the loading animation, dark system dialogs, the icon and the launch screen; to check on the phone after `npx expo run:android`.
   - 2026-10-22: Settings (Places, Public holidays, Extend timer by) and Export database are built; to check on the phone. App icon, signed APK and the dark system dialogs are still to do.
+
+- [ ] **M9 Camera-first Park** (added 2026-10-24, before version 2 continues): Park opens on the camera with Skip photo; Save pinned at the bottom; the timer (Timer when parking) and the location (Use location when parking) set in Settings instead of on each park; Stop timer on Find. See "User flow", Parking
+
+- [ ] **M10 Timer wheel** (added 2026-10-24): timer lengths are picked on a scrolling hours-and-minutes wheel, like setting an alarm, instead of fixed chips. Built in the app (React Native and Reanimated, no new library), in the app's look. Settings: **Timer when parking** is a wheel (0 h 00 m is Off; 5-minute steps). Find: **Set timer** opens the same wheel in a sheet to set this park's timer exactly, showing when it would end; Extend and Stop stay
+- [ ] **M11 Car park list** (added 2026-10-24): a built-in list of about 30 major Klang Valley mall car parks with their public car rates, researched from the web (mall and operator sites) by Claude, each with its GPS point, source link, the date it was checked and, when the source says, the date the rates took effect. Shipped inside the app: the app itself makes no network call for it (AGENTS.md, "Privacy"). With the location on, a listed car park near you is suggested before Android's geocoder is asked; place search also finds listed car parks. Picking one makes it your place with its rates filled in, marked "From the car park list, checked <date>: check the sign"; your own saved rates always win. Updated in later app updates, or moved to the version 2 server (C7)
+
+  - 2026-10-24 (decided by the user, after M11 was built): the list moves to Supabase, so rates can change without a new app build:
+    - **Source of truth:** `src/carparks/carParkList.json` in git. `npm run carparks:sql` turns it into a Supabase migration (`supabase/migrations/`), pushed like any other (local, then dev). Rates are never edited in the dashboard.
+    - **Rate history:** a rate row has `effective_from` (a date, or null for "since before it was first checked"). A change adds rows with the new date and keeps the old ones; the app uses, per day type, the latest rate in effect today. A change can be added before it starts.
+    - **Server:** the dev project (Tokyo) for now, the release build included (its env file, `.env.production.local`, points there). Tables `car_park` and `car_park_rate` anyone may read (the `anon` role, like C0's test table); only migrations write.
+    - **Download:** automatically, at most once a day when the app opens (a privacy exception chosen by the user: AGENTS.md, "Privacy"). A downloaded list replaces the phone's copy; the built-in JSON is used only until a download has worked (first open, offline, a server that is paused or reset). Errors never reach the user's screens; Database check shows the last one.
+- [ ] **M12 Car park list on Supabase** (added 2026-10-24): the server tables and data migration, rate history on the phone (SQLite v3), the daily download, and the list's source in one JSON file. See M11's notes above
 
 ## Version 2: Park Yourself Cloud (future)
 
-Not part of version 1; start after M8. You will write the sync yourself, to learn how syncing and data migration work.
+Not part of version 1; start after M8 and M9 (C0, the environments, was set up early on 2026-10-24). You will write the sync yourself, to learn how syncing and data migration work.
 
 ### Decisions
 
@@ -636,6 +697,7 @@ Not part of version 1; start after M8. You will write the sync yourself, to lear
 | `vehicle`, `place`, `place_rate`, `public_holiday`, `parking_session` | Yes | Your data, needed on other phones and for sharing |
 | `photo` | No | Photos stay on the phone; file paths only mean something on that phone |
 | `setting` | No | Preferences for one phone |
+| `car_park`, `car_park_rate` | Downloaded, never uploaded | The public car park list (M12): Supabase holds it, the phone keeps a copy and never sends its own |
 
 ### Architecture
 
@@ -685,7 +747,7 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 ### Changing the schema in two databases (migration checklist)
 
-1. Write the PostgreSQL migration with the Supabase CLI and apply it to the dev project.
+1. Write the PostgreSQL migration with the Supabase CLI (`supabase migration new`), including the `GRANT`s for every new table (see "Security and privacy"). Check it on local (`supabase db reset`, then `supabase test db`), then push it to hosted dev with `supabase db push --linked --dry-run`, then without `--dry-run`. Always pass `--linked`: from the next major CLI version, `db push` without it targets local.
 2. Add the matching step to the SQLite `MIGRATIONS` list.
 3. Make changes additive first (new nullable column or a default), because phones still running the old app keep syncing and must not break.
 4. Backfill existing data in the migration where needed.
@@ -694,17 +756,36 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 ### Security and privacy
 
-- Only the Supabase anon key goes in the app. The service-role key lives only in Edge Functions.
+- Only the Supabase publishable key (`sb_publishable_...`, formerly the anon key) goes in the app. The secret key (`sb_secret_...`, formerly the service-role key) bypasses RLS: it lives only in Edge Functions and is never committed or pasted anywhere. The local stack's keys are fixed defaults, the same on every laptop, so they are not secrets; the hosted projects' keys are.
 - A Row Level Security policy on every table, each with a test: user A must not read user B's data.
+- Every new table in `public` gets explicit `GRANT`s to `authenticated` in the migration that creates it. Supabase no longer exposes new tables to the Data API by default (new projects since 2026-05-30, every project from 2026-10-30), and a missing grant fails before RLS runs, on local `db reset` too. Grant only what the app uses; `anon` gets nothing (two exceptions: C0's `connection_check`, dropped at the start of C1, and M12's public car park list, read only).
 - Car location is personal data: a privacy policy is required on Google Play for apps with accounts and location, and Malaysia's PDPA applies once friends' data is stored.
 - Data export and account deletion.
+
+### Environments (chosen 2026-10-24)
+
+Three environments, so both local Docker and the hosted service get learned. Schema changes only move one way: migration file → local → hosted dev → hosted prod.
+
+| | Local (Docker) | Hosted dev | Hosted prod (C9) |
+|---|---|---|---|
+| Runs on | The laptop: Docker Desktop (WSL 2) and `supabase start` | Supabase free tier, Tokyo region (created 2026-10-24; fine for test data) | Supabase free tier, Singapore region (closest to Malaysia; real data stays in the region) |
+| Used for | Writing migrations, policy tests, quick resets | Phone tests over mobile data, real sign-in emails, two-phone sync tests | Real data, friends |
+| Data | Throwaway, rebuilt by `supabase db reset` from `supabase/seed.sql` | Test data only | Real |
+| Free-tier cost | None (does not count as a project) | Project 1 of 2 | Project 2 of 2 |
+
+- **`supabase/` lives in this repo** (config, migrations, seed, pgTAP tests), next to `src/db/migrations.js`.
+- **Never change a hosted database in its dashboard** without bringing the change back as a migration file (`supabase db diff` or `supabase db pull`). It is the cloud version of "never edit a migration step that has already run".
+- **The app picks its backend from one env file:** `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.development.local` (git-ignored, copied from `.env.example`), with a local block and a hosted dev block; keep one uncommented. Expo loads that file only in development builds. Release builds read `.env.production.local` instead (also git-ignored): since M12 it points at hosted dev, for the daily car park list download, until C9 adds the prod project. Not `.env.local`: Expo loads it in every build.
+- **The phone cannot reach `127.0.0.1` on the laptop.** Over USB, `adb reverse tcp:54321 tcp:54321`; over Wi-Fi, the laptop's LAN IP.
+- **Sign-in emails on local** land in the inbox the local stack runs, not a real mailbox.
+- **A free hosted project pauses after 7 days idle**; restore it from the dashboard.
 
 ### Running it
 
 | Item | Detail |
 |---|---|
-| Environments | Two Supabase projects, `dev` and `prod` |
-| Migrations | Supabase CLI, versioned in git, applied to dev first |
+| Environments | Local (Docker), hosted `dev` and hosted `prod`; see "Environments" |
+| Migrations | Supabase CLI, versioned in git in `supabase/migrations/`, checked on local, then pushed to dev, then prod |
 | Error tracking | Sentry for the app and Edge Functions |
 | App updates | EAS Update for JavaScript-only fixes; a new build when native libraries change |
 | Domain | Needed for share links and App Links (about RM 50 per year) |
@@ -717,13 +798,16 @@ Web: share-link fallback page + optional dashboard (Next.js)
 - Delete on one phone, check it disappears on the other.
 - Create the same place name offline on two phones, check the merge.
 - Run an old app version against the migrated server.
-- Policy tests with two users for every table.
+- Policy tests with two users for every table (pgTAP, `supabase test db`, run on local).
+- CI (2026-10-25): every push and pull request applies all migrations to an empty Postgres and runs the pgTAP tests (the "Supabase migrations" job), and a pull request that edits, renames or deletes an existing migration fails. Pushing to a hosted project stays manual.
 - Family sharing: invite, accept, live update, remove member, access stops.
 - Share links: app installed, not installed, expired.
 
 ### Milestones
 
-- [ ] **C1** Supabase dev project, PostgreSQL schema matching v1 plus `owner_id` and `server_updated_at`, policies and policy tests
+- [ ] **C0** Environments, no tables yet: Docker Desktop and the Supabase CLI installed; `supabase init` and `supabase start` working; hosted dev project created and linked; one trivial migration pushed to local and dev; one pgTAP test passing with `supabase test db`; the dev build reading one row from local (through `adb reverse`) and from hosted dev
+  - 2026-10-24: Docker Desktop and the CLI installed; local stack running with storage and analytics off; hosted dev project (Tokyo) linked; migration `connection_check` (one row anon may read, dropped at the start of C1) pushed to local and dev; pgTAP test passing (5 of 5); Check connection on the Database check screen built. To check on the phone, against local and hosted dev.
+- [ ] **C1** Drop C0's `connection_check` (a new migration) and remove `readConnectionCheck` and the Check connection card; PostgreSQL schema matching v1 plus `owner_id` and `server_updated_at`, policies and policy tests
 - [ ] **C2** Sign-in, profile, account deletion
 - [ ] **C3** SQLite migration adding `dirty`; push
 - [ ] **C4** Pull, `last_pulled_at`, conflict handling, duplicate-place merge, two-phone tests

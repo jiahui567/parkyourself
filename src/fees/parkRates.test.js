@@ -1,5 +1,40 @@
-import { enteredRates, offersSameEveryDay, ratesToSave, rateDayTypeFor } from './parkRates';
+import { enteredRates, offersSameEveryDay, ratesToSave, rateDayTypeFor, withListedRates } from './parkRates';
 import { EMPTY_RATE_FORM, holidayRate, holidayRateFromText, rateFromForm } from './rateForm';
+
+describe('withListedRates', () => {
+  const hourly = (first_sen) => ({
+    type: 'hourly',
+    first_minutes: 60,
+    first_sen,
+    block_minutes: 60,
+    block_sen: 100,
+    grace_minutes: 0,
+    daily_cap_sen: null,
+  });
+  // A car_park_rate row, with its own columns beside the fee fields.
+  const LISTED = {
+    weekday: { car_park_id: 'sunway-pyramid', day_type: 'weekday', ...hourly(200) },
+    weekend: { car_park_id: 'sunway-pyramid', day_type: 'weekend', ...hourly(300) },
+    holiday: null,
+  };
+
+  it('adds the rates for the day types Park did not show', () => {
+    const all = withListedRates({ weekday: hourly(250) }, LISTED, ['weekday']);
+
+    expect(all.weekday.first_sen).toBe(250);
+    expect(all.weekend).toEqual(expect.objectContaining({ type: 'hourly', first_sen: 300 }));
+    expect(all.weekend).not.toHaveProperty('car_park_id');
+    expect(all.holiday).toBeUndefined();
+  });
+
+  it('keeps a shown rate the user cleared cleared', () => {
+    expect(withListedRates({}, LISTED, ['weekday'])).toEqual({ weekend: expect.objectContaining({ first_sen: 300 }) });
+  });
+
+  it('adds nothing without a list', () => {
+    expect(withListedRates({ weekday: hourly(250) }, null, ['weekday'])).toEqual({ weekday: hourly(250) });
+  });
+});
 
 // RM 3.00 first hour, then RM 2.00 per hour, as typed.
 const FORM = { ...EMPTY_RATE_FORM, firstPrice: '3.00', blockPrice: '2.00' };

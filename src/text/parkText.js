@@ -1,8 +1,24 @@
 import { DAY_TYPES, holidayRateFromText, rateFromForm } from '../fees';
+import { formatDateKey } from '../lib/time';
 import { fillsOther } from '../ocr/pillarText';
 import { dayTypeLabel, rateSummary } from './rateText';
 
 // Text for the Park screen's place picker and rate questions.
+
+// Under a listed car park in the place search: 'From the car park list · Cheras, Kuala Lumpur'.
+export function listedPlaceHint({ area }) {
+  return area ? `From the car park list · ${area}` : 'From the car park list';
+}
+
+// Under the rate on Park when it came from the built-in car park list (M11):
+// where it came from and how old it is, and what the list could not show.
+export function listedRateHint({ checked_on, effective_from, notes }) {
+  const since = effective_from ? `, in effect since ${formatDateKey(effective_from)}` : '';
+  const lead =
+    `From the car park list (checked ${formatDateKey(checked_on)}${since}). ` +
+    'Check the sign: these rates are saved to this place when you park.';
+  return notes ? `${lead} ${notes}` : lead;
+}
 
 const NOT_FINISHED = 'Not finished · tap to check it';
 

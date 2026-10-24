@@ -1,9 +1,19 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ChevronDownIcon } from './icons';
 import { useAppTheme, useThemedStyles } from './ThemeProvider';
 
 const ICON_SIZE = 18;
+const FOLD_MS = 200;
 
 // A card row that opens to show what is under it, so an optional part of a
 // form (Park's rate, timer and note, Find's way back) stays one line until
@@ -12,11 +22,18 @@ const ICON_SIZE = 18;
 // '2 hours'); hint is a muted line under the label (the rate, the route).
 // Like ListRow, every row but the first draws a hairline above itself; put
 // the rows in a card with overflow hidden.
+// Opening grows the row smoothly while the chevron turns and the content
+// fades in; closing runs the other way.
 export function Disclosure({ label, value, hint, icon: Icon, open, onToggle, first = true, children }) {
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
+  const turn = useSharedValue(open ? 1 : 0);
+  useEffect(() => {
+    turn.set(withTiming(open ? 1 : 0, { duration: FOLD_MS }));
+  }, [open, turn]);
+  const chevronStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 180}deg` }] }));
   return (
-    <View style={!first && styles.divider}>
+    <Animated.View layout={LinearTransition.duration(FOLD_MS)} style={!first && styles.divider}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -33,12 +50,16 @@ export function Disclosure({ label, value, hint, icon: Icon, open, onToggle, fir
           ) : null}
         </View>
         {value != null && <Text style={styles.value}>{value}</Text>}
-        <View style={open && styles.flipped}>
+        <Animated.View style={chevronStyle}>
           <ChevronDownIcon size={ICON_SIZE} color={colours.muted} />
-        </View>
+        </Animated.View>
       </Pressable>
-      {open && <View style={styles.body}>{children}</View>}
-    </View>
+      {open && (
+        <Animated.View entering={FadeIn.duration(FOLD_MS)} exiting={FadeOut.duration(FOLD_MS / 2)} style={styles.body}>
+          {children}
+        </Animated.View>
+      )}
+    </Animated.View>
   );
 }
 
@@ -51,6 +72,5 @@ const createStyles = (c) =>
     label: { fontSize: 16, color: c.text },
     hint: { fontSize: 13, color: c.muted },
     value: { fontSize: 13, fontWeight: '600', color: c.muted },
-    flipped: { transform: [{ rotate: '180deg' }] },
     body: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
   });

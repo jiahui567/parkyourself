@@ -1,0 +1,983 @@
+{
+  "version": "2026-10-24",
+  "carParks": [
+    {
+      "id": "1-utama-shopping-centre",
+      "name": "1 Utama Shopping Centre",
+      "area": "Bandar Utama, Petaling Jaya",
+      "lat": 3.14833,
+      "lng": 101.61605,
+      "source_url": "https://www.1utama.com.my/services/",
+      "checked_on": "2026-10-24",
+      "notes": "Regular areas, without 1PAY (with 1PAY the first 4 hours are RM2). The outdoor Dataran car park charges per entry instead.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": "2024-10-01",
+          "type": "hourly",
+          "first_minutes": 240,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": "2024-10-01",
+          "type": "hourly",
+          "first_minutes": 240,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "aeon-mall-shah-alam",
+      "name": "AEON Mall Shah Alam",
+      "area": "Seksyen 13, Shah Alam",
+      "lat": 3.07671,
+      "lng": 101.54793,
+      "source_url": "https://parkinginmalaysia.com/aeon-mall-shah-alam-parking-info/",
+      "checked_on": "2026-10-24",
+      "notes": "From parkinginmalaysia.com; AEON publishes no rates. Non-member rate (members: first 2 hours free). No weekend rate: sources disagree (one says RM5 per entry).",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "bangsar-shopping-centre",
+      "name": "Bangsar Shopping Centre",
+      "area": "Bangsar, Kuala Lumpur",
+      "lat": 3.1431,
+      "lng": 101.66733,
+      "source_url": "https://www.bsc.com.my/centre-info/services",
+      "checked_on": "2026-10-24",
+      "notes": "The mall gives one rate with no weekday or weekend split.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 250,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 250,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "berjaya-times-square",
+      "name": "Berjaya Times Square",
+      "area": "Jalan Imbi, Kuala Lumpur",
+      "lat": 3.14249,
+      "lng": 101.71035,
+      "source_url": "https://www.motorist.my/article/2324/malaysia-s-mall-parking-rates-part-1-2026-update",
+      "checked_on": "2026-10-24",
+      "notes": "The source's table is dated 1 Feb 2022, so these may be out of date.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 300,
+          "grace_minutes": 0,
+          "daily_cap_sen": 1200
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 300,
+          "grace_minutes": 0,
+          "daily_cap_sen": 1500
+        }
+      ]
+    },
+    {
+      "id": "ioi-city-mall",
+      "name": "IOI City Mall",
+      "area": "IOI Resort City, Putrajaya",
+      "lat": 2.96984,
+      "lng": 101.71422,
+      "source_url": "https://www.ioicitymall.com.my/data/ckfinder/images/Parking_Rates_Signages_v5_FAOL_A4%281%29.jpg",
+      "checked_on": "2026-10-24",
+      "notes": "From the mall's signage (July 2025). An older mall FAQ shows RM2 and RM4 for the first hour.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "ioi-mall-damansara",
+      "name": "IOI Mall Damansara",
+      "area": "Kota Damansara, Petaling Jaya (formerly Tropicana Gardens Mall)",
+      "lat": 3.14875,
+      "lng": 101.59475,
+      "source_url": "https://parking.com.my/item/tropicana-gardens-mall-kota-damansara/",
+      "checked_on": "2026-10-24",
+      "notes": "Weekdays: first 3 hours free, 4th hour RM1, then RM2. Approximate on weekends: the 4th hour is RM1 (shown as RM2), and some sources say the first 3 hours are free there too. The mall says its rates are to be updated.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 240,
+          "first_sen": 100,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 180,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "ioi-mall-puchong",
+      "name": "IOI Mall Puchong",
+      "area": "Bandar Puchong Jaya, Puchong",
+      "lat": 3.04521,
+      "lng": 101.6182,
+      "source_url": "https://ioimallpuchong.freshdesk.com/support/solutions/articles/150000204705-what-are-the-parking-rates-",
+      "checked_on": "2026-10-24",
+      "notes": null,
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "kl-east-mall",
+      "name": "KL East Mall",
+      "area": "Desa Melawati, Kuala Lumpur",
+      "lat": 3.22478,
+      "lng": 101.73063,
+      "source_url": "https://www.simedarbyproperty.com/malls/kleast-mall/",
+      "checked_on": "2026-10-24",
+      "notes": "Prices exclude 8% service tax, so you pay about 8% more. Cashless only.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "lot-10",
+      "name": "Lot 10",
+      "area": "Bukit Bintang, Kuala Lumpur",
+      "lat": 3.14635,
+      "lng": 101.71198,
+      "source_url": "https://www.comparehero.my/transportation/articles/mall-parking-rates",
+      "checked_on": "2026-10-24",
+      "notes": "From CompareHero and Motorist, not the mall. Not included: weekday flat RM7 from 5pm to 7am. Weekends RM10 covers 8 hours; longer stays up to RM15.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 300,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "flat",
+          "flat_sen": 1000,
+          "grace_minutes": 0
+        }
+      ]
+    },
+    {
+      "id": "melawati-mall",
+      "name": "Melawati Mall",
+      "area": "Taman Melawati, Kuala Lumpur",
+      "lat": 3.21118,
+      "lng": 101.7488,
+      "source_url": "https://www.melawatimall.com/mall-info/parking-rates",
+      "checked_on": "2026-10-24",
+      "notes": "Same rate every day.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "mid-valley-megamall",
+      "name": "Mid Valley Megamall",
+      "area": "Mid Valley City, Kuala Lumpur",
+      "lat": 3.11825,
+      "lng": 101.67707,
+      "source_url": "https://www.midvalley.com.my/locate/by-car/",
+      "checked_on": "2026-10-24",
+      "notes": "Approximate: weekdays the 4th hour is RM1, so stays over 3 hours show RM1.50 more than charged. Free 15 minutes needs card validation at an Autopay station.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 250,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "mytown-shopping-centre",
+      "name": "MyTOWN Shopping Centre",
+      "area": "Cochrane, Cheras, Kuala Lumpur",
+      "lat": 3.13476,
+      "lng": 101.723,
+      "source_url": "https://mytownkl.com.my/information",
+      "checked_on": "2026-10-24",
+      "notes": "Also the IKEA Cheras car park. Not included: weekday early bird (entry before 9am, 8 to 12 hours RM7.70).",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 330,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 440,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "nu-empire-shopping-gallery",
+      "name": "NU Empire Shopping Gallery",
+      "area": "SS16, Subang Jaya (formerly Empire Shopping Gallery)",
+      "lat": 3.08203,
+      "lng": 101.58267,
+      "source_url": "https://parkinginmalaysia.com/nu-empire-shopping-gallery-ss16-parking-rate/",
+      "checked_on": "2026-10-24",
+      "notes": "From parkinginmalaysia.com; the mall publishes no rates. Basement rates.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "nu-sentral",
+      "name": "NU Sentral",
+      "area": "KL Sentral, Brickfields, Kuala Lumpur",
+      "lat": 3.13328,
+      "lng": 101.68699,
+      "source_url": "https://www.nusentral.com/",
+      "checked_on": "2026-10-24",
+      "notes": "No public car rate found; check at the gantry.",
+      "rates": []
+    },
+    {
+      "id": "paradigm-mall-petaling-jaya",
+      "name": "Paradigm Mall Petaling Jaya",
+      "area": "Kelana Jaya, Petaling Jaya",
+      "lat": 3.10512,
+      "lng": 101.59591,
+      "source_url": "https://www.paradigmmall.com.my/gettinghere.aspx?cid=3&CarPark",
+      "checked_on": "2026-10-24",
+      "notes": "Approximate: from the 7th hour it is RM2 per hour, not RM1.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "pavilion-bukit-jalil",
+      "name": "Pavilion Bukit Jalil",
+      "area": "Bukit Jalil, Kuala Lumpur",
+      "lat": 3.05106,
+      "lng": 101.67051,
+      "source_url": "https://www.pavilion-bukitjalil.com/about",
+      "checked_on": "2026-10-24",
+      "notes": "The mall page also shows an older-looking second table (RM3 per hour, RM30 maximum); the first table is used. Check on site.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": 1500
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": 1500
+        }
+      ]
+    },
+    {
+      "id": "pavilion-kuala-lumpur",
+      "name": "Pavilion Kuala Lumpur",
+      "area": "Bukit Bintang, Kuala Lumpur",
+      "lat": 3.14939,
+      "lng": 101.71299,
+      "source_url": "https://malaysia.news.yahoo.com/plan-drive-pavilion-kl-parking-103415658.html",
+      "checked_on": "2026-10-24",
+      "notes": "RM4 per hour, up to RM40 a day, from 1 Jan 2024 (Malay Mail; Motorist agrees). Not included: weekday flat RM10 per entry from 5pm to 7am.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": "2024-01-01",
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": 4000
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": "2024-01-01",
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": 4000
+        }
+      ]
+    },
+    {
+      "id": "plaza-low-yat",
+      "name": "Plaza Low Yat",
+      "area": "Bukit Bintang, Kuala Lumpur",
+      "lat": 3.14403,
+      "lng": 101.71,
+      "source_url": "https://plazalowyat.com/getting-here/",
+      "checked_on": "2026-10-24",
+      "notes": "Not included: flat RM8 from 6pm to 6am. Touch 'n Go only.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 300,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 300,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "publika",
+      "name": "Publika Shopping Gallery",
+      "area": "Solaris Dutamas, Kuala Lumpur",
+      "lat": 3.17119,
+      "lng": 101.66579,
+      "source_url": "https://www.publika.com.my/parking/daily-parking",
+      "checked_on": "2026-10-24",
+      "notes": "Not included: weekday early-bird maximum (RM13 for entry 5am to 9am) at Basement 6 and 7 only.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "quill-city-mall",
+      "name": "Quill City Mall",
+      "area": "Jalan Sultan Ismail, Kuala Lumpur",
+      "lat": 3.16,
+      "lng": 101.70056,
+      "source_url": "https://quillcitymall.com.my/getting-here/",
+      "checked_on": "2026-10-24",
+      "notes": "Approximate: weekdays from the 5th hour it is RM3 per hour (capped at RM10). The day rate resets at 7am. No overnight parking.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 15,
+          "daily_cap_sen": 1000
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "flat",
+          "flat_sen": 300,
+          "grace_minutes": 15
+        }
+      ]
+    },
+    {
+      "id": "setia-city-mall",
+      "name": "Setia City Mall",
+      "area": "Setia Alam, Shah Alam",
+      "lat": 3.10996,
+      "lng": 101.45921,
+      "source_url": "https://setiacitymall.com/index.php/getting-here/",
+      "checked_on": "2026-10-24",
+      "notes": "Older listings still show the first 3 hours free on weekdays; the mall's page no longer does.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "subang-parade",
+      "name": "Subang Parade",
+      "area": "SS16, Subang Jaya",
+      "lat": 3.08219,
+      "lng": 101.58552,
+      "source_url": "https://parkinginmalaysia.com/subang-parade-parking-rate/",
+      "checked_on": "2026-10-24",
+      "notes": "From parkinginmalaysia.com (the mall's site was down); parking.com.my agrees. Basement rates, every day.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 220,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 220,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "sunway-putra-mall",
+      "name": "Sunway Putra Mall",
+      "area": "Jalan Putra, Kuala Lumpur",
+      "lat": 3.16639,
+      "lng": 101.69239,
+      "source_url": "https://www.sunwayputramall.com/faq",
+      "checked_on": "2026-10-24",
+      "notes": "Approximate: the 3rd hour is RM1, so stays over 2 hours show RM1 more than charged.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 15,
+          "daily_cap_sen": 2600
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 200,
+          "grace_minutes": 15,
+          "daily_cap_sen": 2600
+        }
+      ]
+    },
+    {
+      "id": "sunway-pyramid",
+      "name": "Sunway Pyramid",
+      "area": "Bandar Sunway, Subang Jaya",
+      "lat": 3.07249,
+      "lng": 101.60655,
+      "source_url": "https://www.sunwaypyramid.com/faq",
+      "checked_on": "2026-10-24",
+      "notes": "Not included: the weekend rate also applies on the eve of a public holiday.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 200,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 10,
+          "daily_cap_sen": 1200
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 10,
+          "daily_cap_sen": 1500
+        }
+      ]
+    },
+    {
+      "id": "sunway-velocity-mall",
+      "name": "Sunway Velocity Mall",
+      "area": "Cheras, Kuala Lumpur",
+      "lat": 3.12679,
+      "lng": 101.72502,
+      "source_url": "https://www.sunwayvelocitymall.com/getting-here",
+      "checked_on": "2026-10-24",
+      "notes": "Maximum RM20 per entry per day. No overnight parking.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": 2000
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 0,
+          "daily_cap_sen": 2000
+        }
+      ]
+    },
+    {
+      "id": "sunway-wangsa-mall",
+      "name": "Sunway Wangsa Mall",
+      "area": "Wangsa Maju, Kuala Lumpur (formerly Wangsa Walk Mall)",
+      "lat": 3.19865,
+      "lng": 101.7425,
+      "source_url": "https://www.sunwaywangsamall.com/faqs",
+      "checked_on": "2026-10-24",
+      "notes": "Not included: the weekend rate also applies on the eve of a public holiday. The mall says the rates were revised from 18 May 2026.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 150,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 250,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "suria-klcc",
+      "name": "Suria KLCC",
+      "area": "KLCC, Kuala Lumpur",
+      "lat": 3.15738,
+      "lng": 101.71238,
+      "source_url": "https://www.suriaklcc.com.my/parking/",
+      "checked_on": "2026-10-24",
+      "notes": "Approximate: weekdays the 2nd hour is RM5 (shown as RM4); weekends the 4th hour is RM5. Not included: weekday RM18 maximum from 5pm to 5am; Saturday before 12pm uses the weekday rate.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "the-curve",
+      "name": "The Curve",
+      "area": "Mutiara Damansara, Petaling Jaya",
+      "lat": 3.15777,
+      "lng": 101.6118,
+      "source_url": "https://parking.com.my/item/the-curve/",
+      "checked_on": "2026-10-24",
+      "notes": "From parking.com.my; the mall page could not be read. Sources disagree on a daily maximum (none, RM7.70 to RM9.90), and on whether 6% SST is on top.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 220,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 120,
+          "first_sen": 330,
+          "block_minutes": 60,
+          "block_sen": 110,
+          "grace_minutes": 0,
+          "daily_cap_sen": null
+        }
+      ]
+    },
+    {
+      "id": "the-exchange-trx",
+      "name": "The Exchange TRX",
+      "area": "Tun Razak Exchange, Kuala Lumpur",
+      "lat": 3.14254,
+      "lng": 101.71808,
+      "source_url": "https://theexchange.my/visit/getting-here",
+      "checked_on": "2026-10-24",
+      "notes": "Not included: flat RM10 for entries between 5pm and 5am, every day.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 500,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": 4000
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 60,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 400,
+          "grace_minutes": 0,
+          "daily_cap_sen": 4000
+        }
+      ]
+    },
+    {
+      "id": "the-gardens-mall",
+      "name": "The Gardens Mall",
+      "area": "Mid Valley City, Kuala Lumpur",
+      "lat": 3.11864,
+      "lng": 101.67583,
+      "source_url": "https://www.thegardensmall.com.my/parking",
+      "checked_on": "2026-10-24",
+      "notes": "Same car park and rates as Mid Valley. Approximate: weekdays the 4th hour is RM1. No maximum. Free 15 minutes needs card validation.",
+      "rates": [
+        {
+          "day_type": "weekday",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 300,
+          "block_minutes": 60,
+          "block_sen": 250,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        },
+        {
+          "day_type": "weekend",
+          "effective_from": null,
+          "type": "hourly",
+          "first_minutes": 180,
+          "first_sen": 400,
+          "block_minutes": 60,
+          "block_sen": 100,
+          "grace_minutes": 15,
+          "daily_cap_sen": null
+        }
+      ]
+    }
+  ]
+}

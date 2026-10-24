@@ -1,0 +1,12 @@
+# Supabase
+.branches
+.temp
+
+# Secrets that config.toml reads with env(...): OAuth client secrets, Edge Function secrets
+.env
+functions/.env
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

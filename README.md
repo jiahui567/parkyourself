@@ -4,24 +4,26 @@ An Android app that remembers where you parked and what it will cost.
 
 Take a photo of the pillar sign and the app reads the level, bay number and zone colour. Add the first shop you saw after the lift or escalator, and the app shows you the way back. It remembers each car park's weekday, weekend and public holiday rates, calculates the fee while you are away, reminds you before paid parking runs out, lets you share your spot through WhatsApp, and shows your monthly parking spend.
 
-All data stays on the phone. No account, no server. An optional cloud sync is planned for version 2. Two things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); and, only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place.
+All your data stays on the phone. No account. An optional cloud sync is planned for version 2. Three things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place; and at most once a day the app downloads the public car park list from Supabase, sending no personal data (Supabase sees the phone's IP address).
 
 ## Status
 
 | | |
 |---|---|
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
-| In progress | **M8 Polish**: Settings and Export database are built; the app icon, dark system dialogs and a release APK for the phone are left |
-| Next | Build a release APK (see "Release APK"), use the app day to day, then finish M8. Version 2 (cloud) starts after M8 |
+| In progress | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park** (camera first, Save pinned, timer and location in Settings, Stop timer on Find), **M10 Timer wheel**, **M11 Car park list** (30 Klang Valley malls with researched rates) and **M12 Car park list on Supabase** (daily download, rate history): built, to check on the phone |
+| Next | Push M12's migrations to hosted dev, install a release build, check M8 to M12 on the phone, then version 2 continues from C0 |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
 
 ## Features (version 1)
 
-- **Park:** pillar photo (camera or gallery), level and bay read by on-device OCR, zone colour picked from the photo. The rate, timer and note fold away until you need them.
+- **Park:** tap Park and the camera opens: one photo of the pillar sign (or Skip photo), and the form is filled in for you: level and bay by on-device OCR, the zone colour from the photo, the place and its rate from your location. Save is pinned at the bottom; only the note is optional. The timer and the location are set once in Settings.
 - **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
+- **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too.
+- **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
 - **Share:** the parking info as a message, or one photo, through WhatsApp or any app.
@@ -46,11 +48,13 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Location (optional) | `expo-location`, foreground only; native config in `app.json`, so run `npx expo run:android` again after pulling it in |
 | Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
 | Charts | `react-native-gifted-charts` with `expo-linear-gradient` (its gradient peer dependency), for the Spending tab's 12-month bar chart. `expo-linear-gradient` has native code: after pulling it in, run `npx expo run:android` again |
+| Animation | `react-native-reanimated` with `react-native-worklets` (native code: run `npx expo run:android` again after pulling it in). Shared pieces in `src/components/motion.js`; the loading animation in `src/components/ParkingIntro.js`. Skipped when the phone's Reduce motion is on |
 | Theme | Own dark and light colour sets in `src/components/theme.js`; the choice is saved in the `setting` table. Design rules in the `add-screen` skill |
 | Build | Expo development build (`expo-dev-client`), built locally with Android Studio's SDK. Expo Go is not supported |
 | Lint | ESLint 9 with `eslint-config-expo` |
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
-| CI | GitHub Actions (`.github/workflows/ci.yml`): lint and tests on every push and pull request to `master` |
+| Version 2 server (in progress) | Supabase: `supabase` CLI (dev dependency, run with `npx supabase`), local stack in Docker Desktop, hosted dev project; `@supabase/supabase-js` in the app. See "Version 2 server" |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request to `master`: **Lint and test** (ESLint, Jest), and **Supabase migrations** (every migration applied to an empty Postgres with `supabase db start`, then the pgTAP tests; on a pull request it also fails if an existing migration file was edited, renamed or deleted) |
 
 `react-native-image-colors` (approved for M4) was added on 2026-10-23 for the zone colour. M5 needs no extra library; the QR code was dropped.
 
@@ -80,7 +84,8 @@ park-yourself/
 │   │                        SegmentedControl, Field, ErrorText, icons, CarLogo, RateForm,
 │   │                        SwitchRow, List (ListSection, ListRow), PlacePicker, SessionCard,
 │   │                        EstimatePill, CameraCapture, PhotoStrip, PhotoViewer, BackdropButton,
-│   │                        Disclosure (folded rows), WayBackCard (Find's way back while parked)
+│   │                        Disclosure (folded rows), WayBackCard (Find's way back while parked),
+│   │                        motion (shared animations), ParkingIntro (the loading animation)
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
 │   │                        (notification taps, in the root layout)
@@ -100,10 +105,15 @@ park-yourself/
 │   │                        Found my car, a place's rates and the fee so far
 │   ├── timer/               Timer options, Extend, reminder times
 │   ├── spending/            Monthly totals, by place and by car; Sessions screen filter
+│   ├── carparks/            The car park list: carParkList.json (the one source), ratesInEffect.js
+│   │                        (the rate in effect on a day), schedule.js (when to download again)
+│   ├── cloud/               Version 2: supabase.js (the only code that calls @supabase/supabase-js),
+│   │                        carParkUpdates.js (the daily car park list download)
 │   ├── lib/                 Shared helpers
 │   │   ├── money.js         formatRM ("RM 3.00"), formatAmountInput ("3.00") and parseRM
 │   │   ├── time.js          Local date and month keys, time/date/month/duration text
 │   │   ├── placeName.js     Whether a typed place name is new
+│   │   ├── motion.js        Easing, count-up and burst numbers for the animations
 │   │   └── listIndex.js     Which photo to show after one is deleted
 │   └── db/                  Data layer: the only code that runs SQL
 │       ├── index.js         What screens import
@@ -117,14 +127,18 @@ park-yourself/
 │       ├── places.js, holidays.js  Saved places and rates, public holiday dates
 │       ├── preferences.js   Extend and reminder minutes (setting table)
 │       ├── export.js        Export database: WAL checkpoint, copy, share sheet
+│       ├── carParks.js      The phone's copy of the car park list: refresh, search, rates in effect
 │       └── vehicles.js, settings.js
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
+├── supabase/                Version 2 server: config.toml, migrations/ (PostgreSQL), tests/ (pgTAP)
+├── .env.example             Which Supabase server a build uses; copy to .env.development.local and .env.production.local
 ├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
 │   ├── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
 │   └── withImageColorsJvmTarget.js  Config plugin: builds react-native-image-colors' Kotlin for Java 17
 ├── scripts/
-│   └── pull-db.js           Copies the phone's database to db-snapshot/
+│   ├── pull-db.js           Copies the phone's database to db-snapshot/
+│   └── car-park-sql.js      Writes the Supabase migration for the car park list (npm run carparks:sql)
 ├── assets/                  App icons and splash image
 ├── .github/workflows/ci.yml GitHub Actions: lint and tests on push and pull request
 ├── app.json                 Expo config: name, Android package, plugins
@@ -134,7 +148,7 @@ park-yourself/
 └── CLAUDE.md                Points Claude Code at AGENTS.md
 ```
 
-Not in git, created on your machine: `node_modules/` (`npm ci`), `android/` (`npx expo run:android`), `.expo/` (Expo cache) and `db-snapshot/` (`npm run db:pull`).
+Not in git, created on your machine: `node_modules/` (`npm ci`), `android/` (`npx expo run:android`), `.expo/` (Expo cache), `db-snapshot/` (`npm run db:pull`), `.env.development.local` and `.env.production.local` (from `.env.example`) and `supabase/.temp/` and `supabase/.branches/` (Supabase CLI).
 
 ## What to install (once per laptop)
 
@@ -187,6 +201,26 @@ The first build takes a while. After that:
 | `npm run db:pull` | Copies the database (and its `-wal` file) from the phone into `db-snapshot/` |
 
 `npm run ios` and `npm run web` come from the Expo template and are not used yet.
+
+## Version 2 server (Supabase)
+
+In progress (milestone C0 in PLAN.md). The app works without it. Two things talk to it: Check connection on the Database check screen (development builds, when you tap it), and the car park list download (M12), at most once a day when the app opens, in every build.
+
+**The car park list** lives in `src/carparks/carParkList.json` (the one source), on Supabase (`car_park`, `car_park_rate`: anyone may read, only migrations write) and as a copy on the phone. To change a rate, add a row with the new `effective_from` (keep the old one), bump `version`, run `npm run carparks:sql`, check on local, and push. Phones get it within a day.
+
+**Once per laptop:** turn on WSL 2 (`wsl --install --no-distribution` as administrator, then restart) and install Docker Desktop (`winget install Docker.DockerDesktop`, WSL 2 backend). The Supabase CLI comes with `npm ci`. Then `npx supabase login` and `npx supabase link --project-ref <dev project ref>` (asks for the dev database password), and copy `.env.example` to `.env.development.local`.
+
+| Command | What it does |
+|---|---|
+| `npx supabase start` / `stop` | Starts or stops local Supabase in Docker (Docker Desktop must be running). `stop` keeps the data. Studio: http://127.0.0.1:54323 |
+| `npx supabase migration new <name>` | Creates an empty migration file in `supabase/migrations/` |
+| `npx supabase db reset` | Rebuilds the local database from every migration, then `supabase/seed.sql` |
+| `npx supabase test db` | Runs the pgTAP tests in `supabase/tests/` against local |
+| `npx supabase db push --linked --dry-run` | Lists the migrations hosted dev does not have yet; drop `--dry-run` to push them |
+| `adb reverse tcp:54321 tcp:54321` | Lets the phone reach local Supabase over USB (again after reconnecting the phone) |
+| `npm run carparks:sql` | Writes a migration that puts `src/carparks/carParkList.json` on the server. Run it after every change to the list (bump its `version`), then `db reset`, `test db` and push |
+
+**Which server the app uses:** `.env.development.local` (development builds) has a local block and a hosted dev block; keep one uncommented and fully reload the app. `.env.production.local` (release builds) points at hosted dev. Copy both from `.env.example`. Never put a secret key (`sb_secret_...`) or the database password in it. Never change a hosted schema in the Supabase dashboard: write a migration (PLAN.md, "Version 2").
 
 ## Database
 

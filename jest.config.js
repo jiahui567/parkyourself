@@ -6,6 +6,9 @@ process.env.TZ = 'Asia/Kuala_Lumpur';
 module.exports = {
   preset: 'jest-expo',
   setupFiles: ['<rootDir>/test/setup.js'],
+  // Reanimated and its worklets have no native side in Jest; this resolves
+  // their web versions instead.
+  resolver: 'react-native-reanimated/jest/resolver',
   // npm installs some Expo packages (such as expo-asset, used by expo-sqlite)
   // inside node_modules/expo. The app's bundler finds them there; Jest needs
   // to be told.

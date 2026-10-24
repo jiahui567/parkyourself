@@ -1,8 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ErrorText } from '../components/ErrorText';
+import { enterUp } from '../components/motion';
 import { SessionCard } from '../components/SessionCard';
 import { useThemedStyles } from '../components/ThemeProvider';
 import { places, sessions, useDatabase, vehicles } from '../db';
@@ -66,7 +68,11 @@ export default function Sessions() {
           </View>
         }
         ListEmptyComponent={<Text style={styles.muted}>{noSessionsText(filter.month)}</Text>}
-        renderItem={({ item }) => <SessionCard session={item} showVehicle={showVehicle} />}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={enterUp(index)}>
+            <SessionCard session={item} showVehicle={showVehicle} />
+          </Animated.View>
+        )}
       />
     </>
   );

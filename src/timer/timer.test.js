@@ -1,7 +1,70 @@
-import { extendTimer, reminderTimes, timerEndFrom } from './timer';
+import {
+  extendTimer,
+  isTimerLength,
+  parkTimerEnd,
+  reminderTimes,
+  splitMinutes,
+  timerEndFrom,
+  wheelStartMinutes,
+} from './timer';
+
+describe('isTimerLength', () => {
+  it.each([0, 5, 150, 23 * 60 + 55])('takes %p minutes', (minutes) => {
+    expect(isTimerLength(minutes)).toBe(true);
+  });
+
+  it.each([-5, 7, 24 * 60, 1.5, '30', null])('refuses %p', (minutes) => {
+    expect(isTimerLength(minutes)).toBe(false);
+  });
+});
+
+describe('wheelStartMinutes', () => {
+  const now = new Date('2026-10-27T15:00').getTime();
+  const MINUTE = 60 * 1000;
+
+  it('starts at the time left, rounded up to 5 minutes', () => {
+    expect(wheelStartMinutes(now + 42 * MINUTE, now, 0)).toBe(45);
+    expect(wheelStartMinutes(now + 45 * MINUTE, now, 0)).toBe(45);
+  });
+
+  it('starts at the Settings length when the timer ended or there is none', () => {
+    expect(wheelStartMinutes(now - MINUTE, now, 150)).toBe(150);
+    expect(wheelStartMinutes(null, now, 150)).toBe(150);
+  });
+
+  it('starts at 1 hour when Timer when parking is Off', () => {
+    expect(wheelStartMinutes(null, now, 0)).toBe(60);
+  });
+
+  it('never starts past the end of the wheel', () => {
+    expect(wheelStartMinutes(now + 30 * 60 * MINUTE, now, 0)).toBe(23 * 60 + 55);
+  });
+});
+
+describe('splitMinutes', () => {
+  it('gives the hours and minutes columns', () => {
+    expect(splitMinutes(150)).toEqual({ hours: 2, minutes: 30 });
+    expect(splitMinutes(0)).toEqual({ hours: 0, minutes: 0 });
+    expect(splitMinutes(23 * 60 + 55)).toEqual({ hours: 23, minutes: 55 });
+  });
+});
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
 const at = (localDateTime) => new Date(localDateTime).getTime();
+
+describe('parkTimerEnd', () => {
+  it('starts no timer when Timer when parking is Off', () => {
+    expect(parkTimerEnd(at('2026-10-27T10:00'), 0)).toBeNull();
+  });
+
+  it('ends the set length after parking', () => {
+    expect(parkTimerEnd(at('2026-10-27T10:00'), 120)).toBe(at('2026-10-27T12:00'));
+  });
+
+  it('refuses a length that is not whole minutes', () => {
+    expect(() => parkTimerEnd(at('2026-10-27T10:00'), 1.5)).toThrow('whole number');
+  });
+});
 
 describe('timerEndFrom', () => {
   it('ends the chosen minutes after the start', () => {

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInUp, FadeOut } from 'react-native-reanimated';
 
 import { hasMoreRateOptions, moreRateOptionsInUse } from '../fees';
 import { blockPriceLabel, firstPriceLabel, moreOptionsLabel } from '../text/rateText';
 import { Button } from './Button';
 import { Field } from './Field';
+import { ENTER_MS } from './motion';
 import { SegmentedControl } from './SegmentedControl';
 import { space } from './theme';
 
@@ -57,7 +59,11 @@ export function RateForm({ value, onChange, disabled = false }) {
         </View>
       )}
       {more && !flat && (
-        <>
+        <Animated.View
+          entering={FadeInUp.duration(ENTER_MS)}
+          exiting={FadeOut.duration(ENTER_MS / 2)}
+          style={styles.form}
+        >
           <View style={styles.pair}>
             <View style={styles.half}>
               <Field label="First period (min)" {...minutes('firstMinutes')} />
@@ -74,7 +80,7 @@ export function RateForm({ value, onChange, disabled = false }) {
               <Field label="Daily max (RM)" placeholder="Optional" {...price('dailyCap')} />
             </View>
           </View>
-        </>
+        </Animated.View>
       )}
       <View style={styles.sideActions}>
         <Button

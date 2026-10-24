@@ -2,6 +2,7 @@
 // the db from useDatabase(); they never write SQL themselves.
 export { useSQLiteContext as useDatabase } from 'expo-sqlite';
 
+export { carParks } from './carParks';
 export { DATABASE_NAME, DatabaseProvider } from './DatabaseProvider';
 export { readDatabaseInfo } from './debug';
 export { exportDatabase } from './export';

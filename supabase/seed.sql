@@ -1,0 +1,2 @@
+-- Test rows for local Supabase only: `supabase db reset` runs this after the migrations;
+-- `supabase db push` never sends it to a hosted project. Never put real parking data here.

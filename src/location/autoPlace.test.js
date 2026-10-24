@@ -1,9 +1,11 @@
 import { placeForReading, shouldFillPlace } from './autoPlace';
 
 const VELOCITY = { id: 'v', name: 'Sunway Velocity', lat: 3.1279, lng: 101.7238 };
+const LISTED_VELOCITY = { id: 'sunway-velocity-mall', name: 'Sunway Velocity Mall', lat: 3.1279, lng: 101.7238 };
 // About 100 m north of Sunway Velocity.
 const HERE = { lat: 3.1288, lng: 101.7238, accuracyM: 15 };
 const FAR = { lat: 3.2, lng: 101.7238, accuracyM: 15 };
+const none = async () => [];
 
 describe('shouldFillPlace', () => {
   const ready = { touched: false, filled: false, finding: false, reading: HERE };
@@ -25,33 +27,58 @@ describe('placeForReading', () => {
 
   it('picks a saved place nearby without looking anything up', async () => {
     const lookUpName = lookUp('Somewhere else');
+    const listCarParks = jest.fn(async () => [LISTED_VELOCITY]);
 
-    expect(await placeForReading(HERE, { listSavedPlaces: async () => [VELOCITY], lookUpName })).toEqual({
+    expect(await placeForReading(HERE, { listSavedPlaces: async () => [VELOCITY], listCarParks, lookUpName })).toEqual({
       id: 'v',
       name: 'Sunway Velocity',
+    });
+    expect(listCarParks).not.toHaveBeenCalled();
+    expect(lookUpName).not.toHaveBeenCalled();
+  });
+
+  it('suggests a listed car park nearby before looking a name up online', async () => {
+    const lookUpName = lookUp('Somewhere else');
+
+    expect(
+      await placeForReading(HERE, { listSavedPlaces: none, listCarParks: async () => [LISTED_VELOCITY], lookUpName })
+    ).toEqual({ id: null, name: 'Sunway Velocity Mall', carParkId: 'sunway-velocity-mall' });
+    expect(lookUpName).not.toHaveBeenCalled();
+  });
+
+  it('finds a saved place with no location of its own through the list', async () => {
+    const lookUpName = lookUp('Somewhere else');
+    const listCarParks = async () => [{ ...LISTED_VELOCITY, place_id: 'v2', place_name: 'sunway velocity mall' }];
+
+    expect(await placeForReading(HERE, { listSavedPlaces: none, listCarParks, lookUpName })).toEqual({
+      id: 'v2',
+      name: 'sunway velocity mall',
     });
     expect(lookUpName).not.toHaveBeenCalled();
   });
 
-  it('names a new place online when no saved place is near', async () => {
+  it('names a new place online when nothing saved or listed is near', async () => {
     const lookUpName = lookUp('Wangsa Walk Mall');
 
-    expect(await placeForReading(FAR, { listSavedPlaces: async () => [VELOCITY], lookUpName })).toEqual({
-      id: null,
-      name: 'Wangsa Walk Mall',
-    });
+    const lists = { listSavedPlaces: async () => [VELOCITY], listCarParks: async () => [LISTED_VELOCITY] };
+
+    expect(await placeForReading(FAR, { ...lists, lookUpName })).toEqual({ id: null, name: 'Wangsa Walk Mall' });
     expect(lookUpName).toHaveBeenCalledWith(FAR);
   });
 
   it('finds nothing when the lookup has no name', async () => {
-    expect(await placeForReading(FAR, { listSavedPlaces: async () => [], lookUpName: lookUp(null) })).toBeNull();
+    const lookUpName = lookUp(null);
+
+    expect(await placeForReading(FAR, { listSavedPlaces: none, listCarParks: none, lookUpName })).toBeNull();
   });
 
   it('does nothing with a rough reading', async () => {
     const listSavedPlaces = jest.fn(async () => [VELOCITY]);
     const lookUpName = lookUp('Anywhere');
 
-    expect(await placeForReading({ ...HERE, accuracyM: 900 }, { listSavedPlaces, lookUpName })).toBeNull();
+    const rough = { ...HERE, accuracyM: 900 };
+
+    expect(await placeForReading(rough, { listSavedPlaces, listCarParks: none, lookUpName })).toBeNull();
     expect(listSavedPlaces).not.toHaveBeenCalled();
     expect(lookUpName).not.toHaveBeenCalled();
   });
@@ -61,6 +88,8 @@ describe('placeForReading', () => {
       throw new Error('No network');
     });
 
-    await expect(placeForReading(FAR, { listSavedPlaces: async () => [], lookUpName })).rejects.toThrow('No network');
+    await expect(placeForReading(FAR, { listSavedPlaces: none, listCarParks: none, lookUpName })).rejects.toThrow(
+      'No network'
+    );
   });
 });

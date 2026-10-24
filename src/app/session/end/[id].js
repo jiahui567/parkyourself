@@ -87,7 +87,8 @@ export default function FoundMyCar() {
     try {
       await sessions.end(db, session.id, input);
       // Back to Home with Find and this summary gone, so Back cannot reopen them.
-      router.dismissTo('/');
+      // foundAt tells Home to drive the car off with a small celebration.
+      router.dismissTo({ pathname: '/', params: { foundAt: String(endedAt), foundCarId: session.vehicle_id } });
     } catch (e) {
       setSaveError(e);
       setSaving(false);

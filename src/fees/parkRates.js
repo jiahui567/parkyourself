@@ -1,4 +1,4 @@
-import { holidayRateFromText, rateFromForm } from './rateForm';
+import { DAY_TYPES, feeFields, holidayRateFromText, rateFromForm } from './rateForm';
 
 // Which rate Park asks for and which typed rates it passes on (PLAN.md, "User
 // flow", Parking step 2). Pure: the screen loads, shows and saves.
@@ -37,6 +37,20 @@ export function enteredRates({ saved, dayType, form, sameEveryDay = false, holid
     if (holiday.rate) entered.holiday = holiday.rate;
   }
   return { entered, error: null };
+}
+
+// A new place picked from the built-in car park list (M11) keeps every rate
+// the list has, not only the one Park shows today: entered plus the list's
+// rates for the day types not shown. A shown form the user cleared stays
+// cleared. shown: the day types Park's form showed (today's, and 'holiday'
+// on a public holiday).
+export function withListedRates(entered, listedRates, shown) {
+  const all = { ...entered };
+  for (const dayType of DAY_TYPES) {
+    const listed = listedRates?.[dayType];
+    if (listed && !shown.includes(dayType) && !all[dayType]) all[dayType] = feeFields(listed);
+  }
+  return all;
 }
 
 // The day types to save to the place, from planRateSave's plan. "Only this

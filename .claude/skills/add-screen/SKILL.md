@@ -43,7 +43,8 @@ Status: design standard version 3. Version 2 (dark and light theme, bottom tabs,
 
 **Principles**: simple, minimal and modern. Every screen is checked against these before it is built (step 2) and in review.
 - **One job, one main action.** Say what the screen is for in one sentence; everything on it serves that. The one main action is the only full-width button, placed last.
-- **Essentials first, the rest folded.** Show only what most uses need. Optional parts are folded `Disclosure` rows that show their value when closed ("Timer · Off", "Weekday rate · RM 3.00 first hour…", "Not set · optional") and open on tap. Park at the car is a place, a photo and Save.
+- **Essentials first, the rest folded.** Show only what most uses need. Optional parts are folded `Disclosure` rows that show their value when closed ("Timer · Off", "Weekday rate · RM 3.00 first hour…", "Not set · optional") and open on tap. Park at the car is a photo and Save: the camera opens first and everything else fills itself in (M9).
+- 2026-10-24: A choice made the same way on every visit belongs in Settings, not on the screen used in a hurry (the timer length and the location moved from Park to Settings), because the user wants Park to need no typing at all.
 - **Ask when the user knows.** Ask for something at the moment the user has the answer, on the screen where they are then: the first shop is asked on Find while walking out, not on Park at the car.
 - **Fewer fields to type.** Before adding a field, try in this order: read it (OCR, a saved rate), prefill the common case (60-minute periods), offer chips, fold it under "More options". Typing is the last resort.
 - **Familiar patterns.** Use what people know from the apps they use daily rather than a new control: a gallery button beside the camera's shutter, as in WhatsApp; folded rows with a chevron, as in iOS Settings.
@@ -110,7 +111,17 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 - `EstimatePill`: the amber "Estimate" pill beside a fee that may differ from the receipt (overnight, or a borrowed rate). Never emerald.
 - `ListSection` and `ListRow` (`List.js`): the Settings card list. A row with `onPress` shows a chevron; one without is read-only with a `muted` label. Pass `first={false}` to every row after the first.
 - `icons.js`: line icons on a 24 grid, stroke 2, shapes from Lucide drawn with `react-native-svg`. Add new icons there; no icon library.
-- `CarLogo`: the Home car drawing; `active` turns its glow emerald.
+- `CarLogo`: the Home car drawing; `active` turns its glow emerald and lets it breathe slowly.
+- Motion (`motion.js`, with `react-native-reanimated`; numbers in `src/lib/motion.js`, tested), added 2026-10-24 for M8:
+  - Short and quiet: about 200 to 300 ms for UI changes, under 1 s for a moment. Use `ENTER_MS`.
+  - `enterUp(index)` as a list card's `entering` (fade up, staggered, first screenful only: rows mounted while scrolling must not animate); `PressScale` for a big round button that springs under the finger; `CountUpText` for a money total; `Burst` with `useBurst` and `playBurst` for a small celebration; `SavedTick` for a check mark after a save (announced to screen readers, removed after it fades).
+  - Trigger a moment from an explicit signal (a route param such as `savedAt` or `foundAt`), never from data merely changing: deleting a parked session also ends it, and must not celebrate. The rule for the Home car is `homeCarMove` in `src/lib/motion.js`, tested.
+  - `Disclosure` animates its own fold and chevron; `ChipGroup` pops a chip when it is picked, and `popIn` pops chips in as they appear (OCR codes only).
+  - Reanimated skips animations when the phone's Reduce motion setting is on; anything driven by JavaScript (`CountUpText`, `ParkingIntro`, a repeating loop) checks `useReducedMotion()` itself.
+  - Write shared values with `.set()` and read with `.get()`, for the React Compiler.
+- `ParkingIntro`: the loading animation in the root layout, once per cold start, tap to skip.
+- `TimerWheel` (M10): a timer length picked like an alarm, an hours and a minutes column that snap, the unit said once beside the middle band; `onChange` runs when a column settles. Use it for any length the user should set freely.
+- `TimerSheet` (M10): the wheel in a sheet from the bottom, with one full-width main button (Set timer); a tap above the sheet or Back cancels, except while saving. The pattern for a quick choice that needs more room than a folded row.
 - `CameraCapture`: a full-screen camera in a `Modal` that asks for the permission and takes one photo, or picks one with the gallery button beside the shutter (also offered when the camera is not allowed); mount one per screen and pass the picture to `preparePhoto`. `PhotoStrip`: a row of 3:4 thumbnails, oldest (the pillar sign) first. `PhotoViewer`: full-screen photos, swiped, with optional share and delete buttons. `PhotoStrip` takes `disabled` while a photo is being prepared or read. `BackdropButton`: the round icon button used over the camera and photos.
 - Delete, archive and other actions that lose data always ask first with `Alert.alert` (Cancel plus a `destructive` button).
 - Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`. History uses a `SectionList` by month, with section-title-styled headers that show the month's total.
@@ -126,6 +137,6 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 - 2026-10-22: A placeholder must never look like a value. An example starts with "e.g." ("e.g. B2", "e.g. 3.00", "e.g. My Myvi"); otherwise use a word such as "Optional". Never "0.00" in a money field. The user read the Level placeholder "B2" as a level already filled in from the photo.
 
 **Known gaps** (check on the phone):
-- `app.json` still has `"userInterfaceStyle": "light"`, so Android draws system dialogs (`Alert.alert`) and the launch screen light, even in dark mode. Changing it needs a rebuild.
+- 2026-10-24: `app.json` now has `"userInterfaceStyle": "automatic"` and the root layout calls `Appearance.setColorScheme(mode)`, so system dialogs (`Alert.alert`) should follow the app's Dark or Light choice. Not yet checked on the phone (needs `npx expo run:android`). The launch screen is still light until it is configured.
 - With 3-button navigation, the system navigation bar icons may not follow the theme. `expo-navigation-bar` would fix it; ask before adding it.
 - Long forms (Park, Found my car, a place's rates) wrap their ScrollView in `KeyboardAvoidingView behavior="padding"` with `keyboardVerticalOffset={useHeaderHeight()}` (from `expo-router/react-navigation`), because Android draws edge to edge and no longer shrinks the window for the keyboard. Not yet checked on the phone (2026-10-22); the tab bar at large font sizes is untested too.

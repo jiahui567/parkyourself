@@ -3,6 +3,8 @@ import {
   addPlaceLabel,
   holidayRateHint,
   keepPlaceLabel,
+  listedPlaceHint,
+  listedRateHint,
   parkRateRowText,
   photoCodesHint,
   rateUpdateQuestion,
@@ -10,6 +12,30 @@ import {
 } from './parkText';
 
 const PLACE = 'Pavilion Bukit Jalil';
+
+describe('listedPlaceHint', () => {
+  it('names the area when the list has one', () => {
+    expect(listedPlaceHint({ area: 'Cheras, Kuala Lumpur' })).toBe('From the car park list · Cheras, Kuala Lumpur');
+    expect(listedPlaceHint({ area: null })).toBe('From the car park list');
+  });
+});
+
+describe('listedRateHint', () => {
+  it('says where the rate came from and when it was checked', () => {
+    expect(listedRateHint({ checked_on: '2026-10-24', effective_from: null, notes: null })).toBe(
+      'From the car park list (checked Sat, 24 Oct 2026). Check the sign: these rates are saved to this place when you park.'
+    );
+  });
+
+  it('adds when the rates took effect, and what the list could not show', () => {
+    expect(
+      listedRateHint({ checked_on: '2026-10-24', effective_from: '2024-01-01', notes: 'Not included: night flat RM10.' })
+    ).toBe(
+      'From the car park list (checked Sat, 24 Oct 2026, in effect since Mon, 1 Jan 2024). ' +
+        'Check the sign: these rates are saved to this place when you park. Not included: night flat RM10.'
+    );
+  });
+});
 
 describe('rateUpdateQuestion', () => {
   it.each([

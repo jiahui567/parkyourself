@@ -28,3 +28,49 @@ jobs:
 
       - name: Test
         run: npm test -- --ci
+
+  # The version 2 server (supabase/): every migration must build a database
+  # from scratch and pass the pgTAP tests before it can be pushed to a
+  # hosted project. Uses the CLI pinned in package.json, as on the laptop.
+  database:
+    name: Supabase migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          # The pull request's base branch is needed to compare migrations.
+          fetch-depth: 0
+
+      # A migration that has been pushed to a hosted project must never change
+      # (PLAN.md, "Changing the schema in two databases"): only new files.
+      - name: Existing migrations are unchanged
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only --diff-filter=MDR "origin/${{ github.base_ref }}...HEAD" -- supabase/migrations)
+          if [ -n "$changed" ]; then
+            echo "These migrations were edited, renamed or deleted. Add a new migration instead:"
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Starts only Postgres (Docker is on GitHub's Ubuntu runners) and applies
+      # every file in supabase/migrations, in order, to an empty database.
+      - name: Apply all migrations to an empty database
+        run: npx supabase db start
+
+      - name: Run the pgTAP tests
+        run: npx supabase test db
+
+      - name: Stop the database
+        if: always()
+        run: npx supabase stop --no-backup

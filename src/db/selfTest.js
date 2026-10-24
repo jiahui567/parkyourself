@@ -1,7 +1,9 @@
 import { File, Paths } from 'expo-file-system';
 import { defaultDatabaseDirectory, deleteDatabaseAsync, openDatabaseAsync } from 'expo-sqlite';
 
+import { CAR_PARK_LIST } from '../carparks/carParkList';
 import { holidayRate } from '../fees';
+import { carParks } from './carParks';
 import { inTransaction } from './core';
 import { copyDatabaseTo, fileUri } from './export';
 import { holidays } from './holidays';
@@ -263,6 +265,17 @@ export async function runSelfTest() {
       } finally {
         if (copy.exists) copy.delete();
       }
+    });
+
+    // The refresh runs in the phone driver's exclusive transaction, which Jest only imitates.
+    await check('Car park list stores every car park and rate', async () => {
+      await carParks.refresh(db, CAR_PARK_LIST, 'bundled');
+      const { n } = await db.getFirstAsync('SELECT COUNT(*) AS n FROM car_park');
+      const { r } = await db.getFirstAsync('SELECT COUNT(*) AS r FROM car_park_rate');
+      const expectedRates = CAR_PARK_LIST.carParks.reduce((sum, c) => sum + c.rates.length, 0);
+      assert(n === CAR_PARK_LIST.carParks.length, `${n} car parks, expected ${CAR_PARK_LIST.carParks.length}`);
+      assert(r === expectedRates, `${r} rates, expected ${expectedRates}`);
+      return `${n} car parks, ${r} rates`;
     });
 
     await check('Settings upsert', async () => {

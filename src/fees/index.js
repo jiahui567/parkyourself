@@ -4,7 +4,7 @@ export { assertValidRate, calcDayFeeSen, calcStayFee } from './calcFee';
 export { dayTypeOf } from './dayType';
 export { amountPaidText, missingRateTypes, readEndForm, savesMissingRate, typedRates } from './endForm';
 export { feeSoFar } from './feeSoFar';
-export { enteredRates, offersSameEveryDay, rateDayTypeFor, ratesToSave } from './parkRates';
+export { enteredRates, offersSameEveryDay, rateDayTypeFor, ratesToSave, withListedRates } from './parkRates';
 export { changedPlaceRates, placeRatesFormFrom, ratesFromPlaceRatesForm } from './placeRatesForm';
 export {
   DAY_TYPES,

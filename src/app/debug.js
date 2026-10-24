@@ -2,11 +2,12 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { readConnectionCheck, supabaseUrl } from '../cloud/supabase';
 import { Button } from '../components/Button';
 import { ErrorText } from '../components/ErrorText';
 import { radius } from '../components/theme';
 import { useThemedStyles } from '../components/ThemeProvider';
-import { DATABASE_NAME, readDatabaseInfo, runSelfTest, useDatabase } from '../db';
+import { carParks, DATABASE_NAME, readDatabaseInfo, runSelfTest, useDatabase } from '../db';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
 
 // One run at a time, even across leaving and reopening this screen: a second
@@ -31,10 +32,16 @@ function selfTestAndLog() {
 export default function DatabaseCheck() {
   const db = useDatabase();
   const styles = useThemedStyles(createStyles);
-  const loadInfo = useCallback(() => readDatabaseInfo(db), [db]);
+  const loadInfo = useCallback(async () => {
+    const [facts, list] = await Promise.all([readDatabaseInfo(db), carParks.info(db)]);
+    return { ...facts, list };
+  }, [db]);
   const { data: info, error: infoError } = useFocusedLoad(loadInfo);
   const [results, setResults] = useState(null);
   const [testError, setTestError] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [serverMessage, setServerMessage] = useState(null);
+  const [serverError, setServerError] = useState(null);
   // The self-test starts by itself only in development builds.
   const running = __DEV__ && !results && !testError;
 
@@ -63,6 +70,19 @@ export default function DatabaseCheck() {
     }
   };
 
+  const checkConnection = async () => {
+    setChecking(true);
+    setServerMessage(null);
+    setServerError(null);
+    try {
+      setServerMessage(await readConnectionCheck());
+    } catch (e) {
+      setServerError(e);
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Stack.Screen options={{ title: 'Database check' }} />
@@ -74,6 +94,12 @@ export default function DatabaseCheck() {
           <Text style={styles.body}>Schema version: v{info.user_version}</Text>
           <Text style={styles.body}>Foreign keys: {info.foreign_keys ? 'on' : 'OFF'}</Text>
           <Text style={styles.body}>Journal mode: {info.journal_mode}</Text>
+          <Text style={styles.body}>
+            Car park list: {info.list.carParks} car parks, {info.list.rates} rates, from{' '}
+            {info.list.source === 'server' ? 'Supabase' : 'the built-in copy'}
+          </Text>
+          {/* Refreshing or downloading the list never stops the app; the last failure is kept here. */}
+          {info.list.error && <Text style={styles.fail}>Car park list not updated: {info.list.error}</Text>}
           <Text style={styles.subheading}>Tables</Text>
           {info.tables.map((t) => (
             <Text key={t.name} style={styles.body}>
@@ -82,6 +108,17 @@ export default function DatabaseCheck() {
           ))}
         </View>
       )}
+
+      <Text style={styles.heading}>Supabase</Text>
+      <View style={styles.card}>
+        <Text style={styles.body}>Server: {supabaseUrl ?? 'Not set up'}</Text>
+        {checking && <Text style={styles.body}>Checking…</Text>}
+        {serverMessage != null && <Text style={styles.pass}>PASS {serverMessage}</Text>}
+        <ErrorText error={serverError} />
+        <View style={styles.cardAction}>
+          <Button title="Check connection" variant="tonal" size="small" onPress={checkConnection} disabled={checking} />
+        </View>
+      </View>
 
       <Text style={styles.heading}>Data layer self-test</Text>
       <View style={styles.card}>
@@ -106,6 +143,7 @@ const createStyles = (c) =>
     heading: { fontSize: 18, fontWeight: '600', marginTop: 8, color: c.text },
     subheading: { fontWeight: '600', marginTop: 8, color: c.text },
     card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 2, boxShadow: c.shadow },
+    cardAction: { flexDirection: 'row', marginTop: 8 },
     body: { color: c.text },
     pass: { color: c.accent },
     fail: { color: c.danger },

@@ -16,7 +16,8 @@ export function assertPlaceRate(dayType, rate) {
 }
 
 // LIKE treats % and _ as wildcards; a typed one should match only itself.
-const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
+// Use with ESCAPE '\\'.
+export const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&');
 
 // The helpers below take the connection they are given (db, or txn inside a
 // transaction) and never open a transaction themselves, so sessions.start and

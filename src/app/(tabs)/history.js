@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, SectionList, StyleSheet, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ErrorText } from '../../components/ErrorText';
+import { enterUp } from '../../components/motion';
 import { SessionCard } from '../../components/SessionCard';
 import { useThemedStyles } from '../../components/ThemeProvider';
 import { sessions, useDatabase } from '../../db';
@@ -55,7 +57,12 @@ export default function History() {
           <Text style={styles.total}>{totalLineText(section)}</Text>
         </Pressable>
       )}
-      renderItem={({ item }) => <SessionCard session={item} showVehicle={showVehicle} />}
+      renderItem={({ item, index, section }) => (
+        // Only the newest month animates: the rest are below the first screenful.
+        <Animated.View entering={section === months[0] ? enterUp(index) : undefined}>
+          <SessionCard session={item} showVehicle={showVehicle} />
+        </Animated.View>
+      )}
     />
   );
 }

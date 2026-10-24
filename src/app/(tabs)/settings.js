@@ -8,14 +8,17 @@ import { Disclosure } from '../../components/Disclosure';
 import { ErrorText } from '../../components/ErrorText';
 import { ListRow, ListSection } from '../../components/List';
 import { SegmentedControl } from '../../components/SegmentedControl';
+import { SwitchRow } from '../../components/SwitchRow';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
+import { TimerWheel } from '../../components/TimerWheel';
 import { exportDatabase, preferences, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useLocationPermission } from '../../hooks/useLocationPermission';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { formatMinutes } from '../../lib/time';
 import { askNotificationPermission, notificationPermission, syncNotifications } from '../../notify/notifications';
-import { allowLocationLabel, LOCATION_PURPOSE } from '../../text/locationText';
+import { locationSwitchHint } from '../../text/locationText';
+import { parkTimerText } from '../../text/timerText';
 import { EXTEND_OPTIONS, REMINDER_LEAD_OPTIONS } from '../../timer/timer';
 
 const MODE_OPTIONS = [
@@ -26,8 +29,8 @@ const MODE_OPTIONS = [
 const EXTEND_CHOICES = EXTEND_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 const LEAD_CHOICES = REMINDER_LEAD_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
-// Settings: appearance, cars, places and holidays, the timer, the location
-// and export.
+// Settings: appearance, cars, places and holidays, what happens when you park
+// (the timer and the location), the timer, and export.
 export default function Settings() {
   const db = useDatabase();
   const { mode, setMode, loadError } = useAppTheme();
@@ -44,6 +47,8 @@ export default function Settings() {
   const [leadChoice, setLeadChoice] = useState(null);
   const [savingLead, setSavingLead] = useState(false);
   const [leadError, setLeadError] = useState(null);
+  const [parkTimerChoice, setParkTimerChoice] = useState(null);
+  const [parkTimerError, setParkTimerError] = useState(null);
 
   // Read again on focus and when the app comes back to the front, so returning
   // from Android settings shows the change. Home syncs the notifications then.
@@ -53,11 +58,12 @@ export default function Settings() {
   const [allowing, setAllowing] = useState(false);
 
   // The timer choices are folded rows that show their value (Disclosure).
-  const [open, setOpen] = useState({ extend: false, lead: false });
+  const [open, setOpen] = useState({ parkTimer: false, extend: false, lead: false });
   const toggle = (part) => () => setOpen((current) => ({ ...current, [part]: !current[part] }));
 
   const location = useLocationPermission();
-  const [allowingLocation, setAllowingLocation] = useState(false);
+  const [locationChoice, setLocationChoice] = useState(null);
+  const [savingLocation, setSavingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
 
   const [exporting, setExporting] = useState(false);
@@ -76,6 +82,25 @@ export default function Settings() {
       setError(e);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const parkTimerMinutes = parkTimerChoice ?? prefs?.parkTimerMinutes;
+
+  // Every park starts this timer (0 is Off). Saved each time the wheel
+  // settles; a failure puts the old value back only if no newer turn of the
+  // wheel came since, so the screen never shows a stale value.
+  const latestParkTimer = useRef(0);
+  const changeParkTimer = async (next) => {
+    const turn = ++latestParkTimer.current;
+    const previous = parkTimerMinutes;
+    setParkTimerChoice(next);
+    setParkTimerError(null);
+    try {
+      await preferences.setParkTimerMinutes(db, next);
+    } catch (e) {
+      if (turn === latestParkTimer.current) setParkTimerChoice(previous);
+      setParkTimerError(e);
     }
   };
 
@@ -142,16 +167,26 @@ export default function Settings() {
     }
   };
 
-  // Only allowing is offered here; it is turned off in Android's own settings.
-  const allowLocation = async () => {
-    setAllowingLocation(true);
+  // The switch is on only while the choice is on and Android allows it.
+  // Turning it on also asks Android (or opens its settings once it no longer
+  // asks); if the user says no there, the switch simply stays off.
+  const useLocation = locationChoice ?? prefs?.useLocation;
+  const locationOn = Boolean(useLocation && location.permission?.granted);
+  const changeUseLocation = async (next) => {
+    const previous = useLocation;
+    setLocationChoice(next);
+    setSavingLocation(true);
     setLocationError(null);
     try {
-      await location.allow();
+      // Asked first, so a failure saves nothing; saying no in Android's dialog
+      // still saves "on", and the switch stays off until Android allows it.
+      if (next && !location.permission.granted) await location.allow();
+      await preferences.setUseLocation(db, next);
     } catch (e) {
+      setLocationChoice(previous);
       setLocationError(e);
     } finally {
-      setAllowingLocation(false);
+      setSavingLocation(false);
     }
   };
 
@@ -186,6 +221,29 @@ export default function Settings() {
       <ListSection title="Places and rates">
         <ListRow label="Places" onPress={() => router.push('/places')} />
         <ListRow label="Public holidays" onPress={() => router.push('/holidays')} first={false} />
+      </ListSection>
+
+      <ListSection title="When you park">
+        <Disclosure
+          label="Timer when parking"
+          value={parkTimerMinutes != null ? parkTimerText(parkTimerMinutes) : null}
+          open={open.parkTimer}
+          onToggle={toggle('parkTimer')}
+        >
+          {parkTimerMinutes != null && <TimerWheel value={parkTimerMinutes} onChange={changeParkTimer} />}
+          <Text style={styles.hint}>0 h 00 m is off. Change, extend or stop it on Find.</Text>
+          <ErrorText error={parkTimerError ?? prefsLoadError} />
+        </Disclosure>
+        <View style={[styles.switchRow, styles.rowDivider]}>
+          <SwitchRow
+            label="Use location when parking"
+            hint={locationSwitchHint(location.permission)}
+            value={locationOn}
+            onValueChange={changeUseLocation}
+            disabled={savingLocation || !location.permission || useLocation == null}
+          />
+          <ErrorText error={locationError ?? location.error ?? prefsLoadError} />
+        </View>
       </ListSection>
 
       <ListSection title="Timer">
@@ -234,25 +292,6 @@ export default function Settings() {
         </Disclosure>
       </ListSection>
 
-      <ListSection title="Location">
-        <ListRow label="Use my location" value={location.permission && (location.permission.granted ? 'On' : 'Off')} />
-        <View style={styles.rowNote}>
-          <Text style={styles.hint}>{LOCATION_PURPOSE}</Text>
-          {location.permission && !location.permission.granted && (
-            <View style={styles.inlineAction}>
-              <Button
-                title={allowLocationLabel(location.permission)}
-                variant="tonal"
-                size="small"
-                onPress={allowLocation}
-                disabled={allowingLocation}
-              />
-            </View>
-          )}
-          <ErrorText error={locationError ?? location.error} />
-        </View>
-      </ListSection>
-
       <ListSection title="Data">
         {/* While the export runs the row is read-only, so it cannot start twice. */}
         <ListRow
@@ -284,6 +323,9 @@ const createStyles = (c) =>
   StyleSheet.create({
     container: { padding: 16, gap: 24 },
     padded: { padding: 12, gap: 8 },
+    // SwitchRow has no side padding; this lines it up with the Disclosure rows.
+    switchRow: { paddingHorizontal: 16, paddingVertical: 6 },
+    rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
     // Sits under a ListRow in the same card, lined up with the row's label.
     rowNote: { paddingHorizontal: 16, paddingBottom: 14, marginTop: -6, gap: 4 },
     // A row, so the small pill sits at the start instead of the centre.

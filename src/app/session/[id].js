@@ -1,17 +1,20 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../components/Button';
 import { CameraCapture } from '../../components/CameraCapture';
 import { ErrorText } from '../../components/ErrorText';
 import { EstimatePill } from '../../components/EstimatePill';
-import { CameraIcon, MapPinIcon, ShareIcon, TimerIcon } from '../../components/icons';
+import { CameraIcon, MapPinIcon, PlusIcon, ShareIcon, TimerIcon, XIcon } from '../../components/icons';
+import { ENTER_MS, SavedTick } from '../../components/motion';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { PhotoViewer } from '../../components/PhotoViewer';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
+import { TimerSheet } from '../../components/TimerSheet';
 import { WayBackCard } from '../../components/WayBackCard';
 import {
   deletePhotoFiles,
@@ -37,9 +40,13 @@ import { addPhotoLabel } from '../../text/photoText';
 import { missingRateText } from '../../text/rateText';
 import { routeBackText, shareMessage, spotLocation, walkingDirectionsUrl } from '../../text/sessionText';
 import { timerStatusText } from '../../text/timerText';
+import { timerEndFrom, wheelStartMinutes } from '../../timer/timer';
 import { swatchFor, textColourOn } from '../../zone/zoneColour';
 
 const goHome = () => (router.canGoBack() ? router.back() : router.replace('/'));
+// Only Set timer's handler reads the clock; the React Compiler lint cannot tell
+// it from render code, so the read lives out here.
+const clockNow = () => Date.now();
 
 // Find: where the car is and the way back. A parked car shows its fee so far
 // and timer, and "Found my car" opens the summary that ends it; an ended
@@ -50,7 +57,8 @@ export default function SessionScreen() {
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   // extendedAt: set when Extend timer on a notification opened this screen.
-  const { id, extendedAt } = useLocalSearchParams();
+  // savedAt: set when Park has just saved this session.
+  const { id, extendedAt, savedAt } = useLocalSearchParams();
   const load = useCallback(async () => {
     const [session, holidayDates, prefs, sessionPhotos] = await Promise.all([
       sessions.getDetails(db, id),
@@ -83,6 +91,7 @@ export default function SessionScreen() {
   const [viewing, setViewing] = useState(null);
   const [photoError, setPhotoError] = useState(null);
   const [wayBackError, setWayBackError] = useState(null);
+  const [timerSheetOpen, setTimerSheetOpen] = useState(false);
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;
@@ -122,6 +131,40 @@ export default function SessionScreen() {
     setActionError(null);
     try {
       await sessions.extend(db, session.id);
+      await reload();
+      await resyncNotifications();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // The wheel's length counts from now, like setting an alarm. A failure stays
+  // in the sheet, which shows it.
+  const setTimerTo = async (minutes) => {
+    await sessions.setTimer(db, session.id, timerEndFrom(clockNow(), minutes));
+    setTimerSheetOpen(false);
+    await reload();
+    try {
+      await resyncNotifications();
+    } catch (e) {
+      setActionError(e);
+    }
+  };
+
+  // Drops the timer for this park (Timer when parking starts one on every
+  // park). Extend can only start a new one from now, so it asks first.
+  const confirmStopTimer = () =>
+    Alert.alert('Stop the timer?', 'Its reminders are cancelled.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Stop timer', style: 'destructive', onPress: stopTimer },
+    ]);
+  const stopTimer = async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await sessions.setTimer(db, session.id, null);
       await reload();
       await resyncNotifications();
     } catch (e) {
@@ -223,11 +266,12 @@ export default function SessionScreen() {
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ title: session.vehicle_name }} />
+      {savedAt && active && <SavedTick key={savedAt} label="Parked" />}
       {/* handled: with the keyboard up for the shop, a tap on a chip or button
           still works instead of only closing the keyboard. */}
       <ScrollView style={styles.screen} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-        <View style={[styles.spot, spotColours]}>
+        <Animated.View entering={FadeInDown.duration(ENTER_MS)} style={[styles.spot, spotColours]}>
           {session.level || session.bay ? (
             <>
               {/* "Level" is what people look for on the signs; the bay is the
@@ -247,7 +291,7 @@ export default function SessionScreen() {
             <Text style={[styles.bay, spotTextStyle]}>No level or bay recorded</Text>
           )}
           {session.zone_colour_name && <Text style={spotTextStyle}>{session.zone_colour_name} zone</Text>}
-        </View>
+        </Animated.View>
 
         {active ? (
           <WayBackCard session={session} route={route} onSave={saveWayBack} error={wayBackError} />
@@ -280,6 +324,13 @@ export default function SessionScreen() {
           </View>
         )}
         <CameraCapture visible={cameraOpen} onCapture={addPhoto} onClose={() => setCameraOpen(false)} />
+        <TimerSheet
+          visible={timerSheetOpen}
+          initialMinutes={wheelStartMinutes(session.timer_ends_at, now, prefs.parkTimerMinutes)}
+          now={now}
+          onSet={setTimerTo}
+          onClose={() => setTimerSheetOpen(false)}
+        />
         <PhotoViewer
           uris={photoUris}
           index={viewing}
@@ -321,13 +372,31 @@ export default function SessionScreen() {
         {active && (
           <View style={styles.sideActions}>
             <Button
-              title={extendTimerText(session.timer_ends_at, prefs.extendMinutes)}
+              title="Set timer"
               variant="tonal"
               size="small"
               icon={TimerIcon}
+              onPress={() => setTimerSheetOpen(true)}
+              disabled={busy}
+            />
+            <Button
+              title={extendTimerText(session.timer_ends_at, prefs.extendMinutes)}
+              variant="tonal"
+              size="small"
+              icon={PlusIcon}
               onPress={extend}
               disabled={busy}
             />
+            {session.timer_ends_at != null && (
+              <Button
+                title="Stop timer"
+                variant="tonal"
+                size="small"
+                icon={XIcon}
+                onPress={confirmStopTimer}
+                disabled={busy}
+              />
+            )}
             <Button title="Share" variant="tonal" size="small" icon={ShareIcon} onPress={shareSpot} disabled={busy} />
             {location && (
               <Button

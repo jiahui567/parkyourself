@@ -107,4 +107,66 @@ export const MIGRATIONS = [
     value           TEXT
   );
   `,
+
+  // v2: the car park list (M11). Local only, never synced: reference data
+  // shipped inside the app (src/carparks/carParkList.js) and replaced whenever
+  // the list's version changes, so its rows are deleted for real. Rates have
+  // the place_rate columns, so the fee code reads them the same way.
+  `
+  CREATE TABLE car_park (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    area            TEXT,
+    lat             REAL,
+    lng             REAL,
+    source_url      TEXT NOT NULL,
+    checked_on      TEXT NOT NULL,
+    effective_from  TEXT,
+    notes           TEXT
+  );
+
+  CREATE TABLE car_park_rate (
+    car_park_id     TEXT NOT NULL REFERENCES car_park(id) ON DELETE CASCADE,
+    day_type        TEXT NOT NULL CHECK (day_type IN ('weekday','weekend','holiday')),
+    type            TEXT NOT NULL CHECK (type IN ('hourly','flat')),
+    first_minutes   INTEGER,
+    first_sen       INTEGER,
+    block_minutes   INTEGER,
+    block_sen       INTEGER,
+    grace_minutes   INTEGER NOT NULL DEFAULT 0,
+    daily_cap_sen   INTEGER,
+    flat_sen        INTEGER,
+    PRIMARY KEY (car_park_id, day_type),
+    CHECK (day_type <> 'holiday' OR type = 'flat')
+  );
+  `,
+
+  // v3: rate history for the car park list (M12). Each rate keeps the date it
+  // took effect (null: since before it was first checked) beside the others.
+  // The tables hold only a copy of the list, so they are emptied and the list
+  // is loaded again when the app starts (the stored stamp is cleared).
+  `
+  DROP TABLE car_park_rate;
+  DELETE FROM car_park;
+  ALTER TABLE car_park DROP COLUMN effective_from;
+  DELETE FROM setting WHERE key = 'car_park_list_version';
+
+  CREATE TABLE car_park_rate (
+    car_park_id     TEXT NOT NULL REFERENCES car_park(id) ON DELETE CASCADE,
+    day_type        TEXT NOT NULL CHECK (day_type IN ('weekday','weekend','holiday')),
+    effective_from  TEXT,
+    type            TEXT NOT NULL CHECK (type IN ('hourly','flat')),
+    first_minutes   INTEGER,
+    first_sen       INTEGER,
+    block_minutes   INTEGER,
+    block_sen       INTEGER,
+    grace_minutes   INTEGER NOT NULL DEFAULT 0,
+    daily_cap_sen   INTEGER,
+    flat_sen        INTEGER,
+    CHECK (day_type <> 'holiday' OR type = 'flat')
+  );
+
+  CREATE UNIQUE INDEX car_park_rate_unique
+    ON car_park_rate (car_park_id, day_type, COALESCE(effective_from, ''));
+  `,
 ];

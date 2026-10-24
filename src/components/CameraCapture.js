@@ -19,15 +19,17 @@ const SHUTTER = 72;
 // is a copy the picker made in the app's cache, so deleting it once it is
 // prepared leaves the gallery alone.
 // Only one camera preview can run at a time, so it is mounted only while open.
-export function CameraCapture({ visible, onCapture, onClose }) {
+// onSkip, when given, adds a Skip photo button (Park, for parking with no
+// sign to photograph).
+export function CameraCapture({ visible, onCapture, onClose, onSkip }) {
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      {visible && <CameraBody onCapture={onCapture} onClose={onClose} />}
+      {visible && <CameraBody onCapture={onCapture} onClose={onClose} onSkip={onSkip} />}
     </Modal>
   );
 }
 
-function CameraBody({ onCapture, onClose }) {
+function CameraBody({ onCapture, onClose, onSkip }) {
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const camera = useRef(null);
@@ -69,7 +71,19 @@ function CameraBody({ onCapture, onClose }) {
 
   const closeButton = (
     <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
-      <BackdropButton icon={XIcon} label="Close camera" onPress={onClose} />
+      {/* Not while a photo is being taken: Park would close before it arrives. */}
+      <BackdropButton icon={XIcon} label="Close camera" onPress={onClose} disabled={taking} />
+      {onSkip && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onSkip}
+          disabled={taking}
+          hitSlop={8}
+          style={({ pressed }) => [styles.skip, (pressed || taking) && styles.dimmed]}
+        >
+          <Text style={styles.skipText}>Skip photo</Text>
+        </Pressable>
+      )}
     </View>
   );
   // Not ErrorText: its danger red is hard to read on the black backdrop.
@@ -128,7 +142,17 @@ function CameraBody({ onCapture, onClose }) {
 const createStyles = (c) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.backdrop },
-    top: { position: 'absolute', top: 0, left: 16 },
+    top: {
+      position: 'absolute',
+      top: 0,
+      left: 16,
+      right: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    skip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: c.backdropSoft },
+    skipText: { color: c.onBackdrop, fontWeight: '600' },
     bottom: { position: 'absolute', bottom: 0, left: 16, right: 16, alignItems: 'center', gap: 12 },
     ask: { flex: 1, justifyContent: 'center', padding: 24, gap: 16 },
     text: { color: c.onBackdrop, textAlign: 'center', lineHeight: 22 },
