@@ -35,24 +35,47 @@ jobs:
   database:
     name: Supabase migrations
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out code
         uses: actions/checkout@v7
         with:
-          # The pull request's base branch is needed to compare migrations.
+          # The commits before this change are needed to compare migrations.
           fetch-depth: 0
 
       # A migration that has been pushed to a hosted project must never change
-      # (PLAN.md, "Changing the schema in two databases"): only new files.
+      # (PLAN.md, "Changing the schema in two databases"): only new files, each
+      # named after the newest one before it, so every database applies them in
+      # the same order. Compared with the pull request's base, or for a push
+      # (this repo commits straight to master) with the commit before it.
       - name: Existing migrations are unchanged
-        if: github.event_name == 'pull_request'
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          changed=$(git diff --name-only --diff-filter=MDR "origin/${{ github.base_ref }}...HEAD" -- supabase/migrations)
+          if [ "$EVENT" = pull_request ]; then
+            base=$(git merge-base "origin/$BASE_REF" HEAD)
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
+            || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "No earlier commit to compare with (a new branch or a force-push); skipped."
+            exit 0
+          else
+            base=$BEFORE
+          fi
+          changed=$(git diff --name-only --diff-filter=MDR "$base" HEAD -- supabase/migrations)
           if [ -n "$changed" ]; then
             echo "These migrations were edited, renamed or deleted. Add a new migration instead:"
             echo "$changed"
             exit 1
           fi
+          newest=$(git ls-tree --name-only "$base" supabase/migrations/ | xargs -r -n1 basename | sort | tail -n1)
+          for file in $(git diff --name-only --diff-filter=A "$base" HEAD -- supabase/migrations); do
+            if [ -n "$newest" ] && [[ "$(basename "$file")" < "$newest" || "$(basename "$file")" == "$newest" ]]; then
+              echo "$file is named before $newest, the newest migration already there. Run supabase migration new."
+              exit 1
+            fi
+          done
 
       - name: Set up Node.js
         uses: actions/setup-node@v7

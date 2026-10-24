@@ -54,7 +54,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Lint | ESLint 9 with `eslint-config-expo` |
 | Tests | Jest 30 with the `jest-expo` preset, time zone pinned to `Asia/Kuala_Lumpur` in `jest.config.js`. Data layer tests run `src/db` on Node's built-in SQLite (`test/testDatabase.js`) |
 | Version 2 server (in progress) | Supabase: `supabase` CLI (dev dependency, run with `npx supabase`), local stack in Docker Desktop, hosted dev project; `@supabase/supabase-js` in the app. See "Version 2 server" |
-| CI | GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request to `master`: **Lint and test** (ESLint, Jest), and **Supabase migrations** (every migration applied to an empty Postgres with `supabase db start`, then the pgTAP tests; on a pull request it also fails if an existing migration file was edited, renamed or deleted) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request to `master`: **Lint and test** (ESLint, Jest), and **Supabase migrations** (every migration applied to an empty Postgres with `supabase db start`, then the pgTAP tests; it also fails if an existing migration file was edited, renamed or deleted, or a new one is named before the newest existing one) |
 
 `react-native-image-colors` (approved for M4) was added on 2026-10-23 for the zone colour. M5 needs no extra library; the QR code was dropped.
 
@@ -140,7 +140,7 @@ park-yourself/
 │   ├── pull-db.js           Copies the phone's database to db-snapshot/
 │   └── car-park-sql.js      Writes the Supabase migration for the car park list (npm run carparks:sql)
 ├── assets/                  App icons and splash image
-├── .github/workflows/ci.yml GitHub Actions: lint and tests on push and pull request
+├── .github/workflows/ci.yml GitHub Actions: lint and tests, and Supabase migrations, on push and pull request
 ├── app.json                 Expo config: name, Android package, plugins
 ├── jest.config.js           Jest setup (jest-expo preset, Malaysia time zone)
 ├── PLAN.md                  Full build plan

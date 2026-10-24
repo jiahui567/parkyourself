@@ -799,7 +799,7 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 - Create the same place name offline on two phones, check the merge.
 - Run an old app version against the migrated server.
 - Policy tests with two users for every table (pgTAP, `supabase test db`, run on local).
-- CI (2026-10-25): every push and pull request applies all migrations to an empty Postgres and runs the pgTAP tests (the "Supabase migrations" job), and a pull request that edits, renames or deletes an existing migration fails. Pushing to a hosted project stays manual.
+- CI (2026-10-25): every push and pull request applies all migrations to an empty Postgres and runs the pgTAP tests (the "Supabase migrations" job). It fails when a change edits, renames or deletes an existing migration, or adds one named before the newest existing one (compared with a pull request's base, or the commit before a push). It cannot see a migration pushed to a hosted project from a branch and then edited before merging: push to hosted only from what is on `master`. Local and CI need explicit GRANTs like hosted (`auto_expose_new_tables = false` in `supabase/config.toml`). Pushing to a hosted project stays manual.
 - Family sharing: invite, accept, live update, remove member, access stops.
 - Share links: app installed, not installed, expired.
 
