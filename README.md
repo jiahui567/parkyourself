@@ -11,9 +11,10 @@ All your data stays on the phone. No account. An optional cloud sync is planned 
 | | |
 |---|---|
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
-| In progress | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park** (camera first, Save pinned, timer and location in Settings, Stop timer on Find), **M10 Timer wheel**, **M11 Car park list** (30 Klang Valley malls with researched rates) and **M12 Car park list on Supabase** (daily download, rate history): built, to check on the phone |
-| Next | Push M12's migrations to hosted dev, install a release build, check M8 to M12 on the phone, then version 2 continues from C0 |
-| Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M8 and the version 2 cloud design |
+| Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
+| In progress | **C1** (version 2): the five synced tables on Supabase with Row Level Security and pgTAP tests, built on local; not pushed to hosted dev yet |
+| Next | Push C1 to hosted dev; decide the sync conflict rules and how a phone gets a user before C2 and C3 |
+| Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M12 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
 
@@ -204,7 +205,7 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestone C0 in PLAN.md). The app works without it. Two things talk to it: Check connection on the Database check screen (development builds, when you tap it), and the car park list download (M12), at most once a day when the app opens, in every build.
+In progress (milestone C1 in PLAN.md: the synced tables are on local, not pushed yet). The app works without it. Only one thing talks to it so far: the car park list download (M12), at most once a day when the app opens, in every build. Database check shows which server the build uses.
 
 **The car park list** lives in `src/carparks/carParkList.json` (the one source), on Supabase (`car_park`, `car_park_rate`: anyone may read, only migrations write) and as a copy on the phone. To change a rate, add a row with the new `effective_from` (keep the old one), bump `version`, run `npm run carparks:sql`, check on local, and push. Phones get it within a day.
 

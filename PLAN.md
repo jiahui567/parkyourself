@@ -656,25 +656,26 @@ Version 1 is finished when M0 to M8 are done.
   - 2026-10-22: on hold while the GPS design is rethought.
   - 2026-10-22: online place search is to be designed with it (see "Decisions made", Place search).
   - 2026-10-23: redesigned and built (see "Location"), and checked on the phone.
-- [ ] **M8 Polish**: Settings, export database, app icon, animations, a loading animation. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
+- [x] **M8 Polish**: Settings, export database, app icon, animations, a loading animation. Dark mode was built early (2026-10-22); what is left is making system dialogs and the launch screen follow it
   - 2026-10-24 (decided by the user): M8 is finished before version 2 continues past C0. The signed release APK moves out of M8: it is built once version 2 is ready (C9). Added to M8:
     - **Animations** with `react-native-reanimated` (and `react-native-worklets`), everywhere they help: Home (Park button spring, the car driving in with a glow pulse when parked and driving off on Found my car, status and spot fading in), folding rows and chips (Disclosure opens and closes smoothly with the chevron turning, a small pop on a picked chip, More options sliding), lists and Spending (cards fading up in turn, bars growing, the total counting up) and moments (a check mark when Park saves, a small celebration on Found my car, level and bay chips popping in as OCR reads them). Every animation is short and is skipped when the phone's Reduce motion setting is on.
     - **Loading animation**: Android draws the first frame itself (a still icon on charcoal). Then, on a cold start only, a cute car drives in and reverses into a bay while the P sign lights up emerald, for about 1 second, then fades into Home. A tap skips it; not shown when returning from another app.
     - **App icon**: designed from the app's look (an emerald P parking sign with the car, on charcoal), approved by the user before it goes in; the same drawing is used for the launch screen.
   - 2026-10-24: the icon was approved for now; the user wants a better one later. The launch screen (`expo-splash-screen`, approved) is charcoal with the icon's sign and car in both phone modes, so it flows into the loading animation. Built: the animations, the loading animation, dark system dialogs, the icon and the launch screen; to check on the phone after `npx expo run:android`.
   - 2026-10-22: Settings (Places, Public holidays, Extend timer by) and Export database are built; to check on the phone. App icon, signed APK and the dark system dialogs are still to do.
+  - 2026-10-25: M8 to M12 checked on the phone by the user, with a release build.
 
-- [ ] **M9 Camera-first Park** (added 2026-10-24, before version 2 continues): Park opens on the camera with Skip photo; Save pinned at the bottom; the timer (Timer when parking) and the location (Use location when parking) set in Settings instead of on each park; Stop timer on Find. See "User flow", Parking
+- [x] **M9 Camera-first Park** (added 2026-10-24, before version 2 continues): Park opens on the camera with Skip photo; Save pinned at the bottom; the timer (Timer when parking) and the location (Use location when parking) set in Settings instead of on each park; Stop timer on Find. See "User flow", Parking
 
-- [ ] **M10 Timer wheel** (added 2026-10-24): timer lengths are picked on a scrolling hours-and-minutes wheel, like setting an alarm, instead of fixed chips. Built in the app (React Native and Reanimated, no new library), in the app's look. Settings: **Timer when parking** is a wheel (0 h 00 m is Off; 5-minute steps). Find: **Set timer** opens the same wheel in a sheet to set this park's timer exactly, showing when it would end; Extend and Stop stay
-- [ ] **M11 Car park list** (added 2026-10-24): a built-in list of about 30 major Klang Valley mall car parks with their public car rates, researched from the web (mall and operator sites) by Claude, each with its GPS point, source link, the date it was checked and, when the source says, the date the rates took effect. Shipped inside the app: the app itself makes no network call for it (AGENTS.md, "Privacy"). With the location on, a listed car park near you is suggested before Android's geocoder is asked; place search also finds listed car parks. Picking one makes it your place with its rates filled in, marked "From the car park list, checked <date>: check the sign"; your own saved rates always win. Updated in later app updates, or moved to the version 2 server (C7)
+- [x] **M10 Timer wheel** (added 2026-10-24): timer lengths are picked on a scrolling hours-and-minutes wheel, like setting an alarm, instead of fixed chips. Built in the app (React Native and Reanimated, no new library), in the app's look. Settings: **Timer when parking** is a wheel (0 h 00 m is Off; 5-minute steps). Find: **Set timer** opens the same wheel in a sheet to set this park's timer exactly, showing when it would end; Extend and Stop stay
+- [x] **M11 Car park list** (added 2026-10-24): a built-in list of about 30 major Klang Valley mall car parks with their public car rates, researched from the web (mall and operator sites) by Claude, each with its GPS point, source link, the date it was checked and, when the source says, the date the rates took effect. Shipped inside the app: the app itself makes no network call for it (AGENTS.md, "Privacy"). With the location on, a listed car park near you is suggested before Android's geocoder is asked; place search also finds listed car parks. Picking one makes it your place with its rates filled in, marked "From the car park list, checked <date>: check the sign"; your own saved rates always win. Updated in later app updates, or moved to the version 2 server (C7)
 
   - 2026-10-24 (decided by the user, after M11 was built): the list moves to Supabase, so rates can change without a new app build:
     - **Source of truth:** `src/carparks/carParkList.json` in git. `npm run carparks:sql` turns it into a Supabase migration (`supabase/migrations/`), pushed like any other (local, then dev). Rates are never edited in the dashboard.
     - **Rate history:** a rate row has `effective_from` (a date, or null for "since before it was first checked"). A change adds rows with the new date and keeps the old ones; the app uses, per day type, the latest rate in effect today. A change can be added before it starts.
     - **Server:** the dev project (Tokyo) for now, the release build included (its env file, `.env.production.local`, points there). Tables `car_park` and `car_park_rate` anyone may read (the `anon` role, like C0's test table); only migrations write.
     - **Download:** automatically, at most once a day when the app opens (a privacy exception chosen by the user: AGENTS.md, "Privacy"). A downloaded list replaces the phone's copy; the built-in JSON is used only until a download has worked (first open, offline, a server that is paused or reset). Errors never reach the user's screens; Database check shows the last one.
-- [ ] **M12 Car park list on Supabase** (added 2026-10-24): the server tables and data migration, rate history on the phone (SQLite v3), the daily download, and the list's source in one JSON file. See M11's notes above
+- [x] **M12 Car park list on Supabase** (added 2026-10-24): the server tables and data migration, rate history on the phone (SQLite v3), the daily download, and the list's source in one JSON file. See M11's notes above
 
 ## Version 2: Park Yourself Cloud (future)
 
@@ -728,8 +729,8 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 1. **Change tracking.** A version 2 migration adds a local `dirty` column to every synced table, with `DEFAULT 1` so every existing row is pushed on the first sync. The data layer sets `dirty = 1` on every insert, update and soft delete.
 2. **Server columns.** Each server table has the same columns plus `owner_id` and `server_updated_at`, which a database trigger sets to `now()` on every write. The server's clock decides sync order, so a phone with a wrong clock cannot break it.
-3. **Push.** Read rows with `dirty = 1`, parents first (`vehicle`, `place`, then `place_rate`, `public_holiday`, `parking_session`). Send them in batches to an upsert function. The server keeps whichever version has the newer `updated_at` (last write wins). After a successful push, set `dirty = 0` only if the row's `updated_at` has not changed since you read it, so an edit made during the push is not lost.
-4. **Pull.** Ask for rows with `server_updated_at` later than `last_pulled_at` (saved in `setting`). Write them into SQLite unless the local row is dirty and newer. Save the largest `server_updated_at` received as the new `last_pulled_at`.
+3. **Push.** Read rows with `dirty = 1`, parents first (`vehicle`, `place`, then `place_rate`, `public_holiday`, `parking_session`). Send them in batches to an upsert function. The server keeps whichever version has the newer `updated_at` (last write wins). After a successful push, set `dirty = 0` only if the row's `updated_at` has not changed since you read it, so an edit made during the push is not lost. Within a table, push rows in `updated_at` order: the server checks its unique rules row by row, so a row that frees a name (a place renamed, a session ended) must arrive before the row that takes it.
+4. **Pull.** Ask for rows with `server_updated_at` later than `last_pulled_at` (saved in `setting`). Write them into SQLite unless the local row is dirty and newer. Save the largest `server_updated_at` received as the new `last_pulled_at`. Read with an overlap (rows later than `last_pulled_at` minus a margin, such as a minute): the trigger stamps `now()`, when a push's transaction started, not when it committed, so a push that commits after another phone's pull can carry an older stamp. Pulling a row twice is harmless.
 5. **Order and timing.** Push, then pull. Run on app open, after each save, on pull-to-refresh, and occasionally in the background.
 6. **Deletes.** Soft-deleted rows sync like any other change. Purge them on both sides once they are older than an agreed window (for example 90 days).
 7. **First sign-in.** All local rows are dirty, so they are pushed; then pull brings rows from your other phones.
@@ -740,7 +741,9 @@ Web: share-link fallback page + optional dashboard (Next.js)
 | SQLite | PostgreSQL |
 |---|---|
 | `TEXT` UUID id | `uuid` |
-| `INTEGER` epoch ms | `bigint` (or `timestamptz`, converted in the sync code) |
+| `INTEGER` epoch ms | `bigint` (chosen in C1: the numbers round-trip unchanged). Only `server_updated_at` is `timestamptz` |
+| Other `INTEGER` (sen, minutes) | `bigint`: SQLite integers are 64-bit and typed amounts have no cap, so a value the phone holds never fails the push |
+| `TEXT` date (`holiday_date`, `YYYY-MM-DD`) | `date` |
 | `INTEGER` 0/1 flags | `boolean` |
 | `REAL` | `double precision` |
 | `TEXT` JSON (`rate_snapshot`) | `jsonb` |
@@ -758,7 +761,7 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 - Only the Supabase publishable key (`sb_publishable_...`, formerly the anon key) goes in the app. The secret key (`sb_secret_...`, formerly the service-role key) bypasses RLS: it lives only in Edge Functions and is never committed or pasted anywhere. The local stack's keys are fixed defaults, the same on every laptop, so they are not secrets; the hosted projects' keys are.
 - A Row Level Security policy on every table, each with a test: user A must not read user B's data.
-- Every new table in `public` gets explicit `GRANT`s to `authenticated` in the migration that creates it. Supabase no longer exposes new tables to the Data API by default (new projects since 2026-05-30, every project from 2026-10-30), and a missing grant fails before RLS runs, on local `db reset` too. Grant only what the app uses; `anon` gets nothing (two exceptions: C0's `connection_check`, dropped at the start of C1, and M12's public car park list, read only).
+- Every new table in `public` gets explicit `GRANT`s to `authenticated` in the migration that creates it. Supabase no longer exposes new tables to the Data API by default (new projects since 2026-05-30, every project from 2026-10-30), and a missing grant fails before RLS runs, on local `db reset` too. Grant only what the app uses; `anon` gets nothing (one exception: M12's public car park list, read only; C0's `connection_check` was dropped in C1).
 - Car location is personal data: a privacy policy is required on Google Play for apps with accounts and location, and Malaysia's PDPA applies once friends' data is stored.
 - Data export and account deletion.
 
@@ -805,9 +808,17 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 
 ### Milestones
 
-- [ ] **C0** Environments, no tables yet: Docker Desktop and the Supabase CLI installed; `supabase init` and `supabase start` working; hosted dev project created and linked; one trivial migration pushed to local and dev; one pgTAP test passing with `supabase test db`; the dev build reading one row from local (through `adb reverse`) and from hosted dev
+- [x] **C0** Environments, no tables yet: Docker Desktop and the Supabase CLI installed; `supabase init` and `supabase start` working; hosted dev project created and linked; one trivial migration pushed to local and dev; one pgTAP test passing with `supabase test db`; the dev build reading one row from local (through `adb reverse`) and from hosted dev
   - 2026-10-24: Docker Desktop and the CLI installed; local stack running with storage and analytics off; hosted dev project (Tokyo) linked; migration `connection_check` (one row anon may read, dropped at the start of C1) pushed to local and dev; pgTAP test passing (5 of 5); Check connection on the Database check screen built. To check on the phone, against local and hosted dev.
+  - 2026-10-25: the phone reaches hosted dev (the release build downloads the car park list). The check against local over `adb reverse` was skipped: the user chose to drop `connection_check` and move on to C1.
 - [ ] **C1** Drop C0's `connection_check` (a new migration) and remove `readConnectionCheck` and the Check connection card; PostgreSQL schema matching v1 plus `owner_id` and `server_updated_at`, policies and policy tests
+  - 2026-10-25: built and passing on local (`supabase test db`); not pushed to hosted dev yet. Migrations `drop_connection_check` and `synced_tables`; Database check keeps the Server line only. Decisions made while building it:
+    - The phone's rules hold on the server exactly, per owner: the checks and the unique indexes (place name in any case of A to Z, like NOCASE, through `lower(name collate "C")`; one live rate per place and day type; one holiday per date; one active session per car). Looser, and a pull could bring rows the phone rejects; stricter, and a push could fail on rows the phone accepted. Rows two phones made offline that break a rule are merged by the sync (C3, C4).
+    - Foreign keys carry `owner_id` (`(place_id, owner_id)` → `place (id, owner_id)`), so a row can only point at its owner's own car or place.
+    - `owner_id` defaults to the signed-in user and references `auth.users` with `on delete cascade`, so deleting the account deletes the rows (C2).
+    - `authenticated` may select, insert and update its own rows; nobody may delete (rows are soft-deleted). `anon` gets nothing.
+    - A trigger sets `server_updated_at` to the server's clock on every insert and update, overwriting what the phone sends.
+    - pgTAP: `synced_tables_schema` (columns, types, triggers, privileges) and `synced_tables_access` (two users, the unique rules, account deletion). Jest `test/serverColumns.test.js` reads the schema test's column lists and checks them against the phone's migrated SQLite.
 - [ ] **C2** Sign-in, profile, account deletion
 - [ ] **C3** SQLite migration adding `dirty`; push
 - [ ] **C4** Pull, `last_pulled_at`, conflict handling, duplicate-place merge, two-phone tests
@@ -819,7 +830,9 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 
 ### Decide later
 
-- Sign-in methods: email link, Google, or both?
+- Sign-in methods: email link, Google, or both? (2026-10-25: the user would skip Google if it is troublesome, and skip sign-in for now.)
+- How a phone gets a user before there is a sign-in screen (push and pull need one for Row Level Security)?
+- Merge rules for rows two phones made offline that break a unique rule: the same place name, a rate for the same place and day type, the same holiday date, two active sessions for one car ("How the sync works" has a rule for places only, step 8).
 - Shared rates: friend group only, or public one day?
 - Share link expiry time?
 - How long to keep soft-deleted rows before purging?

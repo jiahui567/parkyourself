@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { readConnectionCheck, supabaseUrl } from '../cloud/supabase';
+import { supabaseUrl } from '../cloud/supabase';
 import { Button } from '../components/Button';
 import { ErrorText } from '../components/ErrorText';
 import { radius } from '../components/theme';
@@ -39,9 +39,6 @@ export default function DatabaseCheck() {
   const { data: info, error: infoError } = useFocusedLoad(loadInfo);
   const [results, setResults] = useState(null);
   const [testError, setTestError] = useState(null);
-  const [checking, setChecking] = useState(false);
-  const [serverMessage, setServerMessage] = useState(null);
-  const [serverError, setServerError] = useState(null);
   // The self-test starts by itself only in development builds.
   const running = __DEV__ && !results && !testError;
 
@@ -67,19 +64,6 @@ export default function DatabaseCheck() {
       setResults(await selfTestAndLog());
     } catch (e) {
       setTestError(e);
-    }
-  };
-
-  const checkConnection = async () => {
-    setChecking(true);
-    setServerMessage(null);
-    setServerError(null);
-    try {
-      setServerMessage(await readConnectionCheck());
-    } catch (e) {
-      setServerError(e);
-    } finally {
-      setChecking(false);
     }
   };
 
@@ -112,12 +96,6 @@ export default function DatabaseCheck() {
       <Text style={styles.heading}>Supabase</Text>
       <View style={styles.card}>
         <Text style={styles.body}>Server: {supabaseUrl ?? 'Not set up'}</Text>
-        {checking && <Text style={styles.body}>Checking…</Text>}
-        {serverMessage != null && <Text style={styles.pass}>PASS {serverMessage}</Text>}
-        <ErrorText error={serverError} />
-        <View style={styles.cardAction}>
-          <Button title="Check connection" variant="tonal" size="small" onPress={checkConnection} disabled={checking} />
-        </View>
       </View>
 
       <Text style={styles.heading}>Data layer self-test</Text>
@@ -143,7 +121,6 @@ const createStyles = (c) =>
     heading: { fontSize: 18, fontWeight: '600', marginTop: 8, color: c.text },
     subheading: { fontWeight: '600', marginTop: 8, color: c.text },
     card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 2, boxShadow: c.shadow },
-    cardAction: { flexDirection: 'row', marginTop: 8 },
     body: { color: c.text },
     pass: { color: c.accent },
     fail: { color: c.danger },

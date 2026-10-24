@@ -22,15 +22,6 @@ export const supabaseUrl = client ? SUPABASE_URL : null;
 
 const NOT_SET_UP = 'No Supabase server is set up. Copy .env.example to .env.development.local.';
 
-// C0 only: reads the one row of connection_check, signed out, to prove the app
-// reaches the server. Only when the user taps Check connection (AGENTS.md, "Privacy").
-export async function readConnectionCheck() {
-  if (!client) throw new Error(NOT_SET_UP);
-  const { data, error } = await client.from('connection_check').select('message').eq('id', 1).single();
-  if (error) throw new Error(error.message);
-  return data.message;
-}
-
 const RATE_COLUMNS =
   'day_type, effective_from, type, first_minutes, first_sen, block_minutes, block_sen, grace_minutes, daily_cap_sen, flat_sen';
 

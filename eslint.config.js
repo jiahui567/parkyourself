@@ -37,6 +37,7 @@ module.exports = defineConfig([
     files: ['**/*.test.js', 'test/**/*.js'],
     languageOptions: {
       globals: {
+        __dirname: 'readonly',
         afterAll: 'readonly',
         afterEach: 'readonly',
         beforeAll: 'readonly',
