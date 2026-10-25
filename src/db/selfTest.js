@@ -278,6 +278,22 @@ export async function runSelfTest() {
       return `${n} car parks, ${r} rates`;
     });
 
+    // Leaving out unknown car parks and dropping reports with their car park
+    // both rest on the phone driver's foreign keys and transaction (C10).
+    await check('Rate reports follow the car park list', async () => {
+      const listed = CAR_PARK_LIST.carParks[0].id;
+      const rates = { weekday: { type: 'flat', flat_sen: 300, grace_minutes: 0 }, weekend: null, holiday: null };
+      await carParks.replaceReports(db, [
+        { id: 'selftest-1', car_park_id: listed, rates, reported_at: 1 },
+        { id: 'selftest-2', car_park_id: 'not-on-the-list', rates, reported_at: 2 },
+      ]);
+      const stored = await carParks.pendingReports(db, listed);
+      assert(stored.length === 1 && stored[0].rates.weekday.flat_sen === 300, `${stored.length} reports stored`);
+      await carParks.refresh(db, { ...CAR_PARK_LIST, version: 'selftest' }, 'bundled');
+      const { n } = await db.getFirstAsync('SELECT COUNT(*) AS n FROM car_park_report');
+      assert(n === 0, `${n} reports left after the list was replaced`);
+    });
+
     await check('Settings upsert', async () => {
       await settings.set(db, 'reminder_lead_minutes', '10');
       await settings.set(db, 'reminder_lead_minutes', '15');

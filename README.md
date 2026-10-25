@@ -4,7 +4,7 @@ An Android app that remembers where you parked and what it will cost.
 
 Take a photo of the pillar sign and the app reads the level, bay number and zone colour. Add the first shop you saw after the lift or escalator, and the app shows you the way back. It remembers each car park's weekday, weekend and public holiday rates, calculates the fee while you are away, reminds you before paid parking runs out, lets you share your spot through WhatsApp, and shows your monthly parking spend.
 
-All your data stays on the phone. No account. An optional cloud sync is planned for version 2. Three things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place; and at most once a day the app downloads the public car park list from Supabase, sending no personal data (Supabase sees the phone's IP address).
+All your parking data stays on the phone. An account is optional and only used to send rate reports for the public car park list; an optional cloud sync is planned for version 2. Three things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place; and at most once a day the app downloads the public car park list and the rate reports waiting for review from Supabase, signed out and sending no personal data (Supabase sees the phone's IP address). A rate report, and its photo of the rate board, is sent only when you tap Send report.
 
 ## Status
 
@@ -12,8 +12,8 @@ All your data stays on the phone. No account. An optional cloud sync is planned 
 |---|---|
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
-| In progress | **C1** (version 2): the five synced tables on Supabase with Row Level Security and pgTAP tests, built on local; not pushed to hosted dev yet |
-| Next | Push C1 to hosted dev; decide the sync conflict rules and how a phone gets a user before C2 and C3 |
+| In progress | Version 2, built on local, not pushed to hosted dev yet: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, Delete account) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
+| Next | Check C2 and C10 on the phone against local; push C1, C2 and C10 to hosted dev; then C3 (push), after the sync merge rules are confirmed |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M12 and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -24,6 +24,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
 - **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too.
+- **Rate reports (version 2):** signed in with your email (Settings → Car park list → Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
 - **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
@@ -71,7 +72,8 @@ park-yourself/
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
 │   │   │   ├── history.js   Finished parking, newest first, by month with totals
 │   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
-│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Extend timer, Export, Database check
+│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Account, Extend timer, Export,
+│   │   │                    Database check
 │   │   ├── park.js          Park: place and rate, photos, level, bay, zone colour, timer, note
 │   │   ├── session/[id].js  Find: the spot, the way back (added here while parked), fee so far, Extend timer,
 │   │   │                    Found my car / Delete
@@ -80,6 +82,8 @@ park-yourself/
 │   │   ├── places/          Places list and a place's rates (edit, delete)
 │   │   ├── holidays.js      Public holiday dates
 │   │   ├── vehicles/        Cars list (default, archive), Add a car, Rename car ([id].js)
+│   │   ├── account.js       Account: sign in with an email code, your reports, Sign out, Delete account
+│   │   ├── report/[id].js   Report a place's rates to the car park list
 │   │   └── debug.js         Database check (development builds)
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
 │   │                        SegmentedControl, Field, ErrorText, icons, CarLogo, RateForm,
@@ -107,9 +111,10 @@ park-yourself/
 │   ├── timer/               Timer options, Extend, reminder times
 │   ├── spending/            Monthly totals, by place and by car; Sessions screen filter
 │   ├── carparks/            The car park list: carParkList.json (the one source), ratesInEffect.js
-│   │                        (the rate in effect on a day), schedule.js (when to download again)
-│   ├── cloud/               Version 2: supabase.js (the only code that calls @supabase/supabase-js),
-│   │                        carParkUpdates.js (the daily car park list download)
+│   │                        (the rate in effect on a day), schedule.js (when to download again),
+│   │                        reports.js (what a rate report may hold, as the server checks it)
+│   ├── cloud/               Version 2: supabase.js (the only code that calls @supabase/supabase-js:
+│   │                        the download, sign-in, rate reports), carParkUpdates.js (the daily download)
 │   ├── lib/                 Shared helpers
 │   │   ├── money.js         formatRM ("RM 3.00"), formatAmountInput ("3.00") and parseRM
 │   │   ├── time.js          Local date and month keys, time/date/month/duration text
@@ -131,7 +136,8 @@ park-yourself/
 │       ├── carParks.js      The phone's copy of the car park list: refresh, search, rates in effect
 │       └── vehicles.js, settings.js
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
-├── supabase/                Version 2 server: config.toml, migrations/ (PostgreSQL), tests/ (pgTAP)
+├── supabase/                Version 2 server: config.toml, migrations/ (PostgreSQL), tests/ (pgTAP),
+│                            templates/ (the sign-in code email)
 ├── .env.example             Which Supabase server a build uses; copy to .env.development.local and .env.production.local
 ├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
@@ -205,7 +211,11 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestone C1 in PLAN.md: the synced tables are on local, not pushed yet). The app works without it. Only one thing talks to it so far: the car park list download (M12), at most once a day when the app opens, in every build. Database check shows which server the build uses.
+In progress (milestones C1, C2 and C10 in PLAN.md: on local, not pushed yet). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build), and, only when the user taps, sign-in and rate reports. Database check shows which server the build uses.
+
+**Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
+
+**Sign-in emails:** on local they land in Mailpit, http://127.0.0.1:54324. Hosted dev, once per project, in the dashboard (Authentication → Emails, email settings rather than schema): put `{{ .Token }}` in the **Magic link** and **Confirm signup** templates, like `supabase/templates/sign_in_code.html`, or the email carries a link the app cannot use. Keep **Confirm email** on (Authentication → Sign In / Providers → Email, on by default): without it anyone could sign up with a password for an email they do not own. Supabase's own sender only emails your project's team, a few an hour; that is enough for testing.
 
 **The car park list** lives in `src/carparks/carParkList.json` (the one source), on Supabase (`car_park`, `car_park_rate`: anyone may read, only migrations write) and as a copy on the phone. To change a rate, add a row with the new `effective_from` (keep the old one), bump `version`, run `npm run carparks:sql`, check on local, and push. Phones get it within a day.
 
@@ -213,7 +223,7 @@ In progress (milestone C1 in PLAN.md: the synced tables are on local, not pushed
 
 | Command | What it does |
 |---|---|
-| `npx supabase start` / `stop` | Starts or stops local Supabase in Docker (Docker Desktop must be running). `stop` keeps the data. Studio: http://127.0.0.1:54323 |
+| `npx supabase start` / `stop` | Starts or stops local Supabase in Docker (Docker Desktop must be running). `stop` keeps the data. Studio: http://127.0.0.1:54323, Mailpit (sign-in emails): http://127.0.0.1:54324. After a change to `supabase/config.toml` (such as Storage turned on for C10), `stop` and `start` again |
 | `npx supabase migration new <name>` | Creates an empty migration file in `supabase/migrations/` |
 | `npx supabase db reset` | Rebuilds the local database from every migration, then `supabase/seed.sql` |
 | `npx supabase test db` | Runs the pgTAP tests in `supabase/tests/` against local |
@@ -236,6 +246,8 @@ The database is `park-yourself.db` in the app's private storage (`files/SQLite/`
 | `parking_session` | Each time you park | Yes |
 | `photo` | Pillar photos (file paths and OCR text) | No, phone only |
 | `setting` | Preferences for this phone | No, phone only |
+| `car_park`, `car_park_rate` | The car park list, a copy of the download or the built-in list | No, downloaded only |
+| `car_park_report` | Rate reports waiting for review, a copy of the daily download | No, downloaded only |
 
 Rules the data layer enforces (see `src/db/core.js`):
 

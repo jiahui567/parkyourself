@@ -109,6 +109,16 @@ function PlaceForm({ db, place, rates }) {
 
         <ErrorText error={saveError} />
         <Button title={busy === 'save' ? 'Saving…' : 'Save'} onPress={save} disabled={Boolean(busy)} />
+        {/* Sends the saved rates, so Save first after an edit. */}
+        <View style={styles.reportRow}>
+          <Button
+            title="Report rates to the car park list"
+            variant="secondary"
+            size="small"
+            onPress={() => router.push(`/report/${place.id}`)}
+            disabled={Boolean(busy)}
+          />
+        </View>
         <View style={styles.deleteRow}>
           <Button
             title={busy === 'delete' ? 'Deleting…' : 'Delete place'}
@@ -130,6 +140,8 @@ const createStyles = (c) =>
     card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: space, boxShadow: c.shadow },
     cardTitle: { fontSize: 17, fontWeight: '600', color: c.text },
     hint: { fontSize: 13, color: c.muted, marginTop: -4 },
+    // A row, so the small pill sits at the start instead of the centre.
+    reportRow: { flexDirection: 'row', marginTop: 12 },
     // Kept apart from Save so a slip does not hit it.
     deleteRow: { marginTop: 12 },
   });

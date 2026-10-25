@@ -22,6 +22,7 @@ describe('migrate', () => {
     expect(await tableNames(db)).toEqual([
       'car_park',
       'car_park_rate',
+      'car_park_report',
       'parking_session',
       'photo',
       'place',
@@ -75,6 +76,20 @@ describe('migrate', () => {
     expect(await db.getFirstAsync("SELECT value FROM setting WHERE key = 'car_park_list_version'")).toBeNull();
     const columns = (await db.getAllAsync('PRAGMA table_info(car_park_rate)')).map((c) => c.name);
     expect(columns).toContain('effective_from');
+  });
+
+  it('adds pending rate reports to a v3 database and keeps its car park list (v4)', async () => {
+    const db = track(openTestDatabase());
+    for (let v = 0; v < 3; v++) {
+      await db.execAsync(MIGRATIONS[v]);
+      await db.execAsync(`PRAGMA user_version = ${v + 1}`);
+    }
+    await db.runAsync("INSERT INTO car_park (id, name, source_url, checked_on) VALUES ('p', 'Pyramid', 'https://x', '2026-10-24')");
+
+    await migrate(db);
+
+    expect(await db.getFirstAsync('SELECT name FROM car_park')).toEqual({ name: 'Pyramid' });
+    expect(await db.getFirstAsync('SELECT COUNT(*) AS n FROM car_park_report')).toEqual({ n: 0 });
   });
 
   it('refuses a database made by a newer app version', async () => {

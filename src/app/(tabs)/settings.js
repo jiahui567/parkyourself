@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { supabaseUrl } from '../../cloud/supabase';
 import { Button } from '../../components/Button';
 import { Disclosure } from '../../components/Disclosure';
 import { ErrorText } from '../../components/ErrorText';
@@ -222,6 +223,17 @@ export default function Settings() {
         <ListRow label="Places" onPress={() => router.push('/places')} />
         <ListRow label="Public holidays" onPress={() => router.push('/holidays')} first={false} />
       </ListSection>
+
+      {/* Only to send rate reports for now (C2, C10); parking never syncs yet.
+          A build with no server set up has nothing to sign in to. */}
+      {supabaseUrl && (
+        <ListSection title="Car park list">
+          <ListRow label="Account" onPress={() => router.push('/account')} />
+          <View style={styles.rowNote}>
+            <Text style={styles.hint}>Sign in to report rates. Your parking stays on this phone.</Text>
+          </View>
+        </ListSection>
+      )}
 
       <ListSection title="When you park">
         <Disclosure

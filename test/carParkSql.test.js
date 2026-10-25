@@ -15,6 +15,14 @@ describe('the car park list migration', () => {
     expect(fs.readFileSync(path.join(MIGRATIONS_DIR, newest), 'utf8')).toBe(carParkListSql(readList()));
   });
 
+  it('updates car parks in place, so the rate reports pointing at them stay', () => {
+    const sql = carParkListSql(readList());
+
+    expect(sql).toContain('on conflict (id) do update set');
+    expect(sql).not.toMatch(/delete from public\.car_park;/);
+    expect(sql).toMatch(/delete from public\.car_park where id not in \('1-utama-shopping-centre', /);
+  });
+
   it('doubles quotes in text', () => {
     const sql = carParkListSql({
       version: 'x',

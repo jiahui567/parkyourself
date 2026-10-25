@@ -32,7 +32,7 @@ Package names and versions below were written from memory on 2026-10-20. Check t
 | Free-text note | Always available. On Park it is a folded row (2026-10-22) |
 | Park form | Decided 2026-10-22: at the car, parking takes a place, a photo and Save. Everything optional is a folded row that shows its value and opens when tapped: the rate (under the place), the timer and the note |
 | Place search | Decided 2026-10-22: saved places only, searched on the phone, for now. You usually tap Park in a basement with weak or no signal, so the local search must stay the main path. Decided 2026-10-23: with the location allowed, Park fills in a saved place near you, and for a new place looks its name up online with Android's geocoder (no API key; it sends the location to Google). Online suggestions while typing (type "pavi", get matching malls) are still not planned: they need a provider (Google Places: API key and billing; OpenStreetMap: free, weaker coverage) and send what you type |
-| Photos | Stay on the phone only, in version 2 too; never uploaded, to avoid cloud storage cost. Kept until you delete them. Delete button per photo and per session |
+| Photos | Stay on the phone only, in version 2 too; never uploaded, to avoid cloud storage cost. Kept until you delete them. Delete button per photo and per session. One exception, chosen by the user on 2026-10-25: a photo of a rate board attached to a rate report (C10) is uploaded when the user taps Send report, to a private bucket only the developer sees; it is taken for the report, not one of the session's photos |
 | Vehicles | Cars only, no motorbike type and no plate number. You can add more than one car. Each session belongs to one car. One active session per car |
 | Saved places | Type a place name such as "Pavilion Bukit Jalil" the first time. The rate you enter is saved to that place. Next time you pick the place and the rate fills in. A deleted place keeps its name on past sessions (History, Find, Spending); the place picker and the Places list skip it |
 | Rates | Saved per place for weekday and weekend. A "same rate every day" shortcut saves both at once. A rate is optional when parking: a rate form left empty saves no rate and no fee is calculated; a half-filled form is an error. Decided 2026-10-22: the rate form shows only the two prices (first hour, each hour after); the period lengths, free minutes and daily max are under **More options**, which starts open when a saved rate uses them; **Fewer options** folds them away again (2026-10-23) |
@@ -449,6 +449,20 @@ CREATE UNIQUE INDEX car_park_rate_unique
   ON car_park_rate (car_park_id, day_type, COALESCE(effective_from, ''));
 ```
 
+```sql
+-- v4 (C10, 2026-10-25). Local only, never synced: rate reports about listed
+-- car parks that wait for the developer's review, a copy of the daily
+-- download, replaced whole each time (and dropped with the list when it is
+-- replaced). Shown as "Not verified yet" under the list's rate.
+CREATE TABLE car_park_report (
+  id              TEXT PRIMARY KEY,
+  car_park_id     TEXT NOT NULL REFERENCES car_park(id) ON DELETE CASCADE,
+  rates           TEXT NOT NULL,              -- JSON { weekday, weekend, holiday }, each a rate or null
+  reported_at     INTEGER NOT NULL
+);
+CREATE INDEX car_park_report_car_park ON car_park_report (car_park_id, reported_at);
+```
+
 Using the list: a listed car park becomes a place only when you park there, with all its rates (weekday, weekend and holiday, not only today's) copied into `place_rate` as if typed, and from then on the saved place (your rates) wins: search and the location skip listed car parks whose name is already a saved place.
 
 **Data layer rules** (all in one `db/` folder; screens never write SQL themselves):
@@ -686,10 +700,11 @@ Not part of version 1; start after M8 and M9 (C0, the environments, was set up e
 | Topic | Decision |
 |---|---|
 | Local-first | SQLite on the phone stays the main database. Every screen reads and writes SQLite. The app keeps working fully offline (basement car parks often have no signal) and without an account |
-| Cloud | Supabase: Auth, PostgreSQL with Row Level Security, Realtime, Edge Functions. No Supabase Storage |
+| Cloud | Supabase: Auth, PostgreSQL with Row Level Security, Realtime, Edge Functions. Supabase Storage only for rate report photos (C10, 2026-10-25) |
 | Sync | Hand-written, no sync library: push local changes, pull server changes, last write wins |
-| Photos | Stay on the phone. Never uploaded. The text details (level, bay, zone colour, route, note) sync |
-| Sign-in | Optional |
+| Photos | Stay on the phone. Never uploaded. The text details (level, bay, zone colour, route, note) sync. One exception: a rate board photo attached to a rate report (C10) |
+| Sign-in | Optional. Chosen 2026-10-25: email with a 6-digit code typed in the app (no link, so no deep links); Google skipped. No anonymous sign-in: rate reports need an email, so each report has an account the developer can block |
+| Public (2026-10-25) | The user builds version 2 as if the app were public, without publishing it, to learn the problems a public app has: moderation, abuse limits, other users' privacy, scale |
 
 ### What syncs
 
@@ -717,10 +732,11 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 ### Features
 
-- **Accounts:** Supabase Auth with email magic link and Google sign-in. First sign-in uploads everything already on the phone. Account deletion in the app and on a web page (Google Play requires both for apps with accounts). A `profile` table with display name.
+- **Accounts:** Supabase Auth with an email and a 6-digit code typed in the app (C2, chosen 2026-10-25; Google and magic links dropped). First sign-in uploads everything already on the phone (once sync exists, C3). Account deletion in the app and on a web page (Google Play requires both for apps with accounts). A `profile` table with display name.
 - **Backup and sync across phones:** everything except photos. For moving to a new phone, **Export photos** in Settings saves a zip to your own Google Drive or Files.
 - **Family sharing:** create a family group; invite by link or QR (single-use token that expires); share a car with the group (per-car switch). Members see that car's active session live through Supabase Realtime: place, level, bay, zone colour, route and note, but no photo. A **Send photo** button shares the photo phone to phone through WhatsApp. Optional push notification when a shared car is parked. Leave group and remove member revoke access immediately.
-- **Shared rates in your friend group:** when you type a place name, "2 friends saved rates for Pavilion Bukit Jalil. Use them?". Name matching with PostgreSQL `pg_trgm` similarity ("Pavilion BJ" matches "Pavilion Bukit Jalil"), plus GPS distance when both have a location. Each rate stores who submitted it and when; a "still correct?" button lets friends confirm it. Your own saved rate always wins. A public community is out of scope (it needs moderation).
+- **Shared rates in your friend group:** when you type a place name, "2 friends saved rates for Pavilion Bukit Jalil. Use them?". Name matching with PostgreSQL `pg_trgm` similarity ("Pavilion BJ" matches "Pavilion Bukit Jalil"), plus GPS distance when both have a location. Each rate stores who submitted it and when; a "still correct?" button lets friends confirm it. Your own saved rate always wins. A public community is out of scope (it needs moderation). For the public car park list, see **Rate reports**.
+- **Rate reports** (C10, chosen 2026-10-25): anyone signed in with an email reports a rate change for a listed car park, or suggests one that is not on the list, from a saved place (Places → a place → Report rates to the car park list). The rates start as the place's saved ones; a photo of the rate board and a note are optional. The developer is the moderator: each report is checked in Supabase Studio (the photo too), and an approved one reaches the list through `carParkList.json` and `npm run carparks:sql`, so the list keeps one source; then the report is marked approved (or rejected) in Studio. Until then, the daily download brings pending rate changes to every phone, and Park shows them under the list's rate as "Not verified yet: on <date> a user reported …" (the newest, and how many more wait). The fee always uses the list's verified rate. Other users never see who sent a report, its note or its photo; a suggested new car park stays private until it is added, because its name is free text from a stranger. Limits for a public app: 5 reports a day per user (parallel requests wait for each other, so they cannot slip past), one pending report per user and car park, rates checked on the server too (whole numbers, at most a day and RM 1,000), and one JPEG photo of at most 2 MB per report: the report is sent first and names its photo, and the server takes a photo only for the sender's own pending report that names it (a failed upload leaves the report without its photo, and the user is told). Email sign-up needs the code from the email ("Confirm email" on, locally too), so nobody can make accounts for addresses they do not own. `npm run carparks:sql` updates car parks in place, because deleting one deletes its reports; taking a car park off the list deletes its reports (delete their photos in Studio). Considered and not chosen: community votes (needs many users at one car park), trust scores, showing a range of rates (the fee needs one rate).
 - **Share links:** `https://<your-domain>/s/<code>`. App installed: opens the app and imports the spot (Android App Links need `assetlinks.json` on your domain). App not installed: a small web page with the text details. Links expire (for example after 24 hours).
 - **Push notifications:** Expo Push Service, which uses Firebase Cloud Messaging on Android (needs a Firebase project and its credentials in the Expo config). Device tokens stored after sign-in; an Edge Function sends on database changes. Timer reminders stay local so they work offline.
 - **Web dashboard (optional):** Next.js pages for history, spending and rates. Supabase's own Table Editor and SQL Editor already let you see and edit the data from your laptop.
@@ -761,7 +777,7 @@ Web: share-link fallback page + optional dashboard (Next.js)
 
 - Only the Supabase publishable key (`sb_publishable_...`, formerly the anon key) goes in the app. The secret key (`sb_secret_...`, formerly the service-role key) bypasses RLS: it lives only in Edge Functions and is never committed or pasted anywhere. The local stack's keys are fixed defaults, the same on every laptop, so they are not secrets; the hosted projects' keys are.
 - A Row Level Security policy on every table, each with a test: user A must not read user B's data.
-- Every new table in `public` gets explicit `GRANT`s to `authenticated` in the migration that creates it. Supabase no longer exposes new tables to the Data API by default (new projects since 2026-05-30, every project from 2026-10-30), and a missing grant fails before RLS runs, on local `db reset` too. Grant only what the app uses; `anon` gets nothing (one exception: M12's public car park list, read only; C0's `connection_check` was dropped in C1).
+- Every new table in `public` gets explicit `GRANT`s to `authenticated` in the migration that creates it. Supabase no longer exposes new tables to the Data API by default (new projects since 2026-05-30, every project from 2026-10-30), and a missing grant fails before RLS runs, on local `db reset` too. Grant only what the app uses; `anon` gets nothing (exceptions: M12's public car park list, read only; C10's pending rate reports about listed car parks, only their id, car park, rates and time, through column grants; C0's `connection_check` was dropped in C1). A function that policies call but the app must not belongs in a schema the API does not expose (not `public`).
 - Car location is personal data: a privacy policy is required on Google Play for apps with accounts and location, and Malaysia's PDPA applies once friends' data is stored.
 - Data export and account deletion.
 
@@ -780,7 +796,8 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 - **Never change a hosted database in its dashboard** without bringing the change back as a migration file (`supabase db diff` or `supabase db pull`). It is the cloud version of "never edit a migration step that has already run".
 - **The app picks its backend from one env file:** `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.development.local` (git-ignored, copied from `.env.example`), with a local block and a hosted dev block; keep one uncommented. Expo loads that file only in development builds. Release builds read `.env.production.local` instead (also git-ignored): since M12 it points at hosted dev, for the daily car park list download, until C9 adds the prod project. Not `.env.local`: Expo loads it in every build.
 - **The phone cannot reach `127.0.0.1` on the laptop.** Over USB, `adb reverse tcp:54321 tcp:54321`; over Wi-Fi, the laptop's LAN IP.
-- **Sign-in emails on local** land in the inbox the local stack runs, not a real mailbox.
+- **Sign-in emails on local** land in the inbox the local stack runs (Mailpit, http://127.0.0.1:54324), not a real mailbox. The code email's template is `supabase/templates/sign_in_code.html`, set in `config.toml`; hosted dev needs the same `{{ .Token }}` in its Magic link and Confirm signup templates (Authentication → Emails in the dashboard: email settings, not schema).
+- **Storage is on** (`[storage] enabled = true`), for C10's `report-photos` bucket. CI's `supabase db start` reads the same setting, which is what creates the storage tables the migration needs.
 - **A free hosted project pauses after 7 days idle**; restore it from the dashboard.
 
 ### Running it
@@ -820,6 +837,9 @@ Three environments, so both local Docker and the hosted service get learned. Sch
     - A trigger sets `server_updated_at` to the server's clock on every insert and update, overwriting what the phone sends.
     - pgTAP: `synced_tables_schema` (columns, types, triggers, privileges) and `synced_tables_access` (two users, the unique rules, account deletion). Jest `test/serverColumns.test.js` reads the schema test's column lists and checks them against the phone's migrated SQLite.
 - [ ] **C2** Sign-in, profile, account deletion
+  - 2026-10-25: built and passing on local, not pushed to hosted dev yet; to check on the phone. Settings → Car park list → Account: email, then the 6-digit code from the email; signed in, your reports, Sign out and Delete account (deletes the report photos, then the account through `delete_my_account`, whose foreign keys delete the reports and synced rows). The session is kept in `expo-sqlite`'s key-value store (its own file, so Export database never holds it) and renewed only when the user does something that needs the server: nothing runs in the background. The profile (display name) waits until friends need it (C5, C7).
+- [ ] **C10** Rate reports (added 2026-10-25, built right after C2): see Features, **Rate reports**. Server: `rate_report` table, the `report-photos` bucket and their policies, with pgTAP tests (`rate_reports.test.sql`); local SQLite v4 `car_park_report`; the Report rates screen; the "Not verified yet" line on Park
+  - 2026-10-25: built and passing on local, not pushed to hosted dev yet; to check on the phone.
 - [ ] **C3** SQLite migration adding `dirty`; push
 - [ ] **C4** Pull, `last_pulled_at`, conflict handling, duplicate-place merge, two-phone tests
 - [ ] **C5** Family groups, invites, shared car with live updates, Send photo
@@ -830,10 +850,11 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 
 ### Decide later
 
-- Sign-in methods: email link, Google, or both? (2026-10-25: the user would skip Google if it is troublesome, and skip sign-in for now.)
-- How a phone gets a user before there is a sign-in screen (push and pull need one for Row Level Security)?
+- How sync (C3) starts for a signed-in user: does it run only when signed in, and what happens to the phone's rows on sign-out? (Sign-in was answered on 2026-10-25: an email code, no Google, no anonymous sign-in.)
 - Merge rules for rows two phones made offline that break a unique rule: the same place name, a rate for the same place and day type, the same holiday date, two active sessions for one car ("How the sync works" has a rule for places only, step 8).
-- Shared rates: friend group only, or public one day?
+- Shared rates: friend group only, or public one day? (2026-10-25: the public car park list takes moderated rate reports, C10; friends' own rates, C7, are still undecided.)
+- Rate reports at scale: the daily download brings every pending report (Supabase returns at most 1,000 rows); with many reports, fetch them per car park or only recent ones. Loose ends cleaned up by hand for now: a failed upload leaves a report whose `photo_path` points at no file, and a car park taken off the list deletes its reports but not their photos, which stay until the developer deletes them or the user deletes their account.
+- Hosted email: Supabase's own sender only emails the project's team, a few an hour. A public app needs its own SMTP provider.
 - Share link expiry time?
 - How long to keep soft-deleted rows before purging?
 - Monthly budget before leaving the free tier?

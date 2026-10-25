@@ -115,8 +115,9 @@ port = 54324
 # sender_name = "Admin"
 
 [storage]
-# Off: photos never leave the phone (PLAN.md, Version 2 decisions).
-enabled = false
+# On for one private bucket, report-photos: a rate board photo the user attaches
+# to a rate report (PLAN.md, C10). Every other photo stays on the phone.
+enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
@@ -226,7 +227,9 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# On, as on hosted: otherwise anyone could sign up with a password for an
+# email they do not own and send reports (PLAN.md, C10: reports need an email).
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -250,6 +253,18 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# The app signs in with a 6-digit code typed in the app, not a link (PLAN.md,
+# C2). A new email gets the confirmation email, a known one the magic link
+# email, so both send the code. Hosted dev needs the same change in the
+# dashboard (README.md, "Version 2 server").
+[auth.email.template.magic_link]
+subject = "Your Park Yourself code"
+content_path = "./supabase/templates/sign_in_code.html"
+
+[auth.email.template.confirmation]
+subject = "Your Park Yourself code"
+content_path = "./supabase/templates/sign_in_code.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

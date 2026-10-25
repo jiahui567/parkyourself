@@ -160,13 +160,40 @@ export const carParks = {
   },
 
   // The car park with the rates in effect on todayKey ('YYYY-MM-DD') as
-  // { weekday, weekend, holiday } (place_rate shaped, each a row or null), and
-  // effective_from, the latest start among them; or null when it is not listed.
+  // { weekday, weekend, holiday } (place_rate shaped, each a row or null),
+  // effective_from, the latest start among them, and reports, the users'
+  // reports waiting for review (pendingReports); or null when it is not listed.
   async get(db, id, todayKey) {
     const carPark = await db.getFirstAsync('SELECT * FROM car_park WHERE id = ?', [id]);
     if (!carPark) return null;
     const rows = await db.getAllAsync('SELECT * FROM car_park_rate WHERE car_park_id = ?', [id]);
     const { effective_from, ...rates } = ratesInEffect(rows, todayKey);
-    return { ...carPark, rates, effective_from };
+    return { ...carPark, rates, effective_from, reports: await carParks.pendingReports(db, id) };
+  },
+
+  // Replaces the stored rate reports waiting for review (C10) with reports
+  // (readPendingReports in src/carparks/reports.js), leaving out any about a
+  // car park the stored list does not have. All or nothing.
+  async replaceReports(db, reports) {
+    await inTransaction(db, async (txn) => {
+      await txn.runAsync('DELETE FROM car_park_report');
+      for (const r of reports) {
+        await txn.runAsync(
+          `INSERT INTO car_park_report (id, car_park_id, rates, reported_at)
+           SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM car_park WHERE id = ?)`,
+          [r.id, r.car_park_id, JSON.stringify(r.rates), r.reported_at, r.car_park_id]
+        );
+      }
+    });
+  },
+
+  // The car park's reports waiting for review, newest first:
+  // [{ id, car_park_id, rates, reported_at }], rates as an object.
+  async pendingReports(db, carParkId) {
+    const rows = await db.getAllAsync(
+      'SELECT * FROM car_park_report WHERE car_park_id = ? ORDER BY reported_at DESC, id',
+      [carParkId]
+    );
+    return rows.map((row) => ({ ...row, rates: JSON.parse(row.rates) }));
   },
 };

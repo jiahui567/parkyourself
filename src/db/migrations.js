@@ -169,4 +169,19 @@ export const MIGRATIONS = [
   CREATE UNIQUE INDEX car_park_rate_unique
     ON car_park_rate (car_park_id, day_type, COALESCE(effective_from, ''));
   `,
+
+  // v4: rate reports waiting for review (C10). Local only, never synced: what
+  // users reported about listed car parks, a copy of the daily download,
+  // replaced whole each time, so its rows are deleted for real. rates is JSON,
+  // { weekday, weekend, holiday }, each a place_rate-shaped rate or null.
+  `
+  CREATE TABLE car_park_report (
+    id              TEXT PRIMARY KEY,
+    car_park_id     TEXT NOT NULL REFERENCES car_park(id) ON DELETE CASCADE,
+    rates           TEXT NOT NULL,
+    reported_at     INTEGER NOT NULL
+  );
+
+  CREATE INDEX car_park_report_car_park ON car_park_report (car_park_id, reported_at);
+  `,
 ];

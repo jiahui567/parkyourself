@@ -1,9 +1,11 @@
+import { readPendingReports } from '../carparks/reports';
 import { isCheckDue } from '../carparks/schedule';
 import { carParks, settings } from '../db';
-import { downloadCarParkList, supabaseUrl } from './supabase';
+import { downloadCarParkList, downloadPendingReports, supabaseUrl } from './supabase';
 
 // The daily download of the car park list (PLAN.md, M12; a privacy exception
-// the user chose, AGENTS.md "Privacy").
+// the user chose, AGENTS.md "Privacy"), with the rate reports that wait for
+// review (C10), shown as not verified yet.
 
 const CHECKED_AT_KEY = 'car_park_list_checked_at';
 
@@ -30,6 +32,9 @@ async function checkAndUpdate(db, nowMs) {
     if (!isCheckDue(Number(await settings.get(db, CHECKED_AT_KEY)), nowMs)) return 'not due';
     await settings.set(db, CHECKED_AT_KEY, String(nowMs));
     const replaced = await carParks.refresh(db, await downloadCarParkList(), 'server');
+    // After the list, which a report must point at; replacing the list also
+    // drops the reports stored with it.
+    await carParks.replaceReports(db, readPendingReports(await downloadPendingReports()));
     await carParks.setLastError(db, '');
     return replaced ? 'updated' : 'unchanged';
   } catch (e) {

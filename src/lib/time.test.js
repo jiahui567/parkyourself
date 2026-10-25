@@ -12,6 +12,7 @@ import {
   localMonthKey,
   monthRange,
   nextLocalMidnight,
+  parseServerTime,
 } from './time';
 
 // Local phone time (jest.config.js pins Asia/Kuala_Lumpur).
@@ -128,5 +129,21 @@ describe('formatDuration', () => {
 
   it('rejects a negative duration', () => {
     expect(() => formatDuration(-1)).toThrow('zero or more');
+  });
+});
+
+describe('parseServerTime', () => {
+  it.each([
+    ['2026-10-25T15:45:40.443816+00:00', '2026-10-25T15:45:40.443Z'],
+    ['2026-10-25T15:45:40+00:00', '2026-10-25T15:45:40.000Z'],
+    ['2026-10-25T15:45:40.5Z', '2026-10-25T15:45:40.500Z'],
+    ['2026-10-25T23:45:40.123+08:00', '2026-10-25T15:45:40.123Z'],
+    ['2026-10-25T10:45:40-0500', '2026-10-25T15:45:40.000Z'],
+  ])('reads %s', (text, utc) => {
+    expect(parseServerTime(text)).toBe(Date.parse(utc));
+  });
+
+  it.each(['soon', '2026-10-25', '2026-10-25 15:45:40', '', null])('is NaN for %p', (text) => {
+    expect(parseServerTime(text)).toBeNaN();
   });
 });

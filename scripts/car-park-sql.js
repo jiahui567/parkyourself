@@ -5,9 +5,11 @@
 // "Version 2 server"). test/carParkSql.test.js fails while the newest
 // migration and the JSON disagree, so a change cannot miss the server.
 //
-// The migration replaces the whole list in one transaction: car parks not in
-// the JSON are removed, the rest are written again with every rate in their
-// history. The JSON is the one source; the server keeps no rows of its own.
+// The migration makes the whole list match in one transaction: car parks not
+// in the JSON are removed, the rest are updated in place (rate reports, C10,
+// point at them, so deleting and writing them again would delete every
+// report), and every rate in their history is written again. The JSON is the
+// one source; the server keeps no rows of its own.
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -58,14 +60,21 @@ function carParkListSql(list) {
 ${rateRows.map((row) => `  (${row})`).join(',\n')};
 `
     : '';
+  const carParks = list.carParks.length
+    ? `insert into public.car_park (id, name, area, lat, lng, source_url, checked_on, notes) values
+${carParkRows.map((row) => `  (${row})`).join(',\n')}
+on conflict (id) do update set
+  name = excluded.name, area = excluded.area, lat = excluded.lat, lng = excluded.lng,
+  source_url = excluded.source_url, checked_on = excluded.checked_on, notes = excluded.notes, updated_at = now();
+
+-- A car park taken off the list takes its rate reports with it.
+delete from public.car_park where id not in (${list.carParks.map((c) => literal(c.id)).join(', ')});
+`
+    : 'delete from public.car_park;\n';
   return `-- The car park list, version ${list.version}: ${list.carParks.length} car parks, ${rateRows.length} rates.
 -- Written by \`npm run carparks:sql\` from src/carparks/carParkList.json; do not edit by hand.
+${carParks}
 delete from public.car_park_rate;
-delete from public.car_park;
-
-insert into public.car_park (id, name, area, lat, lng, source_url, checked_on, notes) values
-${carParkRows.map((row) => `  (${row})`).join(',\n')};
-
 ${rates}`;
 }
 

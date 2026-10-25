@@ -19,6 +19,8 @@ const ROUTES = [
   'vehicles/new',
   'vehicles/[id]',
   'debug',
+  'account',
+  'report/[id]',
 ];
 
 describe('routes', () => {

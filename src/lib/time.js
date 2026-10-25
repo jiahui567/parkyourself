@@ -33,6 +33,22 @@ export function formatDate(ms) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// A time from the server (a PostgreSQL timestamptz as Supabase sends it,
+// '2026-10-25T15:45:40.443816+00:00') as UTC epoch milliseconds, or NaN.
+// Read by hand: JavaScript engines differ on fractions finer than a millisecond.
+export function parseServerTime(text) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):?(\d{2}))$/.exec(
+    String(text ?? '')
+  );
+  if (!match) return NaN;
+  const [, year, month, day, hours, minutes, seconds, fraction = '', zone, sign, zoneHours, zoneMinutes] = match;
+  const ms = Number(fraction.padEnd(3, '0').slice(0, 3));
+  const local = Date.UTC(+year, +month - 1, +day, +hours, +minutes, +seconds, ms);
+  if (zone === 'Z') return local;
+  const offset = (Number(zoneHours) * 60 + Number(zoneMinutes)) * 60 * 1000;
+  return sign === '+' ? local - offset : local + offset;
+}
+
 // True for a real calendar day written as 'YYYY-MM-DD' ('2026-02-30' is not).
 export function isDateKey(text) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text ?? ''));

@@ -196,3 +196,50 @@ describe('carParks.search, listLocated and findByName', () => {
     expect(await carParks.findByName(db, 'Sunway', TODAY)).toBeNull();
   });
 });
+
+describe('carParks.replaceReports and pendingReports', () => {
+  const FLAT = { type: 'flat', first_minutes: null, first_sen: null, block_minutes: null, block_sen: null, grace_minutes: 0, daily_cap_sen: null, flat_sen: 500 };
+  const report = (id, car_park_id, reported_at) => ({
+    id,
+    car_park_id,
+    rates: { weekday: null, weekend: FLAT, holiday: null },
+    reported_at,
+  });
+
+  beforeEach(async () => {
+    await carParks.refresh(db, LIST);
+  });
+
+  it('stores the reports, newest first for each car park, with the car park', async () => {
+    await carParks.replaceReports(db, [report('r1', 'sunway-pyramid', 1000), report('r2', 'sunway-pyramid', 2000)]);
+
+    expect((await carParks.pendingReports(db, 'sunway-pyramid')).map((r) => r.id)).toEqual(['r2', 'r1']);
+    const stored = await carParks.get(db, 'sunway-pyramid', TODAY);
+    expect(stored.reports[0]).toEqual(report('r2', 'sunway-pyramid', 2000));
+    expect((await carParks.get(db, 'sunway-velocity-mall', TODAY)).reports).toEqual([]);
+  });
+
+  it('replaces the reports stored before, so reviewed ones go', async () => {
+    await carParks.replaceReports(db, [report('r1', 'sunway-pyramid', 1000)]);
+
+    await carParks.replaceReports(db, [report('r3', 'sunway-velocity-mall', 3000)]);
+
+    expect(await carParks.pendingReports(db, 'sunway-pyramid')).toEqual([]);
+    expect((await carParks.pendingReports(db, 'sunway-velocity-mall')).map((r) => r.id)).toEqual(['r3']);
+  });
+
+  it('leaves out a report about a car park the phone does not have', async () => {
+    await carParks.replaceReports(db, [report('r1', 'not-listed', 1000), report('r2', 'sunway-pyramid', 2000)]);
+
+    const { n } = await db.getFirstAsync('SELECT COUNT(*) AS n FROM car_park_report');
+    expect(n).toBe(1);
+  });
+
+  it('drops the reports of a car park the list no longer has', async () => {
+    await carParks.replaceReports(db, [report('r1', 'sunway-velocity-mall', 1000)]);
+
+    await carParks.refresh(db, { version: 'next', carParks: [PYRAMID] });
+
+    expect(await carParks.pendingReports(db, 'sunway-velocity-mall')).toEqual([]);
+  });
+});

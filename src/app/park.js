@@ -69,6 +69,7 @@ import {
   typedPlaceQuestion,
 } from '../text/parkText';
 import { addPhotoLabel } from '../text/photoText';
+import { pendingReportsText } from '../text/reportText';
 import { parkTimerEnd } from '../timer/timer';
 import { sampleSignColour } from '../zone/photoColour';
 import { ZONE_COLOURS } from '../zone/zoneColour';
@@ -559,6 +560,10 @@ export default function Park() {
                     ? listedRateHint(rateInput.listed)
                     : "Saved to this place for next time. Leave it empty if you don't know it."}
               </Text>
+              {/* Other users' reports (C10): the list's rate may be out of date. */}
+              {!hasSavedRate && rateInput.listed?.reports?.length > 0 && (
+                <Text style={styles.hint}>{pendingReportsText(rateInput.listed.reports)}</Text>
+              )}
               {/* Keyed by day type: each form decides on its own whether its
                   "More options" start open. */}
               <RateForm
