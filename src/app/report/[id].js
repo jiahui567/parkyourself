@@ -1,13 +1,14 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reportRatesFrom } from '../../carparks/reports';
 import { sendReport, signedInEmail } from '../../cloud/supabase';
 import { Button } from '../../components/Button';
 import { CameraCapture } from '../../components/CameraCapture';
+import { useDialog } from '../../components/Dialog';
 import { Disclosure } from '../../components/Disclosure';
 import { ErrorText } from '../../components/ErrorText';
 import { Field } from '../../components/Field';
@@ -72,6 +73,7 @@ function ReportForm({ place, rates, listed, email, accountError }) {
   const styles = useThemedStyles(createStyles);
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
+  const showDialog = useDialog();
   const text = reportScreenText({ name: place.name, isListed: Boolean(listed), hasLocation: place.lat != null });
   const pending = listed && pendingReportsText(listed.reports);
 
@@ -156,8 +158,8 @@ function ReportForm({ place, rates, listed, email, accountError }) {
       return;
     }
     if (photoUri) removePhoto();
-    const { title, message } = reportSentText(sent.photoError);
-    Alert.alert(title, message);
+    // The dialog belongs to the root layout, so it stays up on the place.
+    showDialog(reportSentText(sent.photoError));
     goBack();
   };
 

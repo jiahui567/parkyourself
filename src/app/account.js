@@ -1,12 +1,15 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { deleteAccount, myReports, sendSignInCode, signedInEmail, signInWithCode, signOut } from '../cloud/supabase';
 import { Button } from '../components/Button';
+import { useDialog } from '../components/Dialog';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
+import { IconButton } from '../components/IconButton';
+import { MoreIcon } from '../components/icons';
 import { ListSection } from '../components/List';
 import { radius, space } from '../components/theme';
 import { useThemedStyles } from '../components/ThemeProvider';
@@ -15,11 +18,16 @@ import { readCode, readEmail } from '../lib/signIn';
 import { myReportText } from '../text/reportText';
 
 // Account (C2): sign in with an email and the code emailed to it, to send
-// rate reports; signed in, your reports, Sign out and Delete account. Opened
-// from Settings, or from a report with from=report, which it goes back to
-// once signed in. Your parking never leaves the phone either way.
+// rate reports; signed in, your reports, Sign out, and Delete account in the
+// header's menu. Opened from Settings, or from a report with from=report,
+// which it goes back to once signed in. Your parking never leaves the phone
+// either way.
 export default function AccountScreen() {
   const { from } = useLocalSearchParams();
+  const showDialog = useDialog();
+  // 'signOut' or 'delete' while one runs; either locks both.
+  const [busy, setBusy] = useState(null);
+  const [signOutError, setSignOutError] = useState(null);
   const load = useCallback(async () => {
     const email = await signedInEmail();
     if (!email) return { email: null };
@@ -37,18 +45,87 @@ export default function AccountScreen() {
     else await reload();
   };
 
+  // Both reload whatever happened, so the screen shows the account as it is:
+  // a sign-out that fails on the server still forgets the session here.
+  const leave = async () => {
+    setBusy('signOut');
+    setSignOutError(null);
+    try {
+      await signOut();
+    } catch (e) {
+      setSignOutError(e);
+    } finally {
+      await reload();
+      setBusy(null);
+    }
+  };
+
+  // Delete account is rarely wanted and cannot be undone, so it sits in the
+  // header's menu (2026-10-26) and asks again before it runs. Google Play
+  // requires it for apps with accounts. A failure shows in a dialog, which
+  // stays up when the screen changes to signed out.
+  const removeAccount = async () => {
+    setBusy('delete');
+    try {
+      await deleteAccount();
+    } catch (e) {
+      showDialog({ title: 'Could not delete your account', message: String(e?.message ?? e) });
+    } finally {
+      await reload();
+      setBusy(null);
+    }
+  };
+  const confirmDelete = () =>
+    showDialog({
+      title: 'Delete your account?',
+      message: 'Your reports and their photos are deleted from the server. Your parking on this phone stays.',
+      buttons: [
+        { text: 'Delete account', style: 'destructive', onPress: removeAccount },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
+  const openMenu = (email) =>
+    showDialog({
+      title: email,
+      buttons: [
+        { text: 'Delete account', style: 'destructive', onPress: confirmDelete },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
+
   let body = null;
   if (error) body = <ErrorText error={error} />;
   else if (!loading) {
     body = data.email ? (
-      <SignedIn email={data.email} reports={data.reports} reportsError={data.reportsError} onSignedOut={reload} />
+      <SignedIn
+        email={data.email}
+        reports={data.reports}
+        reportsError={data.reportsError}
+        busy={busy}
+        signOutError={signOutError}
+        onSignOut={leave}
+      />
     ) : (
       <SignIn onSignedIn={signedIn} />
     );
   }
   return (
     <>
-      <Stack.Screen options={{ title: 'Account' }} />
+      <Stack.Screen
+        options={{
+          title: 'Account',
+          headerRight: data?.email
+            ? () => (
+                <IconButton
+                  icon={MoreIcon}
+                  label="More account options"
+                  onPress={() => openMenu(data.email)}
+                  disabled={Boolean(busy)}
+                />
+              )
+            : undefined,
+        }}
+      />
       {body}
     </>
   );
@@ -170,33 +247,9 @@ function SignIn({ onSignedIn }) {
   );
 }
 
-function SignedIn({ email, reports, reportsError, onSignedOut }) {
+// busy: 'signOut' or 'delete' while AccountScreen runs one.
+function SignedIn({ email, reports, reportsError, busy, signOutError, onSignOut }) {
   const styles = useThemedStyles(createStyles);
-  // 'signOut' or 'delete' while one runs.
-  const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-
-  const run = async (kind, action) => {
-    setBusy(kind);
-    setError(null);
-    try {
-      await action();
-      await onSignedOut();
-    } catch (e) {
-      setError(e);
-      setBusy(null);
-    }
-  };
-  const confirmDelete = () =>
-    Alert.alert(
-      'Delete your account?',
-      'Your reports and their photos are deleted from the server. Your parking on this phone stays.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete account', style: 'destructive', onPress: () => run('delete', deleteAccount) },
-      ]
-    );
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
@@ -225,20 +278,16 @@ function SignedIn({ email, reports, reportsError, onSignedOut }) {
         })}
       </ListSection>
 
-      <ErrorText error={error} />
-      <View style={styles.actions}>
+      <ErrorText error={signOutError} />
+      {/* Deleting takes a few calls to the server, so it says so. */}
+      {busy === 'delete' && <Text style={styles.progress}>Deleting your account…</Text>}
+      {/* A small pill sizes itself to its label and sits in the middle. */}
+      <View style={styles.signOut}>
         <Button
           title={busy === 'signOut' ? 'Signing out…' : 'Sign out'}
           variant="secondary"
           size="small"
-          onPress={() => run('signOut', signOut)}
-          disabled={Boolean(busy)}
-        />
-        <Button
-          title={busy === 'delete' ? 'Deleting…' : 'Delete account'}
-          variant="danger"
-          size="small"
-          onPress={confirmDelete}
+          onPress={onSignOut}
           disabled={Boolean(busy)}
         />
       </View>
@@ -261,5 +310,6 @@ const createStyles = (c) =>
     reportName: { fontSize: 16, color: c.text },
     empty: { fontSize: 15, color: c.muted },
     hint: { fontSize: 13, color: c.muted },
-    actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    signOut: { marginTop: 12 },
+    progress: { fontSize: 15, color: c.muted, textAlign: 'center' },
   });

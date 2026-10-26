@@ -136,6 +136,16 @@ export const carParks = {
     );
   },
 
+  // Every listed car park not saved as a place, by name, for the view-only
+  // part of Places: a saved place shows once, as yours.
+  listUnsaved(db) {
+    return db.getAllAsync(
+      `SELECT c.id, c.name, c.area FROM car_park c
+       WHERE NOT EXISTS (SELECT 1 FROM place p WHERE p.deleted_at IS NULL AND p.name = c.name COLLATE NOCASE)
+       ORDER BY c.name COLLATE NOCASE`
+    );
+  },
+
   // Every listed car park with a location, for finding the one the car is at.
   // place_id and place_name are the saved place with the same name, or null:
   // a place saved before the location was on has no location of its own, and

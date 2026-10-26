@@ -242,3 +242,24 @@ export function NoteIcon(props) {
     </Icon>
   );
 }
+
+// Lucide's flag, for reporting a place's rates to the car park list.
+export function FlagIcon(props) {
+  return (
+    <Icon {...props}>
+      <Path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <Path d="M4 22v-7" />
+    </Icon>
+  );
+}
+
+// Lucide's ellipsis-vertical, for a header's menu of rarely used actions.
+export function MoreIcon(props) {
+  return (
+    <Icon {...props}>
+      <Circle cx="12" cy="5" r="1" />
+      <Circle cx="12" cy="12" r="1" />
+      <Circle cx="12" cy="19" r="1" />
+    </Icon>
+  );
+}

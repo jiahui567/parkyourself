@@ -14,6 +14,7 @@ const ROUTES = [
   'sessions',
   'places/index',
   'places/[id]',
+  'car-parks/[id]',
   'holidays',
   'vehicles/index',
   'vehicles/new',

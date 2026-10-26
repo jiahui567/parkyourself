@@ -1,4 +1,4 @@
-import { DEFAULT_THEME_MODE, THEME_MODES, palettes, themeModeFrom } from './theme';
+import { DEFAULT_THEME_MODE, THEME_MODES, dimmedOpacity, palettes, themeModeFrom } from './theme';
 
 // WCAG 2 contrast ratio between two '#RRGGBB' colours.
 function contrast(a, b) {
@@ -12,6 +12,14 @@ function contrast(a, b) {
   };
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
+}
+
+// colour drawn at opacity over under, as '#RRGGBB'.
+function blend(colour, opacity, under) {
+  const channels = (hex) => [16, 8, 0].map((shift) => (parseInt(hex.slice(1), 16) >> shift) & 255);
+  const [top, bottom] = [channels(colour), channels(under)];
+  const mixed = top.map((channel, i) => Math.round(channel * opacity + bottom[i] * (1 - opacity)));
+  return `#${mixed.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
 const keysOf = (object) =>
@@ -62,6 +70,15 @@ describe('palettes', () => {
     it.each(PAIRS)('%s on %s is readable', (foreground, background, minimum) => {
       const colours = palettes[mode];
       expect(contrast(colours[foreground], colours[background])).toBeGreaterThanOrEqual(minimum);
+    });
+
+    // A dimmed card (the car park list on Places) fades its rows' text along
+    // with the card, over the screen's background. The rows are body text, so 7.
+    it('keeps text on a dimmed card readable', () => {
+      const { text, card, background } = palettes[mode];
+      const fadedText = blend(text, dimmedOpacity, background);
+      const fadedCard = blend(card, dimmedOpacity, background);
+      expect(contrast(fadedText, fadedCard)).toBeGreaterThanOrEqual(7);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Alert } from 'react-native';
 
+import { useDialog } from '../components/Dialog';
 import { sessions, useDatabase } from '../db';
 import { listenForResponses } from '../notify/notifications';
 import { responseAction } from '../notify/plan';
@@ -11,9 +11,10 @@ const handled = new Set();
 
 // Opens Find when a notification or one of its buttons is tapped; Extend
 // timer extends first (PLAN.md, "Notifications"). For the root layout, inside
-// DatabaseProvider.
+// DatabaseProvider and DialogProvider.
 export function useNotificationResponses() {
   const db = useDatabase();
+  const showDialog = useDialog();
 
   useEffect(() => {
     const respond = async (response) => {
@@ -25,7 +26,7 @@ export function useNotificationResponses() {
         try {
           extendedTo = await sessions.extend(db, action.sessionId);
         } catch (e) {
-          Alert.alert('Could not extend the timer', String(e?.message ?? e));
+          showDialog({ title: 'Could not extend the timer', message: String(e?.message ?? e) });
         }
       }
       // navigate, not push: Find for that car may already be open, and then
@@ -36,9 +37,9 @@ export function useNotificationResponses() {
       try {
         router.navigate({ pathname: '/session/[id]', params });
       } catch (e) {
-        Alert.alert('Could not open the parked car', String(e?.message ?? e));
+        showDialog({ title: 'Could not open the parked car', message: String(e?.message ?? e) });
       }
     };
     return listenForResponses(respond);
-  }, [db]);
+  }, [db, showDialog]);
 }

@@ -1,8 +1,9 @@
 import { Stack } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
+import { useDialog } from '../components/Dialog';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
 import { IconButton } from '../components/IconButton';
@@ -18,6 +19,7 @@ import { formatDateKey, localDateKey } from '../lib/time';
 export default function Holidays() {
   const db = useDatabase();
   const styles = useThemedStyles(createStyles);
+  const showDialog = useDialog();
   const load = useCallback(() => holidays.list(db), [db]);
   const { data: rows, error: loadError, reload } = useFocusedLoad(load);
   const [date, setDate] = useState('');
@@ -51,14 +53,14 @@ export default function Holidays() {
   };
 
   const confirmRemove = (holiday) =>
-    Alert.alert(
-      `Delete ${formatDateKey(holiday.holiday_date)}?`,
-      'Parking on this day uses the weekday or weekend rate again. Fees already saved do not change.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: `Delete ${formatDateKey(holiday.holiday_date)}?`,
+      message: 'Parking on this day uses the weekday or weekend rate again. Fees already saved do not change.',
+      buttons: [
         { text: 'Delete', style: 'destructive', onPress: () => remove(holiday) },
-      ]
-    );
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   if (loadError) return <ErrorText error={loadError} />;
   if (!rows) return null;

@@ -1,11 +1,14 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { useDialog } from '../../components/Dialog';
 import { ErrorText } from '../../components/ErrorText';
 import { Field } from '../../components/Field';
+import { IconButton } from '../../components/IconButton';
+import { FlagIcon, TrashIcon } from '../../components/icons';
 import { RateForm } from '../../components/RateForm';
 import { radius, space } from '../../components/theme';
 import { useThemedStyles } from '../../components/ThemeProvider';
@@ -17,7 +20,8 @@ import { dayTypeLabel } from '../../text/rateText';
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/places'));
 
 // A place: rename it, edit its weekday and weekend rates and public holiday
-// amount, or delete it. Opened from Places as /places/<id>.
+// amount, report its rates to the car park list, or delete it. Opened from
+// Places as /places/<id>.
 export default function PlaceScreen() {
   const db = useDatabase();
   const { id } = useLocalSearchParams();
@@ -45,6 +49,7 @@ export default function PlaceScreen() {
 function PlaceForm({ db, place, rates }) {
   const styles = useThemedStyles(createStyles);
   const headerHeight = useHeaderHeight();
+  const showDialog = useDialog();
   const [name, setName] = useState(place.name);
   const [form, setForm] = useState(() => placeRatesFormFrom(rates));
   // 'save' or 'delete' while one runs; both lock the whole form.
@@ -74,18 +79,58 @@ function PlaceForm({ db, place, rates }) {
     run('save', () => places.saveDetails(db, place.id, { name, rates: changedPlaceRates(rates, changes) }));
   };
 
+  // A failure shows in a dialog: Delete is in the header, far above the
+  // error line under the form.
+  const remove = async () => {
+    setBusy('delete');
+    try {
+      await places.remove(db, place.id);
+      goBack();
+    } catch (e) {
+      setBusy(null);
+      showDialog({ title: `Could not delete ${place.name}`, message: String(e?.message ?? e) });
+    }
+  };
+
   const confirmDelete = () =>
-    Alert.alert(`Delete ${place.name}?`, 'Its saved rates are deleted too. Past parking keeps the name.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => run('delete', () => places.remove(db, place.id)) },
-    ]);
+    showDialog({
+      title: `Delete ${place.name}?`,
+      message: 'Its saved rates are deleted too. Past parking keeps the name.',
+      buttons: [
+        { text: 'Delete', style: 'destructive', onPress: remove },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   return (
     // As on Park: Android draws edge to edge, so the window no longer shrinks
     // for the keyboard; the padding keeps the holiday amount and Save reachable.
     <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Stack.Screen options={{ title: place.name }} />
+        {/* Actions on the whole place sit in the header's corner, away from
+            Save. Report sends the saved rates, so Save first after an edit. */}
+        <Stack.Screen
+          options={{
+            title: place.name,
+            headerRight: () => (
+              <View style={styles.headerActions}>
+                <IconButton
+                  icon={FlagIcon}
+                  label="Report rates to the car park list"
+                  onPress={() => router.push(`/report/${place.id}`)}
+                  disabled={Boolean(busy)}
+                />
+                <IconButton
+                  icon={TrashIcon}
+                  label={`Delete ${place.name}`}
+                  tone="danger"
+                  onPress={confirmDelete}
+                  disabled={Boolean(busy)}
+                />
+              </View>
+            ),
+          }}
+        />
         <Field label="Name" value={name} onChangeText={setName} editable={!busy} />
 
         {['weekday', 'weekend'].map((dayType) => (
@@ -109,25 +154,6 @@ function PlaceForm({ db, place, rates }) {
 
         <ErrorText error={saveError} />
         <Button title={busy === 'save' ? 'Saving…' : 'Save'} onPress={save} disabled={Boolean(busy)} />
-        {/* Sends the saved rates, so Save first after an edit. */}
-        <View style={styles.reportRow}>
-          <Button
-            title="Report rates to the car park list"
-            variant="secondary"
-            size="small"
-            onPress={() => router.push(`/report/${place.id}`)}
-            disabled={Boolean(busy)}
-          />
-        </View>
-        <View style={styles.deleteRow}>
-          <Button
-            title={busy === 'delete' ? 'Deleting…' : 'Delete place'}
-            variant="danger"
-            size="small"
-            onPress={confirmDelete}
-            disabled={Boolean(busy)}
-          />
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -140,8 +166,6 @@ const createStyles = (c) =>
     card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: space, boxShadow: c.shadow },
     cardTitle: { fontSize: 17, fontWeight: '600', color: c.text },
     hint: { fontSize: 13, color: c.muted, marginTop: -4 },
-    // A row, so the small pill sits at the start instead of the centre.
-    reportRow: { flexDirection: 'row', marginTop: 12 },
-    // Kept apart from Save so a slip does not hit it.
-    deleteRow: { marginTop: 12 },
+    // Apart enough that the two icons' touch areas do not overlap.
+    headerActions: { flexDirection: 'row', gap: 12 },
   });

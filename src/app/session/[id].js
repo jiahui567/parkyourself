@@ -1,14 +1,16 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../components/Button';
 import { CameraCapture } from '../../components/CameraCapture';
+import { useDialog } from '../../components/Dialog';
 import { ErrorText } from '../../components/ErrorText';
 import { EstimatePill } from '../../components/EstimatePill';
-import { CameraIcon, MapPinIcon, PlusIcon, ShareIcon, TimerIcon, XIcon } from '../../components/icons';
+import { IconButton } from '../../components/IconButton';
+import { CameraIcon, MapPinIcon, PlusIcon, ShareIcon, TimerIcon, TrashIcon, XIcon } from '../../components/icons';
 import { ENTER_MS, SavedTick } from '../../components/motion';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { PhotoViewer } from '../../components/PhotoViewer';
@@ -56,6 +58,7 @@ export default function SessionScreen() {
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
+  const showDialog = useDialog();
   // extendedAt: set when Extend timer on a notification opened this screen.
   // savedAt: set when Park has just saved this session.
   const { id, extendedAt, savedAt } = useLocalSearchParams();
@@ -111,15 +114,16 @@ export default function SessionScreen() {
   const photoUris = sessionPhotos.map((photo) => photo.file_uri);
   const location = active ? spotLocation(session) : null;
 
-  const run = async (action) => {
+  // A failure shows in a dialog: Delete is in the header, often far above the
+  // error line at the end of the screen.
+  const remove = async () => {
     setBusy(true);
-    setActionError(null);
     try {
-      await action();
+      await sessions.remove(db, session.id);
       goHome();
     } catch (e) {
-      setActionError(e);
       setBusy(false);
+      showDialog({ title: 'Could not delete this parking session', message: String(e?.message ?? e) });
     }
   };
 
@@ -156,10 +160,14 @@ export default function SessionScreen() {
   // Drops the timer for this park (Timer when parking starts one on every
   // park). Extend can only start a new one from now, so it asks first.
   const confirmStopTimer = () =>
-    Alert.alert('Stop the timer?', 'Its reminders are cancelled.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Stop timer', style: 'destructive', onPress: stopTimer },
-    ]);
+    showDialog({
+      title: 'Stop the timer?',
+      message: 'Its reminders are cancelled.',
+      buttons: [
+        { text: 'Stop timer', style: 'destructive', onPress: stopTimer },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
   const stopTimer = async () => {
     setBusy(true);
     setActionError(null);
@@ -206,24 +214,28 @@ export default function SessionScreen() {
   };
 
   const confirmDeletePhoto = (index) =>
-    Alert.alert('Delete this photo?', 'It is deleted from the phone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setPhotoError(null);
-          try {
-            await photos.remove(db, sessionPhotos[index].id);
-            setViewing(indexAfterRemoval(index, sessionPhotos.length));
-            await reload();
-          } catch (e) {
-            setViewing(null);
-            setPhotoError(e);
-          }
+    showDialog({
+      title: 'Delete this photo?',
+      message: 'It is deleted from the phone.',
+      buttons: [
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setPhotoError(null);
+            try {
+              await photos.remove(db, sessionPhotos[index].id);
+              setViewing(indexAfterRemoval(index, sessionPhotos.length));
+              await reload();
+            } catch (e) {
+              setViewing(null);
+              setPhotoError(e);
+            }
+          },
         },
-      },
-    ]);
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   // Sharing happens only when the user taps Share (PLAN.md, "Share your spot"):
   // the parking info as a message, or one photo from the viewer.
@@ -248,24 +260,45 @@ export default function SessionScreen() {
     }
   };
 
-  // Alert, because the viewer covers the screen's own error line.
+  // A dialog, because the viewer covers the screen's own error line.
   const sharePhotoAt = async (index) => {
     try {
       await sharePhoto(photoUris[index]);
     } catch (e) {
-      Alert.alert('Could not share the photo', String(e?.message ?? e));
+      showDialog({ title: 'Could not share the photo', message: String(e?.message ?? e) });
     }
   };
 
   const confirmDelete = () =>
-    Alert.alert('Delete this parking session?', 'Its photos are deleted too.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => run(() => sessions.remove(db, session.id)) },
-    ]);
+    showDialog({
+      title: 'Delete this parking session?',
+      message: 'Its photos are deleted too.',
+      buttons: [
+        { text: 'Delete', style: 'destructive', onPress: remove },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: session.vehicle_name }} />
+      {/* A finished session can be deleted, from the header's corner (a parked
+          one ends with Found my car instead). */}
+      <Stack.Screen
+        options={{
+          title: session.vehicle_name,
+          headerRight: active
+            ? undefined
+            : () => (
+                <IconButton
+                  icon={TrashIcon}
+                  label="Delete this parking session"
+                  tone="danger"
+                  onPress={confirmDelete}
+                  disabled={busy}
+                />
+              ),
+        }}
+      />
       {savedAt && active && <SavedTick key={savedAt} label="Parked" />}
       {/* handled: with the keyboard up for the shop, a tap on a chip or button
           still works instead of only closing the keyboard. */}
@@ -411,12 +444,7 @@ export default function SessionScreen() {
           </View>
         )}
 
-        {!active && (
-          <>
-            <ErrorText error={actionError ?? notifyError} />
-            <Button title="Delete" variant="danger" onPress={confirmDelete} disabled={busy} />
-          </>
-        )}
+        {!active && <ErrorText error={actionError ?? notifyError} />}
       </ScrollView>
       {/* Found my car stays in sight below the scrolling content, so it never
           has to be scrolled to when the user is back at the car. */}

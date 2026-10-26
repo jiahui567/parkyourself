@@ -15,3 +15,4 @@ description: Use when the user asks to start, continue or finish a Park Yourself
    4. Screens (add-screen skill).
 5. **Verify.** Run `npm run lint` and `npm test`, then ask the `reviewer` subagent to review the change and fix what it finds. List what the user must check on the phone.
 6. **Finish.** Update README.md "Status". Tick the milestone in PLAN.md only after the user confirms it works on the phone. Give the user the commit commands; do not commit unless asked.
+   - 2026-10-26: When the user says they "tested everything", they mean they tried every UI action on the phone they could find: tick every milestone waiting for a phone check, except the server parts (sign-in, reports, sync), and ask only about those, because a narrower reading made them repeat themselves.

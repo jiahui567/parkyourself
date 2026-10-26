@@ -1,17 +1,19 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChevronRightIcon } from './icons';
-import { radius } from './theme';
+import { dimmedOpacity, radius } from './theme';
 import { useAppTheme, useThemedStyles } from './ThemeProvider';
 
 // A titled card of rows, as on Settings. Put ListRows inside, the first with
-// first (the default) and the rest with first={false}.
-export function ListSection({ title, children }) {
+// first (the default) and the rest with first={false}. dimmed fades the card,
+// not its title, for rows that are only there to look at (the car park list
+// on Places).
+export function ListSection({ title, children, dimmed = false }) {
   const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.card}>{children}</View>
+      <View style={[styles.card, dimmed && styles.dimmed]}>{children}</View>
     </View>
   );
 }
@@ -51,6 +53,7 @@ const createStyles = (c) =>
       paddingHorizontal: 4,
     },
     card: { backgroundColor: c.card, borderRadius: radius.card, overflow: 'hidden', boxShadow: c.shadow },
+    dimmed: { opacity: dimmedOpacity },
     row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 16, minHeight: 48 },
     rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
     rowLabel: { flex: 1, fontSize: 16, color: c.text },

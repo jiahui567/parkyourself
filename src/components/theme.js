@@ -82,6 +82,10 @@ export const space = 12;
 
 export const radius = { card: 16, control: 12, pill: 999 };
 
+// How opaque a faded card is (ListSection's dimmed, the car park list on
+// Places). theme.test.js checks that text on it still reads.
+export const dimmedOpacity = 0.8;
+
 // The saved setting text to a mode; anything unknown falls back to dark.
 export function themeModeFrom(value) {
   return THEME_MODES.includes(value) ? value : DEFAULT_THEME_MODE;

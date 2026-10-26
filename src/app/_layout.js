@@ -4,6 +4,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect, useMemo } from 'react';
 import { Appearance } from 'react-native';
 
+import { DialogProvider } from '../components/Dialog';
 import { ParkingIntro } from '../components/ParkingIntro';
 import { AppThemeProvider, navigationThemeFor, useAppTheme } from '../components/ThemeProvider';
 import { DatabaseProvider } from '../db';
@@ -14,7 +15,9 @@ export default function RootLayout() {
   return (
     <DatabaseProvider>
       <AppThemeProvider>
-        <ThemedStack />
+        <DialogProvider>
+          <ThemedStack />
+        </DialogProvider>
       </AppThemeProvider>
     </DatabaseProvider>
   );
@@ -32,8 +35,9 @@ function ThemedStack() {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colours.background);
   }, [colours.background]);
-  // Android draws its own dialogs (Alert) in the app's scheme, not the phone's:
-  // dark in dark mode. Needs "userInterfaceStyle": "automatic" in app.json.
+  // Android draws what is still its own (the app's dialogs are not since
+  // 2026-10-26) in the app's scheme, not the phone's: dark in dark mode.
+  // Needs "userInterfaceStyle": "automatic" in app.json.
   useEffect(() => {
     Appearance.setColorScheme(mode);
   }, [mode]);

@@ -160,7 +160,7 @@ describe('assertCarParkList', () => {
   });
 });
 
-describe('carParks.search, listLocated and findByName', () => {
+describe('carParks.search, listUnsaved, listLocated and findByName', () => {
   beforeEach(() => carParks.refresh(db, LIST));
 
   it('finds listed car parks by part of the name, in any case', async () => {
@@ -180,6 +180,23 @@ describe('carParks.search, listLocated and findByName', () => {
 
   it('also finds a car park by its area', async () => {
     expect((await carParks.search(db, 'bandar sunway')).map((c) => c.id)).toEqual(['sunway-pyramid']);
+  });
+
+  it('lists every car park by name, with its area, for Places', async () => {
+    expect(await carParks.listUnsaved(db)).toEqual([
+      { id: 'sunway-pyramid', name: 'Sunway Pyramid', area: 'Bandar Sunway' },
+      { id: 'sunway-velocity-mall', name: 'Sunway Velocity Mall', area: null },
+    ]);
+  });
+
+  it('leaves a car park saved as a place out of the list, until the place is deleted', async () => {
+    const placeId = await places.create(db, { name: 'SUNWAY PYRAMID' });
+
+    expect((await carParks.listUnsaved(db)).map((c) => c.id)).toEqual(['sunway-velocity-mall']);
+
+    await places.remove(db, placeId);
+
+    expect((await carParks.listUnsaved(db)).map((c) => c.id)).toEqual(['sunway-pyramid', 'sunway-velocity-mall']);
   });
 
   it('lists the located ones for the location, with the saved place of the same name', async () => {

@@ -12,8 +12,9 @@ All your parking data stays on the phone. An account is optional and only used t
 |---|---|
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
-| In progress | **M13** (History filters by car, place and month, and a battery hint in Settings), built, to check on the phone. Version 2, built on local, not pushed to hosted dev yet: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, Delete account) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
-| Next | Check M13 on the phone. Check C2 and C10 on the phone against local; push C1, C2 and C10 to hosted dev; then C3 (push), after the sync merge rules are confirmed |
+| Done (checked on the phone, 2026-10-26) | **M13** (History filters by car, place and month, and a battery hint in Settings) and **M14** (the app's own dialogs instead of Android's, Report rates and Delete in the header, the car park list on Places, view only) |
+| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
+| Next | Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line); then C3 (push), once its decisions are made |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, the milestones and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -23,7 +24,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Park:** tap Park and the camera opens: one photo of the pillar sign (or Skip photo), and the form is filled in for you: level and bay by on-device OCR, the zone colour from the photo, the place and its rate from your location. Save is pinned at the bottom; only the note is optional. The timer and the location are set once in Settings.
 - **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
-- **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too.
+- **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too. Settings → Places lists them under your own places, view only, to look up a car park's rates.
 - **Rate reports (version 2):** signed in with your email (Settings → Car park list → Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
 - **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
@@ -80,10 +81,12 @@ park-yourself/
 │   │   │                    Found my car / Delete
 │   │   ├── session/end/[id].js  Found my car summary: fee, missing rate, Amount paid
 │   │   ├── sessions.js      One month's sessions for a place or car (from Spending)
-│   │   ├── places/          Places list and a place's rates (edit, delete)
+│   │   ├── places/          Places: your places, then the car park list (view only), one search; a place's
+│   │   │                    rates (edit; Report rates and Delete in the header)
+│   │   ├── car-parks/[id].js  A listed car park's rates, view only
 │   │   ├── holidays.js      Public holiday dates
 │   │   ├── vehicles/        Cars list (default, archive), Add a car, Rename car ([id].js)
-│   │   ├── account.js       Account: sign in with an email code, your reports, Sign out, Delete account
+│   │   ├── account.js       Account: sign in with an email code, your reports, Sign out; Delete account in ⋮
 │   │   ├── report/[id].js   Report a place's rates to the car park list
 │   │   └── debug.js         Database check (development builds)
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
@@ -93,14 +96,16 @@ park-yourself/
 │   │                        Disclosure (folded rows), WayBackCard (Find's way back while parked),
 │   │                        motion (shared animations), ParkingIntro (the loading animation),
 │   │                        TimerWheel and TimerSheet (the timer wheel), FilterPill and
-│   │                        ChoiceSheet (History's filters)
+│   │                        ChoiceSheet (History's filters), Dialog (the app's own dialogs, useDialog),
+│   │                        SearchField
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
 │   │                        (notification taps, in the root layout)
 │   ├── notify/              Notifications: plan.js (what to show, tested), notifications.js
 │   │                        (expo-notifications: channels, buttons, sync with the parked cars)
 │   ├── text/                Screen text: way back, notifications, share message, rates, timer,
-│   │                        photos, Park and Find questions and hints, Spending lines, History filters
+│   │                        photos, Park and Find questions and hints, Spending lines, History filters,
+│   │                        the Car park page
 │   ├── zone/                Zone colour chips and hex-to-name rules
 │   ├── ocr/                 pillarText.js (level and bay suggestions from the sign's text),
 │   │                        readText.js (OCR on the phone with expo-mlkit-ocr)
@@ -123,7 +128,9 @@ park-yourself/
 │   │   ├── time.js          Local date and month keys, time/date/month/duration text
 │   │   ├── placeName.js     Whether a typed place name is new
 │   │   ├── motion.js        Easing, count-up and burst numbers for the animations
-│   │   └── listIndex.js     Which photo to show after one is deleted
+│   │   ├── listIndex.js     Which photo to show after one is deleted
+│   │   ├── dialog.js        A dialog's buttons (order, look) and the queue of dialogs
+│   │   └── placeSearch.js   The Places search
 │   └── db/                  Data layer: the only code that runs SQL
 │       ├── index.js         What screens import
 │       ├── core.js          Insert, update, soft delete, transactions, UUIDs
@@ -214,7 +221,7 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestones C1, C2 and C10 in PLAN.md: on local, not pushed yet). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build), and, only when the user taps, sign-in and rate reports. Database check shows which server the build uses.
+In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build), and, only when the user taps, sign-in and rate reports. Database check shows which server the build uses.
 
 **Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
 

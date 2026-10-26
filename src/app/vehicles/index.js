@@ -1,8 +1,9 @@
 import { Stack, router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { useDialog } from '../../components/Dialog';
 import { ErrorText } from '../../components/ErrorText';
 import { IconButton } from '../../components/IconButton';
 import { ArchiveIcon, CarIcon, PencilIcon, PlusIcon } from '../../components/icons';
@@ -16,6 +17,7 @@ export default function Cars() {
   const db = useDatabase();
   const { colours } = useAppTheme();
   const styles = useThemedStyles(createStyles);
+  const showDialog = useDialog();
   const load = useCallback(() => vehicles.list(db), [db]);
   const { data: cars, error, reload } = useFocusedLoad(load);
   const [actionError, setActionError] = useState(null);
@@ -31,10 +33,14 @@ export default function Cars() {
   };
 
   const confirmArchive = (car) =>
-    Alert.alert(`Archive ${car.name}?`, 'It disappears from Home, but its history is kept.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Archive', style: 'destructive', onPress: () => run(() => vehicles.archive(db, car.id)) },
-    ]);
+    showDialog({
+      title: `Archive ${car.name}?`,
+      message: 'It disappears from Home, but its history is kept.',
+      buttons: [
+        { text: 'Archive', style: 'destructive', onPress: () => run(() => vehicles.archive(db, car.id)) },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   if (error) return <ErrorText error={error} />;
   if (!cars) return null;

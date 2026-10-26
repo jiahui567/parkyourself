@@ -1,12 +1,13 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../components/Button';
 import { CameraCapture } from '../components/CameraCapture';
 import { ChipGroup } from '../components/ChipGroup';
+import { useDialog } from '../components/Dialog';
 import { Disclosure } from '../components/Disclosure';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
@@ -95,6 +96,7 @@ const parkedAt = () => Date.now();
 export default function Park() {
   const db = useDatabase();
   const styles = useThemedStyles(createStyles);
+  const showDialog = useDialog();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const { vehicleId } = useLocalSearchParams();
@@ -246,18 +248,21 @@ export default function Park() {
   };
 
   const confirmRemovePhoto = (index) =>
-    Alert.alert('Remove this photo?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          deletePhotoFiles([taken[index].uri]);
-          setTaken((current) => current.filter((_, i) => i !== index));
-          setViewing(indexAfterRemoval(index, taken.length));
+    showDialog({
+      title: 'Remove this photo?',
+      buttons: [
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            deletePhotoFiles([taken[index].uri]);
+            setTaken((current) => current.filter((_, i) => i !== index));
+            setViewing(indexAfterRemoval(index, taken.length));
+          },
         },
-      },
-    ]);
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
 
   const choosePlace = async (next) => {
     const request = ++placeRequest.current;
@@ -428,21 +433,17 @@ export default function Park() {
     }
   };
 
-  // Every answer frees Save again. Android places three buttons as neutral,
-  // negative and positive, in this order. Its dialogs cannot be dismissed
-  // without a button by default; onDismiss covers it if one ever is.
+  // Every answer frees Save again. buttons are listed top to bottom, the main
+  // answer first; each question has Cancel, which a tap outside the sheet or
+  // Back also counts as.
   const ask = (question, buttons) => {
     asking.current = true;
     const answered = (onPress) => () => {
       asking.current = false;
       onPress?.();
     };
-    Alert.alert(
-      question,
-      undefined,
-      buttons.map((button) => ({ ...button, onPress: answered(button.onPress) })),
-      { onDismiss: answered() }
-    );
+    const answers = buttons.map((button) => ({ ...button, onPress: answered(button.onPress) }));
+    showDialog({ title: question, buttons: answers });
   };
 
   // Parks at the place chosen in the picker with its rate card, or with no place.
@@ -483,9 +484,9 @@ export default function Park() {
     }
     // Cancel goes back to the form, for a rate typed by mistake (PLAN.md, "User flow").
     ask(question, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Only this time', onPress: () => start({ started_at, rates, save_rates: ratesToSave(plan, false) }) },
       { text: 'Yes, update', onPress: () => start({ started_at, rates, save_rates: ratesToSave(plan, true) }) },
+      { text: 'Only this time', onPress: () => start({ started_at, rates, save_rates: ratesToSave(plan, false) }) },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
@@ -517,9 +518,9 @@ export default function Park() {
       ? { text: keepPlaceLabel(place.name), onPress: () => parkAtChosen(started_at) }
       : { text: 'No place', onPress: () => start({ started_at, place_name: null, rates: null, save_rates: [] }) };
     ask(typedPlaceQuestion(typed, saved?.name ?? listed?.name), [
-      { text: 'Cancel', style: 'cancel' },
-      other,
       { text: 'Use it', onPress: () => start({ started_at, ...useIt }) },
+      other,
+      { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
