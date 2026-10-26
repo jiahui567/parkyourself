@@ -12,9 +12,9 @@ All your parking data stays on the phone. An account is optional and only used t
 |---|---|
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
-| In progress | Version 2, built on local, not pushed to hosted dev yet: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, Delete account) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
-| Next | Check C2 and C10 on the phone against local; push C1, C2 and C10 to hosted dev; then C3 (push), after the sync merge rules are confirmed |
-| Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, milestones M0 to M12 and the version 2 cloud design |
+| In progress | **M13** (History filters by car, place and month, and a battery hint in Settings), built, to check on the phone. Version 2, built on local, not pushed to hosted dev yet: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, Delete account) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
+| Next | Check M13 on the phone. Check C2 and C10 on the phone against local; push C1, C2 and C10 to hosted dev; then C3 (push), after the sync merge rules are confirmed |
+| Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, the milestones and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
 
@@ -27,8 +27,9 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Rate reports (version 2):** signed in with your email (Settings → Car park list → Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
 - **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
-- **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends.
+- **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends. Settings says how to stop a phone's battery saver holding reminders back.
 - **Share:** the parking info as a message, or one photo, through WhatsApp or any app.
+- **History:** past parking by month with each month's total, filtered by car, place or month.
 - **Monthly spending:** totals by month, place and car.
 - **Location (optional):** fills in the place when you park and gives walking directions back in Google Maps, for open-air and street parking too.
 - **Several cars**, and everything except naming a new place from the location works offline.
@@ -70,10 +71,10 @@ park-yourself/
 │   │   ├── (tabs)/          The bottom tab bar (the folder name is not part of the URL)
 │   │   │   ├── _layout.js   Tabs: Home, History, Spending, Settings
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
-│   │   │   ├── history.js   Finished parking, newest first, by month with totals
+│   │   │   ├── history.js   Finished parking, newest first, by month with totals; car, place and month filters
 │   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
 │   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Account, Extend timer, Export,
-│   │   │                    Database check
+│   │   │                    Reminders late? (battery hint), Database check
 │   │   ├── park.js          Park: place and rate, photos, level, bay, zone colour, timer, note
 │   │   ├── session/[id].js  Find: the spot, the way back (added here while parked), fee so far, Extend timer,
 │   │   │                    Found my car / Delete
@@ -90,14 +91,16 @@ park-yourself/
 │   │                        SwitchRow, List (ListSection, ListRow), PlacePicker, SessionCard,
 │   │                        EstimatePill, CameraCapture, PhotoStrip, PhotoViewer, BackdropButton,
 │   │                        Disclosure (folded rows), WayBackCard (Find's way back while parked),
-│   │                        motion (shared animations), ParkingIntro (the loading animation)
+│   │                        motion (shared animations), ParkingIntro (the loading animation),
+│   │                        TimerWheel and TimerSheet (the timer wheel), FilterPill and
+│   │                        ChoiceSheet (History's filters)
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
 │   │                        (notification taps, in the root layout)
 │   ├── notify/              Notifications: plan.js (what to show, tested), notifications.js
 │   │                        (expo-notifications: channels, buttons, sync with the parked cars)
 │   ├── text/                Screen text: way back, notifications, share message, rates, timer,
-│   │                        photos, Park and Find questions and hints, Spending lines
+│   │                        photos, Park and Find questions and hints, Spending lines, History filters
 │   ├── zone/                Zone colour chips and hex-to-name rules
 │   ├── ocr/                 pillarText.js (level and bay suggestions from the sign's text),
 │   │                        readText.js (OCR on the phone with expo-mlkit-ocr)
@@ -109,7 +112,7 @@ park-yourself/
 │   │   └── parkRates.js, endForm.js, placeRatesForm.js, feeSoFar.js  Rules behind Park,
 │   │                        Found my car, a place's rates and the fee so far
 │   ├── timer/               Timer options, Extend, reminder times
-│   ├── spending/            Monthly totals, by place and by car; Sessions screen filter
+│   ├── spending/            Monthly totals, by place and by car; Sessions screen filter; History filters
 │   ├── carparks/            The car park list: carParkList.json (the one source), ratesInEffect.js
 │   │                        (the rate in effect on a day), schedule.js (when to download again),
 │   │                        reports.js (what a rate report may hold, as the server checks it)

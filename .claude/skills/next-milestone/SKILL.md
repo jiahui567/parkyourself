@@ -1,6 +1,6 @@
 ---
 name: next-milestone
-description: Use when the user asks to start, continue or finish a Park Yourself milestone (M1 to M8, or C1 to C9 for version 2 in PLAN.md), or asks what to work on next.
+description: Use when the user asks to start, continue or finish a Park Yourself milestone (an M milestone for version 1, or a C milestone for version 2, in PLAN.md), or asks what to work on next.
 ---
 
 # Work on a milestone

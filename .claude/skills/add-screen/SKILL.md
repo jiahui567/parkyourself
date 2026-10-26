@@ -57,7 +57,7 @@ Status: design standard version 3. Version 2 (dark and light theme, bottom tabs,
 - 2026-10-23: The one main action is in sight when the screen opens. On a screen that scrolls, pin it in a footer under the ScrollView (Find's Found my car, with the safe-area inset below it), because the user should not have to scroll to it when back at the car.
 - 2026-10-23: Settings choices (the timer's Extend and reminder lengths) are folded `Disclosure` rows that show the chosen value and open on tap, because the user wants Settings short, with a choice shown only when opened.
 
-**Theme**: dark mode is the default. The user picks Dark or Light in Settings; the choice is saved in the `setting` table under `theme` and applies to the whole app at once.
+**Theme**: dark mode is the default. The user picks Dark or Light in Settings; the choice is saved in the `setting` table under `theme` and applies to the whole app at once. System dialogs (`Alert.alert`) follow it too (`"userInterfaceStyle": "automatic"` in `app.json`, `Appearance.setColorScheme(mode)` in the root layout), and the launch screen is charcoal in both modes; both checked on the phone with M8 on 2026-10-25.
 
 **Colours**: tokens in `src/components/theme.js`, one set per mode with the same keys. Add a new token to both sets rather than writing a hex in a screen; `theme.test.js` checks that the sets match and that text pairs are readable.
 
@@ -122,9 +122,11 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 - `ParkingIntro`: the loading animation in the root layout, once per cold start, tap to skip.
 - `TimerWheel` (M10): a timer length picked like an alarm, an hours and a minutes column that snap, the unit said once beside the middle band; `onChange` runs when a column settles. Use it for any length the user should set freely.
 - `TimerSheet` (M10): the wheel in a sheet from the bottom, with one full-width main button (Set timer); a tap above the sheet or Back cancels, except while saving. The pattern for a quick choice that needs more room than a folded row.
+- `FilterPill` (M13): a filter's value as a pill with a chevron, styled like a chip (`accent` on `accentSoft` once set); it opens a `ChoiceSheet`. History's car, place and month filters.
+- `ChoiceSheet` (M13): one choice from a list that may be long, in a sheet from the bottom; each row has an optional count, the chosen one is checked in `accent`, and a tap picks it. A tap above the sheet or Back cancels. Use it when the options are more than chips can hold.
 - `CameraCapture`: a full-screen camera in a `Modal` that asks for the permission and takes one photo, or picks one with the gallery button beside the shutter (also offered when the camera is not allowed); mount one per screen and pass the picture to `preparePhoto`. `PhotoStrip`: a row of 3:4 thumbnails, oldest (the pillar sign) first. `PhotoViewer`: full-screen photos, swiped, with optional share and delete buttons. `PhotoStrip` takes `disabled` while a photo is being prepared or read. `BackdropButton`: the round icon button used over the camera and photos.
 - Delete, archive and other actions that lose data always ask first with `Alert.alert` (Cancel plus a `destructive` button).
-- Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`. History uses a `SectionList` by month, with section-title-styled headers that show the month's total.
+- Lists use `FlatList` with a `ListEmptyComponent` sentence in `muted`; each row opens its detail with `router.push`. History uses a `SectionList` by month, with section-title-styled headers that show the month's total, and filter pills above it.
 - `SessionCard`: one finished session, the place first, then date and duration, the spot and the amount; pass `showVehicle={false}` when the car's name would repeat on every card.
 - `WayBackCard`: Find's way back while parked (how you left, first shop), a `Disclosure` that saves each part as it is given.
 - Planned features show as `muted` rows with the value "Soon", or a card with an `accentSoft` "Coming soon" badge.
@@ -137,6 +139,5 @@ Every `Text` gets a colour from the theme: a `Text` without one is black, which 
 - 2026-10-22: A placeholder must never look like a value. An example starts with "e.g." ("e.g. B2", "e.g. 3.00", "e.g. My Myvi"); otherwise use a word such as "Optional". Never "0.00" in a money field. The user read the Level placeholder "B2" as a level already filled in from the photo.
 
 **Known gaps** (check on the phone):
-- 2026-10-24: `app.json` now has `"userInterfaceStyle": "automatic"` and the root layout calls `Appearance.setColorScheme(mode)`, so system dialogs (`Alert.alert`) should follow the app's Dark or Light choice. Not yet checked on the phone (needs `npx expo run:android`). The launch screen is still light until it is configured.
 - With 3-button navigation, the system navigation bar icons may not follow the theme. `expo-navigation-bar` would fix it; ask before adding it.
 - Long forms (Park, Found my car, a place's rates) wrap their ScrollView in `KeyboardAvoidingView behavior="padding"` with `keyboardVerticalOffset={useHeaderHeight()}` (from `expo-router/react-navigation`), because Android draws edge to edge and no longer shrinks the window for the keyboard. Not yet checked on the phone (2026-10-22); the tab bar at large font sizes is untested too.

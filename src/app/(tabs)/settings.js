@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { supabaseUrl } from '../../cloud/supabase';
 import { Button } from '../../components/Button';
@@ -31,7 +31,7 @@ const EXTEND_CHOICES = EXTEND_OPTIONS.map((minutes) => ({ value: minutes, label:
 const LEAD_CHOICES = REMINDER_LEAD_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
 // Settings: appearance, cars, places and holidays, what happens when you park
-// (the timer and the location), the timer, and export.
+// (the timer and the location), the timer and its reminders, and export.
 export default function Settings() {
   const db = useDatabase();
   const { mode, setMode, loadError } = useAppTheme();
@@ -59,8 +59,9 @@ export default function Settings() {
   const [allowing, setAllowing] = useState(false);
 
   // The timer choices are folded rows that show their value (Disclosure).
-  const [open, setOpen] = useState({ parkTimer: false, extend: false, lead: false });
+  const [open, setOpen] = useState({ parkTimer: false, extend: false, lead: false, battery: false });
   const toggle = (part) => () => setOpen((current) => ({ ...current, [part]: !current[part] }));
+  const [batteryError, setBatteryError] = useState(null);
 
   const location = useLocationPermission();
   const [locationChoice, setLocationChoice] = useState(null);
@@ -165,6 +166,18 @@ export default function Settings() {
       setLeadError(e);
     } finally {
       setAllowing(false);
+    }
+  };
+
+  // Android's settings page for this app, where Battery holds the setting:
+  // asking Android to lift its battery limits directly needs a permission
+  // Google Play allows only for some apps.
+  const openBatterySettings = async () => {
+    setBatteryError(null);
+    try {
+      await Linking.openSettings();
+    } catch (e) {
+      setBatteryError(e);
     }
   };
 
@@ -302,6 +315,20 @@ export default function Settings() {
           )}
           <ErrorText error={leadError ?? permissionError} />
         </Disclosure>
+        {/* Battery savers are Android's (PLAN.md, "Notifications"). The app cannot
+            tell whether they are already lifted, so the row is always here. */}
+        {Platform.OS === 'android' && (
+          <Disclosure label="Reminders late?" open={open.battery} onToggle={toggle('battery')} first={false}>
+            <Text style={styles.hint}>
+              Some phones (Xiaomi, Oppo, Vivo, Samsung) hold back reminders to save battery. In Android settings, find
+              this app&apos;s battery setting and remove its limits (Unrestricted or No restrictions on many phones).
+            </Text>
+            <View style={styles.inlineAction}>
+              <Button title="Open Android settings" variant="tonal" size="small" onPress={openBatterySettings} />
+            </View>
+            <ErrorText error={batteryError} />
+          </Disclosure>
+        )}
       </ListSection>
 
       <ListSection title="Data">
