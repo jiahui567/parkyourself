@@ -244,17 +244,6 @@ export default function Settings() {
         <ListRow label="Public holidays" onPress={() => router.push('/holidays')} first={false} />
       </ListSection>
 
-      {/* Rate reports need an account (C10); so does the backup, under Data.
-          A build with no server set up has nothing to sign in to. */}
-      {supabaseUrl && (
-        <ListSection title="Car park list">
-          <ListRow label="Account" onPress={() => router.push('/account')} />
-          <View style={styles.rowNote}>
-            <Text style={styles.hint}>Sign in to report rates.</Text>
-          </View>
-        </ListSection>
-      )}
-
       <ListSection title="When you park">
         <Disclosure
           label="Timer when parking"
@@ -339,7 +328,9 @@ export default function Settings() {
       </ListSection>
 
       {/* The backup (C3) took Export database's place (2026-10-27). Signing in,
-          Sync now and how it went are on Account. */}
+          Sync now, how it went and your rate reports are on Account, the one
+          way in since the Car park list row was dropped (2026-10-27). A build
+          with no server set up has nothing to sign in to. */}
       {supabaseUrl && (
         <ListSection title="Data">
           <ListRow

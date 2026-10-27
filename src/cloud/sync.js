@@ -1,6 +1,6 @@
 import { accountMatch, SYNCED_TABLES, syncRows, syncState, toServerRow } from '../db';
 import { settlesWithin, withTimeout } from '../lib/timeout';
-import { SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
+import { DELETE_TIMED_OUT_TEXT, LOCAL_SYNC_ERROR_TEXT, SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
 import { deleteAccount, pushSyncedRows, signedInAccount, signOut, supabaseUrl } from './supabase';
 
 // The sync (C3; PLAN.md, "How the sync works"), for now its push: the rows
@@ -23,7 +23,31 @@ export const CALL_TIMEOUT_MS = 20 * 1000;
 // How long Sign out waits for its last push before asking anyway.
 export const SIGN_OUT_WAIT_MS = 10 * 1000;
 
-const timed = (promise) => withTimeout(promise, CALL_TIMEOUT_MS, TIMED_OUT_TEXT);
+// How long Delete account may take: a few calls (the photos, then the
+// account), so longer than one.
+export const DELETE_TIMEOUT_MS = 60 * 1000;
+
+// Every server call here goes through this, time-limited. Its errors are
+// sentences for the user already (src/text/cloudText.js) and are marked as
+// such; any other error is the phone's own database, whose text is not (see
+// errorTextFor).
+function serverCall(promise, ms, timedOutText) {
+  return withTimeout(promise, ms, timedOutText).catch((e) => {
+    const error = e instanceof Error ? e : new Error(String(e));
+    throw Object.assign(error, { fromServer: true });
+  });
+}
+
+const timed = (promise) => serverCall(promise, CALL_TIMEOUT_MS, TIMED_OUT_TEXT);
+
+// What a screen shows for an error from this file's functions: the server's
+// sentence, or LOCAL_SYNC_ERROR_TEXT for the phone's own database, whose raw
+// text means nothing to the user (it goes to the console).
+export function errorTextFor(error) {
+  if (error?.fromServer) return String(error.message);
+  console.warn('Error on the phone:', error);
+  return LOCAL_SYNC_ERROR_TEXT;
+}
 
 // The signed-in account, { id, email } or null, kept on the phone for
 // Settings. Time-limited: supabase-js lets one sign-in call run at a time, so
@@ -39,7 +63,7 @@ export async function loadAccount(db) {
 // is still signed in and can try again. The phone's rows, and the account
 // they are backed up to, stay (PLAN.md, "How the sync works", step 9).
 export async function signOutKeepingData(db) {
-  await withTimeout(signOut(), CALL_TIMEOUT_MS, SIGN_OUT_TIMED_OUT_TEXT);
+  await serverCall(signOut(), CALL_TIMEOUT_MS, SIGN_OUT_TIMED_OUT_TEXT);
   await syncState.setAccount(db, null);
 }
 
@@ -118,7 +142,7 @@ async function pushChanges(db) {
     return { status: 'pushed', refused };
   } catch (e) {
     console.warn('Sync failed:', e);
-    await syncState.failed(db, String(e?.message ?? e)).catch((saveError) => {
+    await syncState.failed(db, e?.fromServer ? String(e.message) : LOCAL_SYNC_ERROR_TEXT).catch((saveError) => {
       // Nothing else can be done: the screens that would show it read the same database.
       console.warn('Could not keep the sync error:', saveError);
     });
@@ -139,11 +163,13 @@ export async function pushBeforeSignOut(db) {
 // Delete account (C2) with the sync's part: a push still running finishes
 // first, since one that marked rows pushed after the reset would leave them
 // clean while the server no longer has them. Throws when the server refuses
-// the deletion. Returns { localError }: null, or why the phone could not reset
-// its backup although the account is gone.
+// the deletion, or takes over DELETE_TIMEOUT_MS: then the account may be gone
+// or not, so the phone is not reset (an account made again with the same
+// email is pushed everything anyway). Returns { localError }: null, or why
+// the phone could not reset its backup although the account is gone.
 export async function deleteAccountAndForget(db) {
   await running;
-  await deleteAccount();
+  await serverCall(deleteAccount(), DELETE_TIMEOUT_MS, DELETE_TIMED_OUT_TEXT);
   await running;
   try {
     await syncState.afterAccountDeleted(db);

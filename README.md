@@ -25,7 +25,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
 - **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too. Settings → Places lists them under your own places, view only, to look up a car park's rates.
-- **Rate reports (version 2):** signed in with your email (Settings → Car park list → Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
+- **Rate reports (version 2):** signed in with your email (Settings → Back up and sync, which opens Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
 - **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
 - **Notifications:** ongoing notification with Navigate and Extend timer, plus a reminder before the timer ends. Settings says how to stop a phone's battery saver holding reminders back.
@@ -74,8 +74,8 @@ park-yourself/
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
 │   │   │   ├── history.js   Finished parking, newest first, by month with totals; car, place and month filters
 │   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
-│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Account, Extend timer,
-│   │   │                    Reminders late? (battery hint), Back up and sync, Database check and Export
+│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Extend timer,
+│   │   │                    Reminders late? (battery hint), Back up and sync (opens Account), Database check and Export
 │   │   ├── park.js          Park: place and rate, photos, level, bay, zone colour, timer, note
 │   │   ├── session/[id].js  Find: the spot, the way back (added here while parked), fee so far, Extend timer,
 │   │   │                    Found my car / Delete

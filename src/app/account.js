@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { myReports, sendSignInCode, signInWithCode } from '../cloud/supabase';
-import { deleteAccountAndForget, loadAccount, pushBeforeSignOut, signOutKeepingData, syncNow } from '../cloud/sync';
+import { deleteAccountAndForget, errorTextFor, loadAccount, pushBeforeSignOut, signOutKeepingData, syncNow } from '../cloud/sync';
 import { Button } from '../components/Button';
 import { useDialog } from '../components/Dialog';
 import { ErrorText } from '../components/ErrorText';
@@ -18,6 +18,7 @@ import { syncState, useDatabase } from '../db';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
 import { useNow } from '../hooks/useNow';
 import { readCode, readEmail } from '../lib/signIn';
+import { ACCOUNT_RESET_FAILED_TEXT } from '../text/cloudText';
 import { myReportText } from '../text/reportText';
 import { signOutWarning, syncErrorText, syncStatusText } from '../text/syncText';
 
@@ -80,7 +81,7 @@ export default function AccountScreen() {
     try {
       await signOutKeepingData(db);
     } catch (e) {
-      setSignOutError(e);
+      setSignOutError(errorTextFor(e));
     } finally {
       await reload();
       setBusy(null);
@@ -96,7 +97,7 @@ export default function AccountScreen() {
     try {
       notBackedUp = await pushBeforeSignOut(db);
     } catch (e) {
-      setSignOutError(e);
+      setSignOutError(errorTextFor(e));
       setBusy(null);
       return;
     }
@@ -124,10 +125,11 @@ export default function AccountScreen() {
     try {
       const { localError } = await deleteAccountAndForget(db);
       if (localError) {
-        showDialog({ title: 'Your account is deleted', message: `But this phone could not reset its backup: ${localError.message ?? localError}` });
+        console.warn('Backup not reset after Delete account:', localError);
+        showDialog({ title: 'Your account is deleted', message: ACCOUNT_RESET_FAILED_TEXT });
       }
     } catch (e) {
-      showDialog({ title: 'Could not delete your account', message: String(e?.message ?? e) });
+      showDialog({ title: 'Could not delete your account', message: errorTextFor(e) });
     } finally {
       await reload();
       setBusy(null);

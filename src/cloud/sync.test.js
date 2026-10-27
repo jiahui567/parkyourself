@@ -1,11 +1,13 @@
 import { openMigratedTestDatabase } from '../../test/testDatabase';
-import { holidays, places, sessions, syncRows, syncState, vehicles } from '../db';
-import { SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
+import { holidays, places, sessions, settings, syncRows, syncState, vehicles } from '../db';
+import { DELETE_TIMED_OUT_TEXT, LOCAL_SYNC_ERROR_TEXT, SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
 import { deleteAccount, pushSyncedRows, signedInAccount, signOut } from './supabase';
 import {
   batches,
   CALL_TIMEOUT_MS,
+  DELETE_TIMEOUT_MS,
   deleteAccountAndForget,
+  errorTextFor,
   loadAccount,
   PUSH_BATCH,
   pushBeforeSignOut,
@@ -155,6 +157,15 @@ describe('syncNow', () => {
     expect(await syncState.get(db)).toMatchObject({ pending: 1, lastError: OFFLINE });
   });
 
+  it('keeps a sentence, not the database\'s own text, when the phone itself fails', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await vehicles.add(db, { name: 'My Myvi' });
+    await db.execAsync('DROP TABLE public_holiday');
+
+    expect((await syncNow(db)).status).toBe('failed');
+    expect(await settings.get(db, 'sync_last_error')).toBe(LOCAL_SYNC_ERROR_TEXT);
+  });
+
   it('gives up on a call that hangs, so the next sync can run', async () => {
     jest.useFakeTimers();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -274,7 +285,31 @@ describe('signOutKeepingData', () => {
   });
 });
 
+describe('errorTextFor', () => {
+  it('gives the server\'s sentence, and a plain one for the phone\'s own database', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    signOut.mockRejectedValue(new Error(OFFLINE));
+    const serverError = await signOutKeepingData(db).catch((e) => e);
+
+    expect(errorTextFor(serverError)).toBe(OFFLINE);
+    expect(errorTextFor(new Error('Error code 5: database is locked'))).toBe(LOCAL_SYNC_ERROR_TEXT);
+  });
+});
+
 describe('deleteAccountAndForget', () => {
+  it('gives up on a deletion that hangs, and leaves the phone as it was', async () => {
+    jest.useFakeTimers();
+    await syncState.setOwner(db, A);
+    deleteAccount.mockReturnValue(new Promise(() => {}));
+
+    const deleting = deleteAccountAndForget(db);
+    const failed = expect(deleting).rejects.toThrow(DELETE_TIMED_OUT_TEXT);
+    await jest.advanceTimersByTimeAsync(DELETE_TIMEOUT_MS);
+
+    await failed;
+    expect((await syncState.get(db)).owner).toEqual(A);
+  });
+
   it('waits for a push in progress, so it cannot mark rows pushed after the reset', async () => {
     await vehicles.add(db, { name: 'My Myvi' });
     let finishPush;

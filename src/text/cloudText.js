@@ -7,6 +7,15 @@ const OFFLINE = 'Could not reach the server. Check your connection and try again
 
 // A call the sync gave up on (src/lib/timeout.js): the signal is too weak.
 export const TIMED_OUT_TEXT = 'The server took too long to answer. It is tried again later.';
+// A sync that failed on the phone itself (its database), not on the server.
+export const LOCAL_SYNC_ERROR_TEXT = 'This phone could not read or save its changes. It is tried again at the next sync.';
+// Delete account went through, but the phone could not reset its backup:
+// signing in with the same email again pushes everything (accountMatch).
+export const ACCOUNT_RESET_FAILED_TEXT =
+  'This phone could not get its data ready for a new account. Sign in again with the same email to back it up again.';
+// Delete account given up on: it may have gone through or not.
+export const DELETE_TIMED_OUT_TEXT =
+  'Deleting your account took too long. It may have been deleted already: open Account again to see.';
 // Sign out given up on: the server was not told, so the user is still signed in.
 export const SIGN_OUT_TIMED_OUT_TEXT = 'Signing out took too long, so you are still signed in. Try again with a better signal.';
 
