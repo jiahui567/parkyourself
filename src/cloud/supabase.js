@@ -26,7 +26,8 @@ const publicClient = SET_UP
 // The signed-in user (C2). The session is kept in expo-sqlite's key-value
 // store, a file of its own, so Export database never holds it. Nothing runs in
 // the background: an expired token is renewed only when the user does
-// something that needs the server (AGENTS.md, "Privacy").
+// something that needs the server, or when the sync runs while signed in
+// (C3; AGENTS.md, "Privacy").
 const accountClient = SET_UP
   ? createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
       auth: { storage: Storage, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
@@ -105,6 +106,14 @@ export async function signedInEmail() {
   return (await currentSession())?.user?.email ?? null;
 }
 
+const accountOf = (user) => (user ? { id: user.id, email: user.email ?? null } : null);
+
+// The signed-in account, { id, email }, or null when signed out.
+export async function signedInAccount() {
+  if (!accountClient) return null;
+  return accountOf((await currentSession())?.user);
+}
+
 // Emails a sign-in code; a new email gets an account with it (C2).
 export async function sendSignInCode(email) {
   const { error } = await requireClient(accountClient).auth.signInWithOtp({
@@ -114,15 +123,30 @@ export async function sendSignInCode(email) {
   if (error) throw userError(error);
 }
 
+// Returns the account signed in, { id, email }.
 export async function signInWithCode(email, code) {
-  const { error } = await requireClient(accountClient).auth.verifyOtp({ email, token: code, type: 'email' });
+  const { data, error } = await requireClient(accountClient).auth.verifyOtp({ email, token: code, type: 'email' });
   if (error) throw userError(error);
+  return accountOf(data.user);
 }
 
 // Signs this phone out; other phones on the account stay signed in.
 export async function signOut() {
   const { error } = await requireClient(accountClient).auth.signOut({ scope: 'local' });
   if (error) throw userError(error);
+}
+
+// Pushes rows of one synced table as the signed-in user (C3), in the order
+// given, each already in the server's shape (toServerRow in src/db/sync.js).
+// The server keeps the newer of its row and each one sent, and refuses a row
+// that breaks one of its rules without holding back the others
+// (supabase/migrations/*_push_synced_rows.sql). Returns the refused rows:
+// [{ id, code, constraint, other }].
+export async function pushSyncedRows(table, rows) {
+  await requireSession();
+  const { data, error } = await accountClient.rpc('push_synced_rows', { p_table: table, p_rows: rows });
+  if (error) throw userError(error);
+  return data ?? [];
 }
 
 // Every path in the user's photo folder, a page at a time.

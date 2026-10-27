@@ -12,13 +12,15 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { SwitchRow } from '../../components/SwitchRow';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { TimerWheel } from '../../components/TimerWheel';
-import { exportDatabase, preferences, useDatabase } from '../../db';
+import { exportDatabase, preferences, syncState, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useLocationPermission } from '../../hooks/useLocationPermission';
+import { useNow } from '../../hooks/useNow';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { formatMinutes } from '../../lib/time';
 import { askNotificationPermission, notificationPermission, syncNotifications } from '../../notify/notifications';
 import { locationSwitchHint } from '../../text/locationText';
+import { dataFooterText, syncErrorText, syncRowValue, syncStatusText } from '../../text/syncText';
 import { parkTimerText } from '../../text/timerText';
 import { EXTEND_OPTIONS, REMINDER_LEAD_OPTIONS } from '../../timer/timer';
 
@@ -31,7 +33,7 @@ const EXTEND_CHOICES = EXTEND_OPTIONS.map((minutes) => ({ value: minutes, label:
 const LEAD_CHOICES = REMINDER_LEAD_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
 // Settings: appearance, cars, places and holidays, what happens when you park
-// (the timer and the location), the timer and its reminders, and export.
+// (the timer and the location), the timer and its reminders, and the backup.
 export default function Settings() {
   const db = useDatabase();
   const { mode, setMode, loadError } = useAppTheme();
@@ -41,6 +43,11 @@ export default function Settings() {
 
   const loadPreferences = useCallback(() => preferences.get(db), [db]);
   const { data: prefs, error: prefsLoadError } = useFocusedLoad(loadPreferences);
+  // What the phone remembers of the account and the last sync: Settings
+  // never asks the server (Account does).
+  const loadSync = useCallback(() => syncState.get(db), [db]);
+  const { data: sync, error: syncError } = useFocusedLoad(loadSync);
+  const now = useNow(60 * 1000);
   // The choice just made, shown at once; null until the user changes it.
   const [extendChoice, setExtendChoice] = useState(null);
   const [savingExtend, setSavingExtend] = useState(false);
@@ -237,13 +244,13 @@ export default function Settings() {
         <ListRow label="Public holidays" onPress={() => router.push('/holidays')} first={false} />
       </ListSection>
 
-      {/* Only to send rate reports for now (C2, C10); parking never syncs yet.
+      {/* Rate reports need an account (C10); so does the backup, under Data.
           A build with no server set up has nothing to sign in to. */}
       {supabaseUrl && (
         <ListSection title="Car park list">
           <ListRow label="Account" onPress={() => router.push('/account')} />
           <View style={styles.rowNote}>
-            <Text style={styles.hint}>Sign in to report rates. Your parking stays on this phone.</Text>
+            <Text style={styles.hint}>Sign in to report rates.</Text>
           </View>
         </ListSection>
       )}
@@ -331,28 +338,43 @@ export default function Settings() {
         )}
       </ListSection>
 
-      <ListSection title="Data">
-        {/* While the export runs the row is read-only, so it cannot start twice. */}
-        <ListRow
-          label="Export database"
-          value={exporting ? 'Exporting…' : null}
-          onPress={exporting ? undefined : startExport}
-        />
-        <View style={styles.rowNote}>
-          <Text style={styles.hint}>Saves a copy you can send to Google Drive or email.</Text>
-          <ErrorText error={exportError} />
-        </View>
-      </ListSection>
+      {/* The backup (C3) took Export database's place (2026-10-27). Signing in,
+          Sync now and how it went are on Account. */}
+      {supabaseUrl && (
+        <ListSection title="Data">
+          <ListRow
+            label="Back up and sync"
+            value={sync ? syncRowValue(sync) : null}
+            onPress={() => router.push('/account')}
+          />
+          <View style={styles.rowNote}>
+            {sync && <Text style={styles.hint}>{syncStatusText(sync, now)}</Text>}
+            <ErrorText error={syncError ?? (sync && syncErrorText(sync))} />
+          </View>
+        </ListSection>
+      )}
 
       {__DEV__ && (
         <ListSection title="Developer">
           <ListRow label="Database check" onPress={() => router.push('/debug')} />
+          {/* While the export runs the row is read-only, so it cannot start twice. */}
+          <ListRow
+            label="Export database"
+            value={exporting ? 'Exporting…' : null}
+            onPress={exporting ? undefined : startExport}
+            first={false}
+          />
+          <View style={styles.rowNote}>
+            <Text style={styles.hint}>Saves a copy you can send to Google Drive or email.</Text>
+            <ErrorText error={exportError} />
+          </View>
         </ListSection>
       )}
 
       <Text style={styles.footer}>
         Park Yourself {Constants.expoConfig?.version}
-        {'\n'}Your data stays on this phone.
+        {'\n'}
+        {dataFooterText(sync)}
       </Text>
     </ScrollView>
   );

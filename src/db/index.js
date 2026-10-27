@@ -3,6 +3,7 @@
 export { useSQLiteContext as useDatabase } from 'expo-sqlite';
 
 export { carParks } from './carParks';
+export { onSyncedChange } from './core';
 export { DATABASE_NAME, DatabaseProvider } from './DatabaseProvider';
 export { readDatabaseInfo } from './debug';
 export { exportDatabase } from './export';
@@ -13,4 +14,5 @@ export { preferences } from './preferences';
 export { runSelfTest } from './selfTest';
 export { sessions } from './sessions';
 export { settings } from './settings';
+export { accountMatch, SYNCED_TABLES, syncRows, syncState, toServerRow } from './sync';
 export { vehicles } from './vehicles';

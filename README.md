@@ -13,8 +13,8 @@ All your parking data stays on the phone. An account is optional and only used t
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
 | Done (checked on the phone, 2026-10-26) | **M13** (History filters by car, place and month, and a battery hint in Settings) and **M14** (the app's own dialogs instead of Android's, Report rates and Delete in the header, the car park list on Places, view only) |
-| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer) |
-| Next | Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line); then C3 (push), once its decisions are made |
+| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer). **C3** (the sync's push: while signed in, the phone backs up its cars, places, rates, holidays and parking, never photos, when the app opens or comes to the front and a few seconds after a save; Settings → Data → Back up and sync), built with Jest tests, not yet on hosted dev or the phone |
+| Next | Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line). For C3: run its pgTAP tests on local Supabase, push its migration to hosted dev, then check the backup on the phone; then C4 (the pull) |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, the milestones and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -74,8 +74,8 @@ park-yourself/
 │   │   │   ├── index.js     Home: the car drawing, where it is parked, round Park/Find button
 │   │   │   ├── history.js   Finished parking, newest first, by month with totals; car, place and month filters
 │   │   │   ├── spending.js  Monthly spending: month switcher, totals, 12-month chart
-│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Account, Extend timer, Export,
-│   │   │                    Reminders late? (battery hint), Database check
+│   │   │   └── settings.js  Dark/Light, Cars, Places, Public holidays, Account, Extend timer,
+│   │   │                    Reminders late? (battery hint), Back up and sync, Database check and Export
 │   │   ├── park.js          Park: place and rate, photos, level, bay, zone colour, timer, note
 │   │   ├── session/[id].js  Find: the spot, the way back (added here while parked), fee so far, Extend timer,
 │   │   │                    Found my car / Delete
@@ -86,7 +86,8 @@ park-yourself/
 │   │   ├── car-parks/[id].js  A listed car park's rates, view only
 │   │   ├── holidays.js      Public holiday dates
 │   │   ├── vehicles/        Cars list (default, archive), Add a car, Rename car ([id].js)
-│   │   ├── account.js       Account: sign in with an email code, your reports, Sign out; Delete account in ⋮
+│   │   ├── account.js       Account: sign in with an email code, the backup and Sync now, your reports,
+│   │   │                    Sign out; Delete account in ⋮
 │   │   ├── report/[id].js   Report a place's rates to the car park list
 │   │   └── debug.js         Database check (development builds)
 │   ├── components/          Theme (theme.js, ThemeProvider.js), Button, IconButton, ChipGroup,
@@ -100,7 +101,7 @@ park-yourself/
 │   │                        SearchField
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
-│   │                        (notification taps, in the root layout)
+│   │                        (notification taps, in the root layout), useSync (when the sync runs)
 │   ├── notify/              Notifications: plan.js (what to show, tested), notifications.js
 │   │                        (expo-notifications: channels, buttons, sync with the parked cars)
 │   ├── text/                Screen text: way back, notifications, share message, rates, timer,
@@ -122,7 +123,8 @@ park-yourself/
 │   │                        (the rate in effect on a day), schedule.js (when to download again),
 │   │                        reports.js (what a rate report may hold, as the server checks it)
 │   ├── cloud/               Version 2: supabase.js (the only code that calls @supabase/supabase-js:
-│   │                        the download, sign-in, rate reports), carParkUpdates.js (the daily download)
+│   │                        the download, sign-in, rate reports, the push), carParkUpdates.js (the daily
+│   │                        download), sync.js (the sync: pushes what changed while signed in)
 │   ├── lib/                 Shared helpers
 │   │   ├── money.js         formatRM ("RM 3.00"), formatAmountInput ("3.00") and parseRM
 │   │   ├── time.js          Local date and month keys, time/date/month/duration text
@@ -144,6 +146,7 @@ park-yourself/
 │       ├── preferences.js   Extend and reminder minutes (setting table)
 │       ├── export.js        Export database: WAL checkpoint, copy, share sheet
 │       ├── carParks.js      The phone's copy of the car park list: refresh, search, rates in effect
+│       ├── sync.js          The sync's side on the phone: rows waiting to push, the account they belong to
 │       └── vehicles.js, settings.js
 ├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
 ├── supabase/                Version 2 server: config.toml, migrations/ (PostgreSQL), tests/ (pgTAP),
@@ -221,7 +224,7 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build), and, only when the user taps, sign-in and rate reports. Database check shows which server the build uses.
+In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3), the sync's push of the five synced tables when the app opens or comes to the front, a few seconds after a save, after Sign in, on Sync now and before Sign out, never in the background. It needs the `push_synced_rows` migration on the server the build uses. Database check shows which server the build uses.
 
 **Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
 
@@ -264,7 +267,8 @@ Rules the data layer enforces (see `src/db/core.js`):
 - Screens never run SQL. They call functions exported from `src/db/index.js`.
 - Every row gets a UUID `id`, `created_at` and `updated_at`. Times are UTC epoch milliseconds.
 - Synced tables are never `DELETE`d: deleting sets `deleted_at`, and every read skips deleted rows. The one exception is display only: a past session keeps showing its place's name after the place is deleted.
-- Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`.
+- Every write to a synced table sets `dirty = 1` (schema v5, C3), and the sync sets it back to 0 once the change is on the server.
+- Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`. Two writes at once wait for each other (up to 5 s) instead of failing with "database is locked".
 
 **Changing the schema:** add a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. The app refuses to open a database whose schema is newer than it knows, so install the newer app rather than downgrading.
 
@@ -276,8 +280,8 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 - **Live:** Android Studio → App Inspection → Database Inspector, with the phone on USB. Browse tables and run SQL.
 - **Copy:** `npm run db:pull`, then open `db-snapshot/park-yourself.db` in DBeaver or DB Browser for SQLite. Do not use `adb exec-out ... > file` in Windows PowerShell; it corrupts the file.
-- **Export:** Settings → Export database shares a copy (through Google Drive, email or any app) that you open on the laptop. It also works on a release build.
-- Both need a development (debuggable) build. `db-snapshot/` is in `.gitignore` because it holds your parking data.
+- **Export:** Settings → Developer → Export database shares a copy (through Google Drive, email or any app) that you open on the laptop. Since C3 it is in development builds only: Back up and sync took its place in Settings.
+- All three need a development build. `db-snapshot/` is in `.gitignore` because it holds your parking data.
 
 ## Native code
 
@@ -290,7 +294,7 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 A release build has the JavaScript inside it, so the app runs without the laptop or `npx expo start`.
 
-1. Back up first: in the app, Settings → Export database, and save the copy somewhere safe.
+1. Back up first: in the development build, Settings → Developer → Export database, and save the copy somewhere safe.
 2. Run `npm run lint` and `npm test`.
 3. Connect the phone by USB with USB debugging on, as for the development build.
 4. Build and install it: `npm run release` (short for `npx expo run:android --variant release`). It replaces the development build on the phone and keeps its data: both have the package `com.parkyourself.app` and are signed with the same key.
@@ -300,7 +304,7 @@ A release build has the JavaScript inside it, so the app runs without the laptop
 Good to know:
 - The release build is signed with Android's shared debug key (`android/app/debug.keystore`, the same in every prebuild). That is fine for your own phone, not for Google Play or for giving the app to others; those need your own release key (part of M8).
 - Android only updates an app with a build signed by the same key. A build signed with another key has to be installed after an uninstall, which deletes the app's data, so export the database first.
-- `npm run db:pull` and Android Studio's Database Inspector need a debuggable build. With the release build installed, use Settings → Export database instead.
+- `npm run db:pull`, Android Studio's Database Inspector and Export database need a development build. With the release build installed, run `npx expo run:android` first: it keeps the data.
 - To go back to developing, run `npx expo run:android`: the development build replaces the release build and keeps the data.
 
 ## Troubleshooting

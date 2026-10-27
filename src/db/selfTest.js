@@ -13,6 +13,7 @@ import { deletePhotoFiles, photos, savingPhotos } from './photos';
 import { placeRates, places } from './places';
 import { sessions } from './sessions';
 import { settings } from './settings';
+import { syncRows } from './sync';
 import { vehicles } from './vehicles';
 
 const TEST_DB = 'park-yourself-selftest.db';
@@ -78,6 +79,42 @@ export async function runSelfTest() {
       assert(journal_mode === 'wal', `journal_mode is ${journal_mode}`);
     });
 
+    // Two writes on two connections at once: the second waits instead of
+    // failing with "database is locked" (BUSY_TIMEOUT_MS, inTransaction).
+    await check('A write waits for a transaction to finish', async () => {
+      let holding = false;
+      const transaction = inTransaction(db, async (txn) => {
+        await txn.runAsync("INSERT OR REPLACE INTO setting (key, value) VALUES ('selftest_lock', 'transaction')");
+        holding = true;
+        await pause(300);
+      });
+      // At most 2 s; a transaction that fails before it holds the lock ends
+      // the wait with its own error, which is then this check's result.
+      for (let tries = 0; !holding && tries < 200; tries++) await Promise.race([pause(10), transaction]);
+      assert(holding, 'the transaction never took the write lock');
+      const startedAt = Date.now();
+      await settings.set(db, 'selftest_lock', 'main');
+      const waitedMs = Date.now() - startedAt;
+      await transaction;
+      const value = await settings.get(db, 'selftest_lock');
+      assert(value === 'main', `the write ran before the transaction ended (${value})`);
+      assert(waitedMs >= 200, `the write did not wait for the transaction (${waitedMs} ms)`);
+      return `waited ${waitedMs} ms`;
+    });
+
+    await check('Two transactions that read, then write, both go through', async () => {
+      await settings.set(db, 'selftest_count', '0');
+      const addOne = () =>
+        inTransaction(db, async (txn) => {
+          const { value } = await txn.getFirstAsync("SELECT value FROM setting WHERE key = 'selftest_count'");
+          await pause(100);
+          await txn.runAsync("UPDATE setting SET value = ? WHERE key = 'selftest_count'", [String(Number(value) + 1)]);
+        });
+      await Promise.all([addOne(), addOne()]);
+      const count = await settings.get(db, 'selftest_count');
+      assert(count === '2', `count is ${count}: one transaction lost the other's write`);
+    });
+
     const vehicleId = await vehicles.create(db, { name: 'Test Myvi', is_default: true });
 
     await check('Insert sets UUID id and timestamps', async () => {
@@ -95,6 +132,15 @@ export async function runSelfTest() {
       const row = await vehicles.get(db, vehicleId);
       assert(changed === 1 && row.name === 'Test Axia', 'name not updated');
       assert(row.updated_at > row.created_at, 'updated_at not bumped');
+    });
+
+    await check('A change waits for the sync until pushed', async () => {
+      assert((await vehicles.get(db, vehicleId)).dirty === 1, 'a new or changed row is not dirty');
+      await syncRows.markPushed(db, 'vehicle', await syncRows.listDirty(db, 'vehicle'));
+      assert((await vehicles.get(db, vehicleId)).dirty === 0, 'a pushed row is still dirty');
+      await pause(5);
+      await vehicles.update(db, vehicleId, { colour: 'Red' });
+      assert((await vehicles.get(db, vehicleId)).dirty === 1, 'a change after the push is not dirty');
     });
 
     await check('Foreign key rejects unknown vehicle', () =>

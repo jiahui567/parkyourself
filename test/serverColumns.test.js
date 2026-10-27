@@ -9,6 +9,8 @@ import { openMigratedTestDatabase } from './testDatabase';
 
 const SCHEMA_TEST = path.join(__dirname, '../supabase/tests/database/synced_tables_schema.test.sql');
 const SERVER_ONLY = ['owner_id', 'server_updated_at'];
+// The phone's change tracking for the push (C3), never sent.
+const PHONE_ONLY = ['dirty'];
 
 function serverColumnLists() {
   const sql = readFileSync(SCHEMA_TEST, 'utf8');
@@ -32,6 +34,8 @@ describe('synced table columns', () => {
     // The table name comes from the fixed list checked above, not from input.
     const phone = await db.getAllAsync(`PRAGMA table_info(${table})`);
 
-    expect(phone.map((c) => c.name).sort()).toEqual(columns.filter((c) => !SERVER_ONLY.includes(c)).sort());
+    expect(phone.map((c) => c.name).filter((c) => !PHONE_ONLY.includes(c)).sort()).toEqual(
+      columns.filter((c) => !SERVER_ONLY.includes(c)).sort()
+    );
   });
 });

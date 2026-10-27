@@ -132,7 +132,7 @@ export const places = {
     await inTransaction(db, async (txn) => {
       const t = now();
       await txn.runAsync(
-        'UPDATE place_rate SET deleted_at = ?, updated_at = ? WHERE place_id = ? AND deleted_at IS NULL',
+        'UPDATE place_rate SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE place_id = ? AND deleted_at IS NULL',
         [t, t, id]
       );
       changed = await softDeleteRow(txn, 'place', id);

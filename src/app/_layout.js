@@ -10,6 +10,7 @@ import { AppThemeProvider, navigationThemeFor, useAppTheme } from '../components
 import { DatabaseProvider } from '../db';
 import { useDailyCarParkUpdate } from '../hooks/useDailyCarParkUpdate';
 import { useNotificationResponses } from '../hooks/useNotificationResponses';
+import { useSync } from '../hooks/useSync';
 
 export default function RootLayout() {
   return (
@@ -29,6 +30,7 @@ function ThemedStack() {
   const navigationTheme = useMemo(() => navigationThemeFor(mode, colours), [mode, colours]);
   useNotificationResponses();
   useDailyCarParkUpdate();
+  useSync();
 
   // The root view shows behind screens while they animate; app.json fixes it to
   // white, so match it to the theme.

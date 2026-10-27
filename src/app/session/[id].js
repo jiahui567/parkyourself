@@ -27,6 +27,7 @@ import {
   savingPhotos,
   sessions,
   sharePhoto,
+  syncState,
   useDatabase,
 } from '../../db';
 import { feeSoFar } from '../../fees';
@@ -41,6 +42,7 @@ import { endedFeeText, extendTimerText, stayTimesText } from '../../text/findTex
 import { addPhotoLabel } from '../../text/photoText';
 import { missingRateText } from '../../text/rateText';
 import { routeBackText, shareMessage, spotLocation, walkingDirectionsUrl } from '../../text/sessionText';
+import { isParkedElsewhere, parkedElsewhereText } from '../../text/syncText';
 import { timerStatusText } from '../../text/timerText';
 import { timerEndFrom, wheelStartMinutes } from '../../timer/timer';
 import { swatchFor, textColourOn } from '../../zone/zoneColour';
@@ -63,13 +65,14 @@ export default function SessionScreen() {
   // savedAt: set when Park has just saved this session.
   const { id, extendedAt, savedAt } = useLocalSearchParams();
   const load = useCallback(async () => {
-    const [session, holidayDates, prefs, sessionPhotos] = await Promise.all([
+    const [session, holidayDates, prefs, sessionPhotos, refusal] = await Promise.all([
       sessions.getDetails(db, id),
       holidays.dateSet(db),
       preferences.get(db),
       photos.listForSession(db, id),
+      syncState.refusedSession(db, id),
     ]);
-    return { session, holidayDates, prefs, sessionPhotos };
+    return { session, holidayDates, prefs, sessionPhotos, refusal };
   }, [db, id]);
   const { data, error, loading, reload } = useFocusedLoad(load);
   // Find opens after Park and from a notification, and Extend changes the
@@ -98,7 +101,7 @@ export default function SessionScreen() {
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;
-  const { session, holidayDates, prefs, sessionPhotos } = data;
+  const { session, holidayDates, prefs, sessionPhotos, refusal } = data;
   if (!session) return <ErrorText error={new Error('This parking session no longer exists.')} />;
 
   const active = session.status === 'active';
@@ -326,6 +329,14 @@ export default function SessionScreen() {
           {session.zone_colour_name && <Text style={spotTextStyle}>{session.zone_colour_name} zone</Text>}
         </Animated.View>
 
+        {/* The server keeps one active session per car, so this one waits
+            until one of the two ends (PLAN.md, "How the sync works", step 8). */}
+        {active && isParkedElsewhere(refusal) && (
+          <View style={styles.elsewhere}>
+            <Text style={styles.elsewhereText}>{parkedElsewhereText(refusal, now)}</Text>
+          </View>
+        )}
+
         {active ? (
           <WayBackCard session={session} route={route} onSave={saveWayBack} error={wayBackError} />
         ) : (
@@ -474,6 +485,14 @@ const createStyles = (c) =>
     level: { fontSize: 56, fontWeight: '800' },
     bay: { fontSize: 28, fontWeight: '700' },
     card: { backgroundColor: c.card, borderRadius: radius.card, padding: 16, gap: 6, boxShadow: c.shadow },
+    // Amber, like the overnight line on Found my car: it needs the user to act.
+    elsewhere: {
+      backgroundColor: c.warningSoft,
+      borderRadius: radius.control,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+    },
+    elsewhereText: { color: c.warning, fontWeight: '600' },
     label: { fontWeight: '600', color: c.text },
     route: { fontSize: 17, lineHeight: 24, color: c.text },
     body: { color: c.text },

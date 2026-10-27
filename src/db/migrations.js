@@ -184,4 +184,16 @@ export const MIGRATIONS = [
 
   CREATE INDEX car_park_report_car_park ON car_park_report (car_park_id, reported_at);
   `,
+
+  // v5: change tracking for the sync (C3; PLAN.md, "How the sync works",
+  // step 1). dirty is 1 until a row's latest change has reached the server, so
+  // every row already on the phone is pushed at the first sync. Local only:
+  // the server has no dirty column.
+  `
+  ALTER TABLE vehicle ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE place ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE place_rate ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE public_holiday ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE parking_session ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  `,
 ];

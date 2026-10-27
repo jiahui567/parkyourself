@@ -1,9 +1,16 @@
 import { MIGRATIONS } from './migrations';
 
+// How long a write waits for another connection's write to finish before it
+// fails with "database is locked". Writes take milliseconds, so this only
+// covers the rare moment two land together: a save during the sync, or two
+// saves. Each connection runs its queries on its own thread, so one waiting
+// never holds up the write it waits for.
+export const BUSY_TIMEOUT_MS = 5000;
+
 // Connection settings. Run on every connection the app opens, outside any
 // transaction (SQLite ignores PRAGMA foreign_keys inside one).
 export async function configureConnection(db) {
-  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  await db.execAsync(`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
 }
 
 // Brings the database up to MIGRATIONS.length. Each step and its user_version

@@ -5,6 +5,11 @@
 
 const OFFLINE = 'Could not reach the server. Check your connection and try again.';
 
+// A call the sync gave up on (src/lib/timeout.js): the signal is too weak.
+export const TIMED_OUT_TEXT = 'The server took too long to answer. It is tried again later.';
+// Sign out given up on: the server was not told, so the user is still signed in.
+export const SIGN_OUT_TIMED_OUT_TEXT = 'Signing out took too long, so you are still signed in. Try again with a better signal.';
+
 const BY_CODE = {
   // A unique index: one report waits per user and car park.
   23505: 'You already have a report waiting for this car park.',

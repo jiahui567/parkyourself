@@ -1,5 +1,5 @@
 import { openMigratedTestDatabase, openTestDatabase } from '../../test/testDatabase';
-import { migrate } from './migrate';
+import { BUSY_TIMEOUT_MS, migrate } from './migrate';
 import { MIGRATIONS } from './migrations';
 
 // Every database a test opens is closed afterwards so Jest workers exit cleanly.
@@ -90,6 +90,27 @@ describe('migrate', () => {
 
     expect(await db.getFirstAsync('SELECT name FROM car_park')).toEqual({ name: 'Pyramid' });
     expect(await db.getFirstAsync('SELECT COUNT(*) AS n FROM car_park_report')).toEqual({ n: 0 });
+  });
+
+  it('marks every row already on the phone to push at the first sync (v5)', async () => {
+    const db = track(openTestDatabase());
+    for (let v = 0; v < 4; v++) {
+      await db.execAsync(MIGRATIONS[v]);
+      await db.execAsync(`PRAGMA user_version = ${v + 1}`);
+    }
+    await db.runAsync("INSERT INTO vehicle (id, name, created_at, updated_at) VALUES ('v', 'My Myvi', 1, 1)");
+    await db.runAsync("INSERT INTO place (id, name, created_at, updated_at, deleted_at) VALUES ('p', 'Mid Valley', 1, 2, 2)");
+
+    await migrate(db);
+
+    expect(await db.getFirstAsync('SELECT name, dirty FROM vehicle')).toEqual({ name: 'My Myvi', dirty: 1 });
+    expect(await db.getFirstAsync('SELECT deleted_at, dirty FROM place')).toEqual({ deleted_at: 2, dirty: 1 });
+  });
+
+  it('makes a write wait for another connection instead of failing at once', async () => {
+    const db = track(await openMigratedTestDatabase());
+
+    expect(await db.getFirstAsync('PRAGMA busy_timeout')).toEqual({ timeout: BUSY_TIMEOUT_MS });
   });
 
   it('refuses a database made by a newer app version', async () => {
