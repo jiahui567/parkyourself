@@ -107,6 +107,25 @@ describe('migrate', () => {
     expect(await db.getFirstAsync('SELECT deleted_at, dirty FROM place')).toEqual({ deleted_at: 2, dirty: 1 });
   });
 
+  it('keeps a v5 database\'s rows for the pull: nothing merged, every session parked here (v6)', async () => {
+    const db = track(openTestDatabase());
+    for (let v = 0; v < 5; v++) {
+      await db.execAsync(MIGRATIONS[v]);
+      await db.execAsync(`PRAGMA user_version = ${v + 1}`);
+    }
+    await db.runAsync("INSERT INTO vehicle (id, name, created_at, updated_at, dirty) VALUES ('v', 'My Myvi', 1, 1, 0)");
+    await db.runAsync("INSERT INTO place (id, name, created_at, updated_at) VALUES ('p', 'Mid Valley', 1, 1)");
+    await db.runAsync(
+      "INSERT INTO parking_session (id, vehicle_id, status, started_at, created_at, updated_at) VALUES ('s', 'v', 'active', 1, 1, 1)"
+    );
+
+    await migrate(db);
+
+    expect(await db.getFirstAsync('SELECT merged_into, dirty FROM vehicle')).toEqual({ merged_into: null, dirty: 0 });
+    expect(await db.getFirstAsync('SELECT merged_into FROM place')).toEqual({ merged_into: null });
+    expect(await db.getFirstAsync('SELECT parked_here FROM parking_session')).toEqual({ parked_here: 1 });
+  });
+
   it('makes a write wait for another connection instead of failing at once', async () => {
     const db = track(await openMigratedTestDatabase());
 

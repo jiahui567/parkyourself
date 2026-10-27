@@ -21,7 +21,7 @@ import { FindIcon } from '../../components/icons';
 import { Burst, ENTER_MS, playBurst, PressScale, useBurst } from '../../components/motion';
 import { radius, space } from '../../components/theme';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
-import { holidays, sessions, useDatabase, vehicles } from '../../db';
+import { holidays, onPulledChange, sessions, useDatabase, vehicles } from '../../db';
 import { feeSoFar } from '../../fees';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
@@ -63,8 +63,12 @@ export default function Home() {
   // Delete), so the notifications are brought up to date here too, and when
   // the app comes back to the front (after allowing them in Android settings).
   const syncLoad = useCallback(() => syncNotifications(db), [db]);
-  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad);
+  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad, { reloadOnPull: false });
   useOnAppActive(resyncNotifications);
+  // A car found, or a timer changed, on another phone of the account comes
+  // with the sync (C4): Home stays mounted under every screen, so the
+  // notifications follow whichever is open, and a failure shows here.
+  useEffect(() => onPulledChange(resyncNotifications), [resyncNotifications]);
   const now = useNow();
 
   if (error) {

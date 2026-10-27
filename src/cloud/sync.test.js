@@ -1,7 +1,7 @@
 import { openMigratedTestDatabase } from '../../test/testDatabase';
-import { holidays, places, sessions, settings, syncRows, syncState, vehicles } from '../db';
+import { holidays, onPulledChange, places, sessions, settings, syncRows, syncState, vehicles } from '../db';
 import { DELETE_TIMED_OUT_TEXT, LOCAL_SYNC_ERROR_TEXT, SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
-import { deleteAccount, pushSyncedRows, signedInAccount, signOut } from './supabase';
+import { deleteAccount, pullSyncedRows, pushSyncedRows, signedInAccount, signOut } from './supabase';
 import {
   batches,
   CALL_TIMEOUT_MS,
@@ -9,6 +9,8 @@ import {
   deleteAccountAndForget,
   errorTextFor,
   loadAccount,
+  PULL_OVERLAP_US,
+  PULL_PAGE,
   PUSH_BATCH,
   pushBeforeSignOut,
   SIGN_OUT_WAIT_MS,
@@ -17,10 +19,12 @@ import {
 } from './sync';
 
 // No network in Jest: the server calls are replaced, and the server is "set up".
+// src/cloud/syncTwoPhones.test.js runs the sync against a fake server instead.
 jest.mock('./supabase', () => ({
   supabaseUrl: 'https://example.supabase.co',
   signedInAccount: jest.fn(),
   pushSyncedRows: jest.fn(),
+  pullSyncedRows: jest.fn(),
   deleteAccount: jest.fn(),
   signOut: jest.fn(),
 }));
@@ -37,6 +41,8 @@ beforeEach(async () => {
   signedInAccount.mockResolvedValue(A);
   pushSyncedRows.mockReset();
   pushSyncedRows.mockResolvedValue([]);
+  pullSyncedRows.mockReset();
+  pullSyncedRows.mockResolvedValue([]);
   deleteAccount.mockReset();
   deleteAccount.mockResolvedValue();
   signOut.mockReset();
@@ -61,18 +67,82 @@ describe('batches', () => {
 });
 
 describe('syncNow', () => {
-  it('makes no call when nothing waits to be pushed', async () => {
-    expect(await syncNow(db)).toEqual({ status: 'up to date' });
-    expect(signedInAccount).not.toHaveBeenCalled();
-  });
-
-  it('pushes nothing while signed out, and keeps the rows waiting', async () => {
+  it('pushes and pulls nothing while signed out, and keeps the rows waiting', async () => {
     await vehicles.add(db, { name: 'My Myvi' });
     signedInAccount.mockResolvedValue(null);
 
     expect(await syncNow(db)).toEqual({ status: 'signed out' });
     expect(pushSyncedRows).not.toHaveBeenCalled();
+    expect(pullSyncedRows).not.toHaveBeenCalled();
     expect(await syncState.get(db)).toMatchObject({ account: null, pending: 1 });
+  });
+
+  it('pulls every table while signed in, even with nothing to push', async () => {
+    expect(await syncNow(db)).toEqual({ status: 'synced', refused: [], pulled: 0 });
+    expect(pushSyncedRows).not.toHaveBeenCalled();
+    expect(pullSyncedRows.mock.calls.map(([table]) => table)).toEqual([
+      'vehicle',
+      'place',
+      'place_rate',
+      'public_holiday',
+      'parking_session',
+    ]);
+    // The first pull reads from the beginning.
+    expect(pullSyncedRows.mock.calls[0][1]).toEqual({ afterUs: null, afterId: null, limit: PULL_PAGE });
+  });
+
+  it('asks for the next page after the last row of a full one, and the next pull from a minute back', async () => {
+    const page = Array.from({ length: PULL_PAGE }, (_, i) => ({
+      id: `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`,
+      name: `Car ${i}`,
+      is_default: false,
+      archived: false,
+      created_at: i,
+      updated_at: i,
+      deleted_at: null,
+      server_updated_us: 5000000000 + i,
+    }));
+    pullSyncedRows.mockImplementation(async (table, { afterId }) => (table === 'vehicle' && afterId == null ? page : []));
+
+    await syncNow(db);
+    const vehicleCalls = pullSyncedRows.mock.calls.filter(([table]) => table === 'vehicle');
+    expect(vehicleCalls[1][1]).toMatchObject({ afterUs: 5000000000 + PULL_PAGE - 1, afterId: page.at(-1).id });
+
+    pullSyncedRows.mockClear();
+    await syncNow(db);
+    expect(pullSyncedRows.mock.calls[0][1]).toMatchObject({
+      afterUs: 5000000000 + PULL_PAGE - 1 - PULL_OVERLAP_US,
+      afterId: null,
+    });
+  });
+
+  it('tells the screens once the sync is done, only when the pull changed something', async () => {
+    // What a screen reloading at that moment would read.
+    const seen = [];
+    const stop = onPulledChange(() => seen.push(syncState.get(db)));
+    const car = { id: 'v', name: 'My Myvi', is_default: true, archived: false, created_at: 1, updated_at: 1 };
+    pullSyncedRows.mockImplementation(async (table) => (table === 'vehicle' ? [{ ...car, server_updated_us: 9 }] : []));
+
+    await syncNow(db);
+    await syncNow(db);
+    stop();
+
+    expect(seen).toHaveLength(1);
+    expect((await seen[0]).lastSyncedAt).not.toBeNull();
+  });
+
+  it('writes nothing from a pull that fails part of the way', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    pullSyncedRows.mockImplementation(async (table) => {
+      if (table === 'place') throw new Error(OFFLINE);
+      return table === 'vehicle'
+        ? [{ id: 'v', name: 'My Myvi', is_default: true, archived: false, created_at: 1, updated_at: 1, server_updated_us: 9 }]
+        : [];
+    });
+
+    expect((await syncNow(db)).status).toBe('failed');
+    expect(await vehicles.list(db)).toEqual([]);
+    expect(await syncState.get(db)).toMatchObject({ lastError: OFFLINE });
   });
 
   it('backs the phone up to the first account that signs in, parents first', async () => {
@@ -88,7 +158,7 @@ describe('syncNow', () => {
       save_rates: ['weekday'],
     });
 
-    expect(await syncNow(db)).toEqual({ status: 'pushed', refused: [] });
+    expect(await syncNow(db)).toEqual({ status: 'synced', refused: [], pulled: 0 });
     expect(pushedTables()).toEqual(['vehicle', 'place', 'place_rate', 'public_holiday', 'parking_session']);
     expect(pushSyncedRows.mock.calls[0][1]).toEqual([expect.objectContaining({ id: vehicleId, is_default: true })]);
     expect(pushSyncedRows.mock.calls[0][1][0]).not.toHaveProperty('dirty');
@@ -114,7 +184,7 @@ describe('syncNow', () => {
     signedInAccount.mockResolvedValue(recreated);
     await syncState.setAccount(db, recreated);
 
-    expect((await syncNow(db)).status).toBe('pushed');
+    expect((await syncNow(db)).status).toBe('synced');
     expect(pushedTables()).toEqual(['vehicle']);
     expect(await syncState.get(db)).toMatchObject({ owner: recreated, pending: 0 });
   });
@@ -142,7 +212,7 @@ describe('syncNow', () => {
 
     const result = await syncNow(db);
 
-    expect(result.status).toBe('pushed');
+    expect(result.status).toBe('synced');
     expect(result.refused).toEqual([expect.objectContaining({ table: 'parking_session', ...refusal })]);
     expect(await syncState.get(db)).toMatchObject({ pending: 1 });
     expect(await syncState.refusedSession(db, sessionId)).toMatchObject({ ...refusal, vehicle_name: 'My Myvi' });
@@ -214,11 +284,17 @@ describe('syncNow', () => {
 });
 
 describe('pushBeforeSignOut', () => {
-  it('pushes, then says nothing is left behind', async () => {
+  it('pushes without pulling, then says nothing is left behind', async () => {
     await vehicles.add(db, { name: 'My Myvi' });
 
     expect(await pushBeforeSignOut(db)).toBe(0);
     expect(pushedTables()).toEqual(['vehicle']);
+    expect(pullSyncedRows).not.toHaveBeenCalled();
+  });
+
+  it('makes no call at all when nothing waits to be pushed', async () => {
+    expect(await pushBeforeSignOut(db)).toBe(0);
+    expect(signedInAccount).not.toHaveBeenCalled();
   });
 
   it('counts what could not be pushed', async () => {

@@ -9,8 +9,9 @@ import { openMigratedTestDatabase } from './testDatabase';
 
 const SCHEMA_TEST = path.join(__dirname, '../supabase/tests/database/synced_tables_schema.test.sql');
 const SERVER_ONLY = ['owner_id', 'server_updated_at'];
-// The phone's change tracking for the push (C3), never sent.
-const PHONE_ONLY = ['dirty'];
+// The phone's change tracking for the push (C3) and which sessions it parked
+// (C4), never sent.
+const PHONE_ONLY = ['dirty', 'parked_here'];
 
 function serverColumnLists() {
   const sql = readFileSync(SCHEMA_TEST, 'utf8');

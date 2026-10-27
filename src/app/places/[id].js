@@ -30,7 +30,8 @@ export default function PlaceScreen() {
     if (!place) return null;
     return { place, rates: await places.getRates(db, id) };
   }, [db, id]);
-  const { data, error, loading } = useFocusedLoad(load);
+  // A pull does not reload the form while it is open (it saves against the rates it opened with).
+  const { data, error, loading } = useFocusedLoad(load, { reloadOnPull: false });
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;
@@ -52,6 +53,10 @@ function PlaceForm({ db, place, rates }) {
   const showDialog = useDialog();
   const [name, setName] = useState(place.name);
   const [form, setForm] = useState(() => placeRatesFormFrom(rates));
+  // Save writes only the day types changed since the form opened. A reload on
+  // focus can bring rates another phone saved meanwhile (C4); comparing with
+  // those would write the form's older values over them.
+  const [openedRates] = useState(rates);
   // 'save' or 'delete' while one runs; both lock the whole form.
   const [busy, setBusy] = useState(null);
   const [saveError, setSaveError] = useState(null);
@@ -76,7 +81,7 @@ function PlaceForm({ db, place, rates }) {
       setSaveError(new Error(error));
       return;
     }
-    run('save', () => places.saveDetails(db, place.id, { name, rates: changedPlaceRates(rates, changes) }));
+    run('save', () => places.saveDetails(db, place.id, { name, rates: changedPlaceRates(openedRates, changes) }));
   };
 
   // A failure shows in a dialog: Delete is in the header, far above the

@@ -108,7 +108,8 @@ export default function Park() {
     ]);
     return { car, holidayDates, prefs };
   }, [db, vehicleId]);
-  const { data, error: loadError, loading } = useFocusedLoad(load);
+  // A pull does not reload the form under the user while they park.
+  const { data, error: loadError, loading } = useFocusedLoad(load, { reloadOnPull: false });
   // The moment whose day type the rate form is for. Save moves it on when
   // the screen stayed open into a different day type.
   const [formDay, setFormDay] = useState(Date.now);

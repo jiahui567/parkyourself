@@ -4,7 +4,7 @@ An Android app that remembers where you parked and what it will cost.
 
 Take a photo of the pillar sign and the app reads the level, bay number and zone colour. Add the first shop you saw after the lift or escalator, and the app shows you the way back. It remembers each car park's weekday, weekend and public holiday rates, calculates the fee while you are away, reminds you before paid parking runs out, lets you share your spot through WhatsApp, and shows your monthly parking spend.
 
-All your parking data stays on the phone. An account is optional and only used to send rate reports for the public car park list; an optional cloud sync is planned for version 2. Three things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place; and at most once a day the app downloads the public car park list and the rate reports waiting for review from Supabase, signed out and sending no personal data (Supabase sees the phone's IP address). A rate report, and its photo of the rate board, is sent only when you tap Send report.
+All your parking data stays on the phone. An account is optional (version 2, in progress): signed in, the app backs up your cars, places, rates, holidays and parking (never photos) and syncs them with your other phones, and you can send rate reports for the public car park list. Three things reach the internet without a tap: Google ML Kit, which reads the pillar sign, sends Google anonymous usage metrics (see "Tech stack", OCR); only if you allow the location, Park asks Android's geocoder (Google) for the name of a new place; and at most once a day the app downloads the public car park list and the rate reports waiting for review from Supabase, signed out and sending no personal data (Supabase sees the phone's IP address). A rate report, and its photo of the rate board, is sent only when you tap Send report.
 
 ## Status
 
@@ -13,8 +13,8 @@ All your parking data stays on the phone. An account is optional and only used t
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
 | Done (checked on the phone, 2026-10-26) | **M13** (History filters by car, place and month, and a battery hint in Settings) and **M14** (the app's own dialogs instead of Android's, Report rates and Delete in the header, the car park list on Places, view only) |
-| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer). **C3** (the sync's push: while signed in, the phone backs up its cars, places, rates, holidays and parking, never photos, when the app opens or comes to the front and a few seconds after a save; Settings → Data → Back up and sync), built with Jest tests, not yet on hosted dev or the phone |
-| Next | Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line). For C3: run its pgTAP tests on local Supabase, push its migration to hosted dev, then check the backup on the phone; then C4 (the pull) |
+| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer). **C3** (the sync's push: while signed in, the phone backs up its cars, places, rates, holidays and parking, never photos, when the app opens or comes to the front and a few seconds after a save; Settings → Data → Back up and sync) and **C4** (the pull: what the account's other phones changed comes back, and rows two phones made offline are merged on the phone), built with Jest tests (two phones against an in-memory server) and passing pgTAP on local Supabase; not yet on hosted dev or the phone |
+| Next | Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line). For C3 and C4: push their migrations to hosted dev, then check the backup and the sync on two phones (PLAN.md, "Testing") |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, the milestones and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -25,6 +25,7 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 - **Find:** photo, level and bay on the zone colour, and the route back in reverse ("Find Starbucks → escalator → B2 → blue zone, pillar C14"). While parked, you add how you left and the first shop as you walk out.
 - **Saved places and rates:** a place remembers its weekday and weekend rates and an optional fixed public holiday amount, and fills them in next time.
 - **Car park list:** about 30 Klang Valley malls with their public rates, researched on the web (each with its source and the date it was checked), with the date each rate took effect. The app downloads the list from Supabase once a day, so rates can change without an app update; a copy is built in for the first open and offline. Nearby ones are suggested from your location, and search finds them too. Settings → Places lists them under your own places, view only, to look up a car park's rates.
+- **Back up and sync (version 2):** signed in with your email, your cars, places, rates, holidays and parking (never photos) go to your account and come back on your other phones, when the app opens or comes to the front and a few seconds after a save. The same place made on two phones offline becomes one; a car parked on another phone shows as parked, with its notifications only on the phone that parked it.
 - **Rate reports (version 2):** signed in with your email (Settings → Back up and sync, which opens Account), report a listed car park's new rates, or suggest a car park that is not listed, from a saved place, with an optional photo of the rate board. The developer checks each report before the list changes; until then, other users see the reported rate on Park as "Not verified yet".
 - **Timer wheel:** set the timer like an alarm, in Settings for every park and on Find for this one.
 - **Fee:** calculated live; stays past midnight are shown as an estimate; you can record the amount actually paid.
@@ -123,8 +124,8 @@ park-yourself/
 │   │                        (the rate in effect on a day), schedule.js (when to download again),
 │   │                        reports.js (what a rate report may hold, as the server checks it)
 │   ├── cloud/               Version 2: supabase.js (the only code that calls @supabase/supabase-js:
-│   │                        the download, sign-in, rate reports, the push), carParkUpdates.js (the daily
-│   │                        download), sync.js (the sync: pushes what changed while signed in)
+│   │                        the download, sign-in, rate reports, the push and pull), carParkUpdates.js
+│   │                        (the daily download), sync.js (the sync while signed in: push, then pull)
 │   ├── lib/                 Shared helpers
 │   │   ├── money.js         formatRM ("RM 3.00"), formatAmountInput ("3.00") and parseRM
 │   │   ├── time.js          Local date and month keys, time/date/month/duration text
@@ -147,8 +148,10 @@ park-yourself/
 │       ├── export.js        Export database: WAL checkpoint, copy, share sheet
 │       ├── carParks.js      The phone's copy of the car park list: refresh, search, rates in effect
 │       ├── sync.js          The sync's side on the phone: rows waiting to push, the account they belong to
+│       ├── pull.js          Writes what the pull brings, and merges rows two phones made offline
 │       └── vehicles.js, settings.js
-├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check
+├── test/                    Jest helpers: Node SQLite test database, setup, screen-load check, and an
+│                            in-memory sync server for the two-phone tests (fakeServer.js)
 ├── supabase/                Version 2 server: config.toml, migrations/ (PostgreSQL), tests/ (pgTAP),
 │                            templates/ (the sign-in code email)
 ├── .env.example             Which Supabase server a build uses; copy to .env.development.local and .env.production.local
@@ -224,7 +227,7 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3), the sync's push of the five synced tables when the app opens or comes to the front, a few seconds after a save, after Sign in, on Sync now and before Sign out, never in the background. It needs the `push_synced_rows` migration on the server the build uses. Database check shows which server the build uses.
+In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone; C3 and C4 on local only). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3, C4), the sync: a push of the five synced tables, then a pull of what the account's other phones changed, when the app opens or comes to the front, a few seconds after a save, after Sign in and on Sync now (before Sign out, a push only), never in the background. Signed in, every sync calls the server, for the pull. It needs the `push_synced_rows` and `pull_synced_rows` migrations on the server the build uses. Database check shows which server the build uses.
 
 **Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
 
@@ -267,7 +270,7 @@ Rules the data layer enforces (see `src/db/core.js`):
 - Screens never run SQL. They call functions exported from `src/db/index.js`.
 - Every row gets a UUID `id`, `created_at` and `updated_at`. Times are UTC epoch milliseconds.
 - Synced tables are never `DELETE`d: deleting sets `deleted_at`, and every read skips deleted rows. The one exception is display only: a past session keeps showing its place's name after the place is deleted.
-- Every write to a synced table sets `dirty = 1` (schema v5, C3), and the sync sets it back to 0 once the change is on the server.
+- Every write to a synced table sets `dirty = 1` (schema v5, C3), and the sync sets it back to 0 once the change is on the server. The pull (C4) writes what other phones changed with `dirty = 0`; a place or car it merged into another keeps `merged_into` (schema v6), and `parked_here` marks the sessions this phone parked, the only ones it shows notifications for.
 - Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`. Two writes at once wait for each other (up to 5 s) instead of failing with "database is locked".
 
 **Changing the schema:** add a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. The app refuses to open a database whose schema is newer than it knows, so install the newer app rather than downgrading.

@@ -7,11 +7,11 @@ select hasnt_table('public', 'connection_check', 'C0''s connection_check is gone
 -- test/serverColumns.test.js reads these lists and checks them against the
 -- phone's schema, so a column added on one side only fails one of the two.
 select columns_are('public', 'vehicle', array[
-  'id', 'owner_id', 'name', 'colour', 'is_default', 'archived',
+  'id', 'owner_id', 'name', 'colour', 'is_default', 'archived', 'merged_into',
   'created_at', 'updated_at', 'deleted_at', 'server_updated_at'
 ], 'vehicle has the phone''s columns');
 select columns_are('public', 'place', array[
-  'id', 'owner_id', 'name', 'note', 'lat', 'lng', 'last_used_at',
+  'id', 'owner_id', 'name', 'note', 'lat', 'lng', 'last_used_at', 'merged_into',
   'created_at', 'updated_at', 'deleted_at', 'server_updated_at'
 ], 'place has the phone''s columns');
 select columns_are('public', 'place_rate', array[
@@ -37,7 +37,7 @@ select is_empty($$
   where table_schema = 'public'
     and table_name in ('vehicle', 'place', 'place_rate', 'public_holiday', 'parking_session')
     and (
-      (column_name in ('id', 'owner_id', 'vehicle_id', 'place_id') and data_type <> 'uuid')
+      (column_name in ('id', 'owner_id', 'vehicle_id', 'place_id', 'merged_into') and data_type <> 'uuid')
       or (column_name like '%\_at' and column_name <> 'server_updated_at' and data_type <> 'bigint')
       or (column_name = 'server_updated_at' and data_type <> 'timestamp with time zone')
       or ((column_name like '%\_sen' or column_name like '%\_minutes') and data_type <> 'bigint')

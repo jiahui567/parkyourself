@@ -53,7 +53,8 @@ export default function ReportScreen() {
       return { place, rates, listed, email: null, accountError: e };
     }
   }, [db, id]);
-  const { data, error, loading } = useFocusedLoad(load);
+  // The report form starts from the rates loaded when it opened; a pull does not reload it.
+  const { data, error, loading } = useFocusedLoad(load, { reloadOnPull: false });
 
   if (error) return <ErrorText error={error} />;
   if (loading) return null;

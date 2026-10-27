@@ -14,6 +14,14 @@ export const ACTION_EXTEND = 'extend';
 export const parkedId = (sessionId) => `parked-${sessionId}`;
 export const reminderId = (sessionId, kind) => `reminder-${kind}-${sessionId}`;
 
+// The parked sessions this phone shows notifications for: the ones it parked
+// (decided 2026-10-27). A car parked on another phone of the account comes
+// with the sync, which never runs in the background, so its timer here can be
+// out of date (extended or found on that phone).
+export function notifiedSessions(activeSessions) {
+  return activeSessions.filter((session) => session.parked_here === 1);
+}
+
 // For parked sessions (sessions.listActive rows): one ongoing notification
 // each, shown now (at null), and the timer reminders still to come.
 // [{ id, kind: 'parked' | 'before' | 'end', at, title, body, data }]

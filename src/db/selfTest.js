@@ -4,13 +4,14 @@ import { defaultDatabaseDirectory, deleteDatabaseAsync, openDatabaseAsync } from
 import { CAR_PARK_LIST } from '../carparks/carParkList';
 import { holidayRate } from '../fees';
 import { carParks } from './carParks';
-import { inTransaction } from './core';
+import { inTransaction, newId } from './core';
 import { copyDatabaseTo, fileUri } from './export';
 import { holidays } from './holidays';
 import { migrate } from './migrate';
 import { MIGRATIONS } from './migrations';
 import { deletePhotoFiles, photos, savingPhotos } from './photos';
 import { placeRates, places } from './places';
+import { syncPull } from './pull';
 import { sessions } from './sessions';
 import { settings } from './settings';
 import { syncRows } from './sync';
@@ -345,6 +346,27 @@ export async function runSelfTest() {
       await settings.set(db, 'reminder_lead_minutes', '15');
       const value = await settings.get(db, 'reminder_lead_minutes');
       assert(value === '15', `got ${value}`);
+    });
+
+    // The pull writes with an upsert built from the table's columns, on the
+    // transaction connection (C4).
+    await check('A pulled row is added, then replaced by a newer one', async () => {
+      const pulled = {
+        id: newId(),
+        name: 'Pulled Myvi',
+        colour: null,
+        is_default: false,
+        archived: false,
+        merged_into: null,
+        created_at: 1,
+        updated_at: 1,
+        deleted_at: null,
+        server_updated_us: 1,
+      };
+      await syncPull.apply(db, { vehicle: [pulled] });
+      await syncPull.apply(db, { vehicle: [{ ...pulled, name: 'Pulled Axia', updated_at: 2, server_updated_us: 2 }] });
+      const stored = await vehicles.get(db, pulled.id);
+      assert(stored?.name === 'Pulled Axia' && stored.dirty === 0, `got ${JSON.stringify(stored)}`);
     });
   } catch (e) {
     results.push({ name: 'Self-test setup', ok: false, detail: String(e?.message ?? e) });

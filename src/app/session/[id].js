@@ -80,7 +80,8 @@ export default function SessionScreen() {
   // app comes back to the front. Right after parking is when the permission
   // is first asked for.
   const syncLoad = useCallback(() => syncNotifications(db, { askPermission: true }), [db]);
-  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad);
+  // After a pull, Home brings them up to date (it stays mounted under Find).
+  const { error: notifyError, reload: resyncNotifications } = useFocusedLoad(syncLoad, { reloadOnPull: false });
   useOnAppActive(resyncNotifications);
   // When this Find was already open, Extend timer on a notification only
   // changes extendedAt, so the new end is loaded and synced here.

@@ -11,6 +11,7 @@ export { holidays } from './holidays';
 export { deletePhotoFiles, photos, preparePhoto, savingPhotos, sharePhoto } from './photos';
 export { placeRates, places } from './places';
 export { preferences } from './preferences';
+export { onPulledChange, syncPull, tellPulledChange } from './pull';
 export { runSelfTest } from './selfTest';
 export { sessions } from './sessions';
 export { settings } from './settings';

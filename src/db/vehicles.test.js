@@ -26,6 +26,21 @@ describe('vehicles.add', () => {
   it.each(['', '   ', null])('rejects the name %p', async (name) => {
     await expect(vehicles.add(db, { name })).rejects.toThrow('Give the car a name');
   });
+
+  // The sync merges two cars in use with one name (C4).
+  it('refuses the name of another car in use, in any case', async () => {
+    await vehicles.add(db, { name: 'My Myvi' });
+
+    await expect(vehicles.add(db, { name: ' my myvi ' })).rejects.toThrow('You already have a car called My Myvi.');
+  });
+
+  it('allows the name of an archived car', async () => {
+    const old = await vehicles.add(db, { name: 'Axia' });
+    await vehicles.add(db, { name: 'My Myvi' });
+    await vehicles.archive(db, old);
+
+    await expect(vehicles.add(db, { name: 'Axia' })).resolves.toEqual(expect.any(String));
+  });
 });
 
 describe('vehicles.rename', () => {
@@ -48,6 +63,22 @@ describe('vehicles.rename', () => {
 
   it('refuses a car that is gone', async () => {
     await expect(vehicles.rename(db, 'missing', 'Axia')).rejects.toThrow('No car with id missing');
+  });
+
+  it('refuses the name of another car in use, and keeps the old one', async () => {
+    await vehicles.add(db, { name: 'Axia' });
+    const id = await vehicles.add(db, { name: 'My Myvi' });
+
+    await expect(vehicles.rename(db, id, 'AXIA')).rejects.toThrow('You already have a car called Axia.');
+    expect((await vehicles.get(db, id)).name).toBe('My Myvi');
+  });
+
+  it('allows a car its own name in another case', async () => {
+    const id = await vehicles.add(db, { name: 'My Myvi' });
+
+    await vehicles.rename(db, id, 'MY MYVI');
+
+    expect((await vehicles.get(db, id)).name).toBe('MY MYVI');
   });
 });
 

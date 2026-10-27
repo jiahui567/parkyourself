@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 
 import { preferences, sessions } from '../db';
-import { ACTION_EXTEND, ACTION_NAVIGATE, CATEGORY, notificationPlan, staleNotificationIds } from './plan';
+import { ACTION_EXTEND, ACTION_NAVIGATE, CATEGORY, notificationPlan, notifiedSessions, staleNotificationIds } from './plan';
 
 // The phone side of the notifications: expo-notifications calls only. What to
 // show is decided in plan.js.
@@ -82,13 +82,14 @@ let askedThisRun = false;
 
 async function sync(db, askPermission) {
   await ensureSetUp();
-  const [permission, active, prefs, shown, scheduled] = await Promise.all([
+  const [permission, parked, prefs, shown, scheduled] = await Promise.all([
     Notifications.getPermissionsAsync(),
     sessions.listActive(db),
     preferences.get(db),
     Notifications.getPresentedNotificationsAsync(),
     Notifications.getAllScheduledNotificationsAsync(),
   ]);
+  const active = notifiedSessions(parked);
   let { granted } = permission;
   // Asked once a car is parked, when notifications first matter (PLAN.md,
   // "Notifications"), so a problem here can never stop the car being parked.
@@ -130,8 +131,9 @@ export function listenForResponses(onResponse) {
 
 let queue = Promise.resolve();
 
-// Makes the phone's notifications match the parked cars: each car's ongoing
-// notification, its timer reminders, and nothing for cars no longer parked.
+// Makes the phone's notifications match the cars it parked: each car's
+// ongoing notification, its timer reminders, and nothing for cars no longer
+// parked or parked on another phone.
 // Safe to run at any time; runs run one after another. askPermission: ask for
 // the permission if a car is parked and Android still allows asking (Find).
 export function syncNotifications(db, { askPermission = false } = {}) {

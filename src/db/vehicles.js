@@ -2,6 +2,17 @@ import { inTransaction, now, syncedTable } from './core';
 
 const base = syncedTable('vehicle');
 
+// Two cars in use never share a name (any case): the sync merges two that do
+// into one (C4, src/db/pull.js), since a new phone asks for a car before it
+// can sign in and the first pull brings the same car again.
+async function assertNameFree(txn, name, id = null) {
+  const other = await txn.getFirstAsync(
+    'SELECT name FROM vehicle WHERE deleted_at IS NULL AND archived = 0 AND name = ? COLLATE NOCASE AND id IS NOT ?',
+    [name, id]
+  );
+  if (other) throw new Error(`You already have a car called ${other.name}.`);
+}
+
 export const vehicles = {
   ...base,
 
@@ -18,6 +29,7 @@ export const vehicles = {
     if (!trimmed) throw new Error('Give the car a name');
     let id;
     await inTransaction(db, async (txn) => {
+      await assertNameFree(txn, trimmed);
       const { n } = await txn.getFirstAsync(
         'SELECT COUNT(*) AS n FROM vehicle WHERE deleted_at IS NULL AND archived = 0'
       );
@@ -26,12 +38,15 @@ export const vehicles = {
     return id;
   },
 
-  // Renames a car, with the same rule as add. Its sessions show the new name.
+  // Renames a car, with the same rules as add. Its sessions show the new name.
   async rename(db, id, name) {
     const trimmed = String(name ?? '').trim();
     if (!trimmed) throw new Error('Give the car a name');
-    const changed = await base.update(db, id, { name: trimmed });
-    if (changed === 0) throw new Error(`No car with id ${id}`);
+    await inTransaction(db, async (txn) => {
+      await assertNameFree(txn, trimmed, id);
+      const changed = await base.update(txn, id, { name: trimmed });
+      if (changed === 0) throw new Error(`No car with id ${id}`);
+    });
   },
 
   async setDefault(db, id) {

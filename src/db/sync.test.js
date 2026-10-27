@@ -97,16 +97,26 @@ describe('onSyncedChange', () => {
 });
 
 describe('syncRows', () => {
-  it('lists dirty rows oldest change first, deleted ones included', async () => {
+  it('lists dirty rows oldest change first', async () => {
     const now = jest.spyOn(Date, 'now');
     now.mockReturnValue(at('2026-10-27T10:00'));
     const later = await places.create(db, { name: 'Sunway Pyramid' });
     now.mockReturnValue(at('2026-10-27T09:00'));
     const earlier = await places.create(db, { name: 'Mid Valley' });
-    now.mockReturnValue(at('2026-10-27T11:00'));
-    await places.remove(db, earlier);
 
-    expect((await syncRows.listDirty(db, 'place')).map((row) => row.id)).toEqual([later, earlier]);
+    expect((await syncRows.listDirty(db, 'place')).map((row) => row.id)).toEqual([earlier, later]);
+  });
+
+  it('lists deleted rows first, since a deletion only frees a name another row may take', async () => {
+    const now = jest.spyOn(Date, 'now');
+    now.mockReturnValue(at('2026-10-27T10:00'));
+    const kept = await places.create(db, { name: 'Sunway Pyramid' });
+    now.mockReturnValue(at('2026-10-27T09:00'));
+    const deleted = await places.create(db, { name: 'Mid Valley' });
+    now.mockReturnValue(at('2026-10-27T11:00'));
+    await places.remove(db, deleted);
+
+    expect((await syncRows.listDirty(db, 'place')).map((row) => row.id)).toEqual([deleted, kept]);
   });
 
   it('leaves a row dirty when it changed after it was read for the push', async () => {
@@ -138,6 +148,13 @@ describe('syncRows', () => {
 });
 
 describe('toServerRow', () => {
+  it('drops the phone-only columns', () => {
+    expect(toServerRow('parking_session', { id: 's', status: 'active', dirty: 1, parked_here: 1 })).toEqual({
+      id: 's',
+      status: 'active',
+    });
+  });
+
   it('drops dirty and sends the flags as booleans', () => {
     expect(toServerRow('vehicle', { id: 'v', name: 'My Myvi', is_default: 1, archived: 0, dirty: 1 })).toEqual({
       id: 'v',

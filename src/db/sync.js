@@ -2,7 +2,8 @@ import { settings } from './settings';
 
 // The phone's side of the sync (C3; PLAN.md, "How the sync works"): the rows
 // that wait to be pushed, marking them pushed, and what the phone remembers
-// about its account. src/cloud/sync.js runs the push.
+// about its account. src/db/pull.js writes what the pull brings (C4), and
+// src/cloud/sync.js runs both.
 //
 // Every write here is one statement on the main connection, never a
 // transaction: a transaction holds SQLite's write lock on a connection of its
@@ -17,12 +18,17 @@ function assertTable(table) {
   if (!SYNCED_TABLES.includes(table)) throw new Error(`Not a synced table: ${table}`);
 }
 
-// A phone row in the server's shape (PLAN.md, "Type mapping"): no dirty, the
-// 0/1 flags as booleans and the rate snapshot as JSON instead of its text.
+// Columns of the synced tables that only mean something on this phone: the
+// change tracking (C3) and which sessions it parked (C4). Never sent or pulled.
+export const PHONE_ONLY_COLUMNS = ['dirty', 'parked_here'];
+
+// A phone row in the server's shape (PLAN.md, "Type mapping"): none of the
+// phone-only columns, the 0/1 flags as booleans and the rate snapshot as JSON
+// instead of its text.
 export function toServerRow(table, row) {
   assertTable(table);
   const serverRow = { ...row };
-  delete serverRow.dirty;
+  for (const column of PHONE_ONLY_COLUMNS) delete serverRow[column];
   if (table === 'vehicle') {
     serverRow.is_default = Boolean(row.is_default);
     serverRow.archived = Boolean(row.archived);
@@ -34,13 +40,15 @@ export function toServerRow(table, row) {
 }
 
 export const syncRows = {
-  // The rows of table whose latest change has not reached the server, deleted
-  // ones too (a deletion syncs like any change), oldest change first: the
-  // server checks its unique rules row by row, so a row that frees a name (a
-  // place renamed, a session ended) must arrive before the one that takes it.
+  // The rows of table whose latest change has not reached the server: the
+  // deleted ones first (a deletion syncs like any change), then the oldest
+  // change first. The server checks its unique rules row by row, so a row that
+  // frees a name (a place renamed, a session ended) must arrive before the one
+  // that takes it. A deletion only ever frees one, and the sync's merges
+  // delete the losing row at the moment they keep the other (src/db/pull.js).
   listDirty(db, table) {
     assertTable(table);
-    return db.getAllAsync(`SELECT * FROM ${table} WHERE dirty = 1 ORDER BY updated_at, id`);
+    return db.getAllAsync(`SELECT * FROM ${table} WHERE dirty = 1 ORDER BY deleted_at IS NULL, updated_at, id`);
   },
 
   // Marks rows pushed, each only if it has not changed since it was read (the
@@ -95,6 +103,14 @@ const KEY = {
   // JSON: the rows the server refused at the last push, [{ table, id,
   // updated_at, code, constraint, other }].
   refused: 'sync_refused',
+};
+
+// Where the pull is up to in table (C4; PLAN.md's last_pulled_at, one per
+// table, so a table pulled later in the same sync cannot move another's on):
+// the latest server_updated_us stored, as text.
+export const pulledKey = (table) => {
+  assertTable(table);
+  return `sync_pulled_${table}`;
 };
 
 async function readAccount(db, idKey, emailKey) {
@@ -192,9 +208,12 @@ export const syncState = {
   // For when the server no longer has this phone's rows (the account they
   // were backed up to was deleted): every row waits to be pushed again, as at
   // a first sign-in, to owner ({ id, email }), or to whichever account signs
-  // in next when owner is null.
+  // in next when owner is null; and the pull starts from the beginning.
   async startOver(db, owner) {
-    for (const table of SYNCED_TABLES) await db.runAsync(`UPDATE ${table} SET dirty = 1`);
+    for (const table of SYNCED_TABLES) {
+      await db.runAsync(`UPDATE ${table} SET dirty = 1`);
+      await settings.set(db, pulledKey(table), '');
+    }
     await settings.set(db, KEY.lastSyncedAt, '');
     await settings.set(db, KEY.lastError, '');
     await settings.set(db, KEY.refused, '');

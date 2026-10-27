@@ -15,7 +15,8 @@ export default function RenameCar() {
   const db = useDatabase();
   const { id } = useLocalSearchParams();
   const load = useCallback(() => vehicles.get(db, id), [db, id]);
-  const { data: car, error, loading } = useFocusedLoad(load);
+  // The field starts with the name loaded when the screen opened; a pull does not change it under the user.
+  const { data: car, error, loading } = useFocusedLoad(load, { reloadOnPull: false });
   // null until the user types, so the field starts with the saved name.
   const [name, setName] = useState(null);
   const [saving, setSaving] = useState(false);

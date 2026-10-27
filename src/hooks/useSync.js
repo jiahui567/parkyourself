@@ -9,10 +9,12 @@ import { useOnAppActive } from './useOnAppActive';
 // transaction has committed.
 const AFTER_SAVE_MS = 5000;
 
-// Pushes the phone's changes while signed in: when the app opens or comes
-// back to the front, and a few seconds after a save (PLAN.md, "How the sync
-// works", step 5). Never in the background. For the root layout. Nothing waits
-// for it and it shows nothing: Settings and Account show how the last one went.
+// Syncs while signed in: when the app opens or comes back to the front, and a
+// few seconds after a save (PLAN.md, "How the sync works", step 5). Never in
+// the background. For the root layout. Nothing waits for it and it shows
+// nothing: Settings and Account show how the last one went, and what the pull
+// changed reaches the screens through onPulledChange (useFocusedLoad, and
+// Home for the notifications).
 export function useSync() {
   const db = useDatabase();
   const sync = useCallback(() => {

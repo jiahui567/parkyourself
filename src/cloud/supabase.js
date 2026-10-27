@@ -149,6 +149,23 @@ export async function pushSyncedRows(table, rows) {
   return data ?? [];
 }
 
+// The signed-in user's rows of one synced table that changed on the server
+// after a point (C4), deleted ones too, oldest change first, at most limit:
+// the point is (afterUs, afterId), a server_updated_us and an id, each null
+// for none (supabase/migrations/*_pull_synced_rows.sql). Each row is in the
+// server's shape with its server_updated_us.
+export async function pullSyncedRows(table, { afterUs, afterId, limit }) {
+  await requireSession();
+  const { data, error } = await accountClient.rpc('pull_synced_rows', {
+    p_table: table,
+    p_after_us: afterUs,
+    p_after_id: afterId,
+    p_limit: limit,
+  });
+  if (error) throw userError(error);
+  return data ?? [];
+}
+
 // Every path in the user's photo folder, a page at a time.
 async function photoPaths(userId) {
   const bucket = accountClient.storage.from(PHOTO_BUCKET);

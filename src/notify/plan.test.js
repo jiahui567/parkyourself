@@ -2,6 +2,7 @@ import {
   ACTION_EXTEND,
   ACTION_NAVIGATE,
   notificationPlan,
+  notifiedSessions,
   parkedId,
   reminderId,
   responseAction,
@@ -20,6 +21,14 @@ const MYVI = {
   timer_ends_at: at('2026-10-23T16:15'),
 };
 const AXIA = { id: 's2', vehicle_name: 'Axia', started_at: at('2026-10-23T15:00'), timer_ends_at: null };
+
+describe('notifiedSessions', () => {
+  it('keeps the cars this phone parked, not those another phone of the account parked', () => {
+    expect(notifiedSessions([{ ...MYVI, parked_here: 1 }, { ...AXIA, parked_here: 0 }])).toEqual([
+      { ...MYVI, parked_here: 1 },
+    ]);
+  });
+});
 
 describe('notificationPlan', () => {
   it('shows one ongoing notification per parked car', () => {

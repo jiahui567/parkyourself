@@ -47,7 +47,8 @@ export default function AccountScreen() {
       return { account, sync, reports: [], reportsError: e };
     }
   }, [db]);
-  const { data, error, loading, reload } = useFocusedLoad(load);
+  // The load asks the server for the reports, so only the user's own actions reload it, not a pull.
+  const { data, error, loading, reload } = useFocusedLoad(load, { reloadOnPull: false });
 
   // The first push starts at once (a second phone on the same account needs
   // nothing more than the code); this screen shows how it went once it ends.

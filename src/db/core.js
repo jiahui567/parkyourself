@@ -6,8 +6,8 @@ import { BUSY_TIMEOUT_MS } from './migrate';
 // deleted_at are managed here. Table and column names cannot be bound as SQL
 // parameters, so this list is also what makes them safe to put in SQL text.
 const SYNCED_COLUMNS = {
-  vehicle: ['name', 'colour', 'is_default', 'archived'],
-  place: ['name', 'note', 'lat', 'lng', 'last_used_at'],
+  vehicle: ['name', 'colour', 'is_default', 'archived', 'merged_into'],
+  place: ['name', 'note', 'lat', 'lng', 'last_used_at', 'merged_into'],
   place_rate: [
     'place_id', 'day_type', 'type', 'first_minutes', 'first_sen', 'block_minutes',
     'block_sen', 'grace_minutes', 'daily_cap_sen', 'flat_sen',

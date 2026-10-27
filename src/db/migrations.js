@@ -196,4 +196,17 @@ export const MIGRATIONS = [
   ALTER TABLE public_holiday ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
   ALTER TABLE parking_session ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
   `,
+
+  // v6: the sync's pull (C4; PLAN.md, "How the sync works", step 8).
+  // merged_into syncs: a place or car merged into another by the sync is
+  // soft-deleted and names the one it became, so every phone moves its rates
+  // and sessions there. No REFERENCES: the row it names can arrive later in
+  // the same pull. parked_here is local only, like dirty: 1 on the phone that
+  // parked, which alone shows the session's notifications (a pulled session
+  // gets 0). Every session already on the phone was parked here.
+  `
+  ALTER TABLE place ADD COLUMN merged_into TEXT;
+  ALTER TABLE vehicle ADD COLUMN merged_into TEXT;
+  ALTER TABLE parking_session ADD COLUMN parked_here INTEGER NOT NULL DEFAULT 1;
+  `,
 ];

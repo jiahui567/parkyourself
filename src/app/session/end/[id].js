@@ -47,7 +47,8 @@ export default function FoundMyCar() {
     const placeRates = place ? await places.getRates(db, place.id) : null;
     return { session, holidayDates, placeRates };
   }, [db, id]);
-  const { data, error, loading } = useFocusedLoad(load);
+  // The summary and its rate forms stay as they opened: a pull does not reload them.
+  const { data, error, loading } = useFocusedLoad(load, { reloadOnPull: false });
   const [rateForms, setRateForms] = useState({});
   // null until the user edits Amount paid; until then it follows the fee.
   const [typedPaid, setTypedPaid] = useState(null);
