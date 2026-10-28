@@ -1,0 +1,70 @@
+name: Web pages
+
+# The privacy policy and the account deletion page (web/), on GitHub Pages:
+# https://jiahui567.github.io/parkyourself/. Deploys when web/ or this file
+# changes on master, or by hand (Actions → Web pages → Run workflow).
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer one waits rather than cancelling a deploy
+# already under way.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy web/
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Nothing here pushes, so the token is not left in the checkout.
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The server and the contact email come from the repository's Actions
+      # variables (Settings → Secrets and variables → Actions → Variables), so
+      # git holds none of them. Each is passed through the environment and
+      # written as JSON, never pasted into the script. Unset, a value stays
+      # empty: no contact email shows a placeholder, and no server leaves only
+      # the app and email for deleting an account.
+      - name: Write config.js
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+        run: |
+          node -e '
+            const config = {
+              supabaseUrl: process.env.SUPABASE_URL || "",
+              publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || "",
+              contactEmail: process.env.CONTACT_EMAIL || "",
+            };
+            require("fs").writeFileSync("web/config.js", `window.PARK_YOURSELF_CONFIG = ${JSON.stringify(config)};\n`);
+          '
+
+      - name: Set up Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload web/
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

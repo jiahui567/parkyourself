@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Scripts only from this site and the one supabase-js file on jsDelivr;
+         calls only to Supabase. 127.0.0.1:54321 is local Supabase, for trying
+         the page on the laptop (README.md, "Web pages"); it reaches nothing
+         for a visitor. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js; connect-src https://*.supabase.co http://127.0.0.1:54321; base-uri 'none'; form-action 'none'"
+    />
+    <title>Delete your account · Park Yourself</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Delete your account</h1>
+      <p class="muted">Park Yourself, an Android app by L.</p>
+
+      <p>
+        Deleting your Park Yourself account deletes your backup (cars, places, rates, holidays and parking), your rate
+        reports and their photos from our server. It cannot be undone. The data on your phone stays until you uninstall
+        the app or clear its storage. See the <a href="privacy.html">privacy policy</a> for what the account holds.
+      </p>
+
+      <h2>In the app</h2>
+      <div class="card">
+        <p>Settings → Back up and sync → Account → ⋮ (top right) → Delete account.</p>
+      </div>
+
+      <h2>On this page</h2>
+      <div class="card">
+        <p id="web-unavailable" class="error">
+          Deleting on this page is not available right now. Use the app, or email us below.
+        </p>
+
+        <form id="email-step" hidden>
+          <p>Sign in with the email you use in the app. We will email you a code.</p>
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" placeholder="e.g. you@example.com" required />
+          <button id="send-code" type="submit">Send code</button>
+        </form>
+
+        <form id="code-step" hidden>
+          <p id="code-sent"></p>
+          <label for="code">Code</label>
+          <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="From the email" required />
+          <button id="sign-in" type="submit">Sign in</button>
+          <p><button id="other-email" class="link" type="button">Use another email</button></p>
+        </form>
+
+        <div id="delete-step" hidden>
+          <p id="signed-in-as"></p>
+          <p>This deletes the account and everything it holds on our server, for good.</p>
+          <button id="delete" class="danger" type="button">Delete my account</button>
+        </div>
+
+        <div id="done-step" hidden>
+          <p><strong>Your account is deleted.</strong></p>
+          <p>
+            Its backup, reports and photos are gone from our server. The data on your phone stays until you uninstall the
+            app or clear its storage.
+          </p>
+        </div>
+
+        <p id="error" class="error" role="alert" hidden></p>
+      </div>
+
+      <h2>By email</h2>
+      <div class="card">
+        <p>
+          Email <span data-contact></span> from the address you signed in with and ask us to delete your account. We
+          delete it and everything it holds on our server, and reply when it is done.
+        </p>
+      </div>
+    </main>
+    <script src="config.js"></script>
+    <script src="contact.js"></script>
+    <!-- The same supabase-js version as the app (package-lock.json). The hash
+         makes the browser refuse the file if the CDN ever serves anything else. -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"
+      integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK"
+      crossorigin="anonymous"
+    ></script>
+    <script src="delete-account.js"></script>
+  </body>
+</html>

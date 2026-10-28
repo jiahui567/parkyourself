@@ -163,7 +163,9 @@ park-yourself/
 │   ├── pull-db.js           Copies the phone's database to db-snapshot/
 │   └── car-park-sql.js      Writes the Supabase migration for the car park list (npm run carparks:sql)
 ├── assets/                  App icons and splash image
+├── web/                     The privacy policy and the account deletion page, on GitHub Pages
 ├── .github/workflows/ci.yml GitHub Actions: lint and tests, and Supabase migrations, on push and pull request
+├── .github/workflows/pages.yml GitHub Actions: deploys web/ to GitHub Pages
 ├── app.json                 Expo config: name, Android package, plugins
 ├── jest.config.js           Jest setup (jest-expo preset, Malaysia time zone)
 ├── PLAN.md                  Full build plan
@@ -227,7 +229,7 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, server parts to check on the phone; C3 and C4 on local only). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3, C4), the sync: a push of the five synced tables, then a pull of what the account's other phones changed, when the app opens or comes to the front, a few seconds after a save, after Sign in and on Sync now (before Sign out, a push only), never in the background. Signed in, every sync calls the server, for the pull. It needs the `push_synced_rows` and `pull_synced_rows` migrations on the server the build uses. Database check shows which server the build uses.
+In progress (milestones C1, C2, C10, C3 and C4 in PLAN.md: on local and hosted dev, to check on the phone; C4's `synced_rows_per_account` migration on neither yet). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3, C4), the sync: a push of the five synced tables, then a pull of what the account's other phones changed, when the app opens or comes to the front, a few seconds after a save, after Sign in and on Sync now (before Sign out, a push only), never in the background. Signed in, every sync calls the server, for the pull. It needs the `push_synced_rows` and `pull_synced_rows` migrations on the server the build uses. Database check shows which server the build uses.
 
 **Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
 
@@ -248,6 +250,20 @@ In progress (milestones C1, C2 and C10 in PLAN.md: on local and hosted dev, serv
 | `npm run carparks:sql` | Writes a migration that puts `src/carparks/carParkList.json` on the server. Run it after every change to the list (bump its `version`), then `db reset`, `test db` and push |
 
 **Which server the app uses:** `.env.development.local` (development builds) has a local block and a hosted dev block; keep one uncommented and fully reload the app. `.env.production.local` (release builds) points at hosted dev. Copy both from `.env.example`. Never put a secret key (`sb_secret_...`) or the database password in it. Never change a hosted schema in the Supabase dashboard: write a migration (PLAN.md, "Version 2").
+
+## Web pages (privacy policy and account deletion)
+
+`web/` holds two static pages Google Play asks for, built ahead of C9 on 2026-10-28: the privacy policy (`privacy.html`, opened from Settings → About → Privacy policy) and a page to delete your account without the app (`delete-account.html`: the same email-code sign-in and deletion as Account, plus the in-app steps and an email route). They are plain HTML, CSS and JavaScript with no build step; the deletion page loads supabase-js from jsDelivr, pinned to the app's version with an integrity hash. ESLint does not check `web/`.
+
+`.github/workflows/pages.yml` deploys `web/` to https://jiahui567.github.io/parkyourself/ on every push to `master` that changes it (or by hand: Actions → Web pages → Run workflow). It writes `web/config.js` from the repository's Actions variables, so git holds no server address or email.
+
+**Once per repo:**
+
+1. GitHub → the repo → Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions → **Variables** (not Secrets: these end up in a public page anyway): `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from hosted dev (the same values as `.env.production.local`), and `CONTACT_EMAIL` when you want an email on the pages; without it they show a placeholder. Never the secret key.
+3. Run the workflow once (Actions → Web pages → Run workflow), then open the site.
+
+**Try it on the laptop:** copy hosted dev's (or local's, `http://127.0.0.1:54321`) URL and publishable key into `web/config.js`, serve the folder with `npx serve web` (a one-off download, not a project dependency) and open the address it prints. Put `config.js` back to empty before committing.
 
 ## Database
 

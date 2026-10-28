@@ -29,11 +29,15 @@ const MODE_OPTIONS = [
   { value: 'light', label: 'Light' },
 ];
 
+// On GitHub Pages, from web/ (.github/workflows/pages.yml).
+const PRIVACY_POLICY_URL = 'https://jiahui567.github.io/parkyourself/privacy.html';
+
 const EXTEND_CHOICES = EXTEND_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 const LEAD_CHOICES = REMINDER_LEAD_OPTIONS.map((minutes) => ({ value: minutes, label: formatMinutes(minutes) }));
 
 // Settings: appearance, cars, places and holidays, what happens when you park
-// (the timer and the location), the timer and its reminders, and the backup.
+// (the timer and the location), the timer and its reminders, the backup, and
+// the privacy policy.
 export default function Settings() {
   const db = useDatabase();
   const { mode, setMode, loadError } = useAppTheme();
@@ -69,6 +73,7 @@ export default function Settings() {
   const [open, setOpen] = useState({ parkTimer: false, extend: false, lead: false, battery: false });
   const toggle = (part) => () => setOpen((current) => ({ ...current, [part]: !current[part] }));
   const [batteryError, setBatteryError] = useState(null);
+  const [privacyError, setPrivacyError] = useState(null);
 
   const location = useLocationPermission();
   const [locationChoice, setLocationChoice] = useState(null);
@@ -211,6 +216,16 @@ export default function Settings() {
     }
   };
 
+  // In the browser: a page the user opens, like Open in Google Maps.
+  const openPrivacyPolicy = async () => {
+    setPrivacyError(null);
+    try {
+      await Linking.openURL(PRIVACY_POLICY_URL);
+    } catch (e) {
+      setPrivacyError(e);
+    }
+  };
+
   const startExport = async () => {
     if (exportingRef.current) return;
     exportingRef.current = true;
@@ -344,6 +359,15 @@ export default function Settings() {
           </View>
         </ListSection>
       )}
+
+      <ListSection title="About">
+        <ListRow label="Privacy policy" onPress={openPrivacyPolicy} />
+        {privacyError && (
+          <View style={styles.rowNote}>
+            <ErrorText error={privacyError} />
+          </View>
+        )}
+      </ListSection>
 
       {__DEV__ && (
         <ListSection title="Developer">
