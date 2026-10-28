@@ -1,5 +1,5 @@
 begin;
-select plan(33);
+select plan(40);
 
 select function_privs_are('public', 'push_synced_rows', array['text', 'jsonb'], 'anon', array[]::text[],
   'anon cannot push');
@@ -138,32 +138,69 @@ select throws_ok(
   'only the five synced tables can be pushed'
 );
 
--- User B pushes a row with A's id: refused, and A's row is left alone.
+-- User B pushes rows with A's ids, as a phone backed up to A does when its
+-- data is added to B (PLAN.md, "How the sync works", step 9): they become
+-- B's own rows, and A's are left alone.
 set local request.jwt.claims to '{"sub": "00000000-0000-0000-0000-00000000000b", "role": "authenticated"}';
 
 select is(
-  public.push_synced_rows('vehicle', '[{"id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Taken", "colour": null, "is_default": false, "archived": false, "created_at": 1792800000000, "updated_at": 1792900000000, "deleted_at": null}]') -> 0 ->> 'code',
-  '42501',
-  'B cannot overwrite A''s car by sending its id'
+  public.push_synced_rows('vehicle', '[{"id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Taken", "colour": "Blue", "is_default": false, "archived": false, "created_at": 1792800000000, "updated_at": 1792700000000, "deleted_at": null}]'),
+  '[]'::jsonb,
+  'B pushes a car with an id A has too'
 );
 select is(
-  public.push_synced_rows('vehicle', '[{"id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Taken", "colour": null, "is_default": false, "archived": false, "created_at": 1792800000000, "updated_at": 1792700000000, "deleted_at": null}]'),
+  (select owner_id from public.vehicle where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  '00000000-0000-0000-0000-00000000000b'::uuid,
+  'it is B''s own car, although the change is older than A''s'
+);
+select is(
+  public.push_synced_rows('parking_session', '[{"id": "aaaaaaaa-0000-0000-0000-000000000008", "vehicle_id": "aaaaaaaa-0000-0000-0000-000000000001", "place_id": null, "status": "active", "started_at": 1792800100000, "ended_at": null, "level": "B9", "bay": null, "zone_colour_name": null, "zone_colour_hex": null, "access_type": null, "landmark": null, "note": null, "rate_snapshot": null, "timer_ends_at": null, "fee_sen": null, "paid_sen": null, "lat": null, "lng": null, "gps_accuracy_m": null, "created_at": 1792800100000, "updated_at": 1792800100000, "deleted_at": null}]'),
   '[]'::jsonb,
-  'an older row with A''s id is skipped like any older change'
+  'B parks its car while A''s car with the same id is parked'
+);
+select is(
+  (select level from public.parking_session where id = 'aaaaaaaa-0000-0000-0000-000000000008'),
+  'B9',
+  'B''s session arrived, although A has one with the same id and time'
+);
+select is(
+  public.push_synced_rows('place', '[{"id": "aaaaaaaa-0000-0000-0000-000000000002", "name": "The Gardens", "note": null, "lat": null, "lng": null, "last_used_at": null, "created_at": 1792800000000, "updated_at": 1792800000000, "deleted_at": null}]'),
+  '[]'::jsonb,
+  'B pushes a place with an id A has too'
+);
+select is(
+  public.push_synced_rows('place_rate', '[{"id": "bbbbbbbb-0000-0000-0000-000000000005", "place_id": "aaaaaaaa-0000-0000-0000-000000000002", "day_type": "weekday", "type": "flat", "first_minutes": null, "first_sen": null, "block_minutes": null, "block_sen": null, "grace_minutes": 0, "daily_cap_sen": null, "flat_sen": 500, "created_at": 1792800000000, "updated_at": 1792800000000, "deleted_at": null}]'),
+  '[]'::jsonb,
+  'and a weekday rate for it'
 );
 select is(
   public.push_synced_rows('vehicle', '[{"id": "bbbbbbbb-0000-0000-0000-000000000001", "name": "B car", "colour": null, "is_default": true, "archived": false, "created_at": 1792800000000, "updated_at": 1792800000000, "deleted_at": null}, {"id": "not-a-uuid", "name": "Bad", "colour": null, "is_default": false, "archived": false, "created_at": 1792800000000, "updated_at": 1792800000000, "deleted_at": null}]'),
   '[{"id": "not-a-uuid", "code": "22P02", "constraint": null, "other": null}]'::jsonb,
   'B pushes a car of its own, and a row with a bad id is refused on its own'
 );
-select is((select count(*) from public.vehicle), 1::bigint, 'B sees only its own car');
+select is((select count(*) from public.vehicle), 2::bigint, 'B sees only its own cars');
 
 set local request.jwt.claims to '{"sub": "00000000-0000-0000-0000-00000000000a", "role": "authenticated"}';
 
 select is(
-  (select name from public.vehicle where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
-  'Our Myvi',
+  (select name || ' ' || colour || ' ' || updated_at from public.vehicle where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  'Our Myvi Red 1792800090000',
   'A''s car is unchanged'
+);
+select is(
+  (select level from public.parking_session where id = 'aaaaaaaa-0000-0000-0000-000000000008'),
+  'L3',
+  'A sees its own session with that id, not B''s'
+);
+select is(
+  public.push_synced_rows('place_rate', '[{"id": "aaaaaaaa-0000-0000-0000-00000000000a", "place_id": "aaaaaaaa-0000-0000-0000-000000000002", "day_type": "weekday", "type": "flat", "first_minutes": null, "first_sen": null, "block_minutes": null, "block_sen": null, "grace_minutes": 0, "daily_cap_sen": null, "flat_sen": 300, "created_at": 1792800000000, "updated_at": 1792800000000, "deleted_at": null}]'),
+  '[]'::jsonb,
+  'A''s weekday rate for its place does not clash with B''s for the place with the same id'
+);
+select is(
+  (select owner_id from public.vehicle where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  '00000000-0000-0000-0000-00000000000a'::uuid,
+  'A sees only its own car with that id'
 );
 
 select * from finish();

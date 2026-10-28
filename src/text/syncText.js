@@ -51,13 +51,24 @@ export function signOutWarning(pending) {
   };
 }
 
+// Asked on Account when the account just signed in is not the one this
+// phone's data is backed up to (PLAN.md, "How the sync works", step 9).
+export function addPhoneDataQuestion(state) {
+  return {
+    title: `Add this phone's data to ${state.account.email ?? 'this account'}?`,
+    message:
+      `This phone's cars, places, rates, holidays and parking are backed up to ${state.owner.email ?? 'another account'}. ` +
+      'Add them to this account and sync with it from now on, or sign out. The other account keeps its backup.',
+  };
+}
+
 // How the backup stands, in a sentence or two, for Settings and Account.
 export function syncStatusText(state, nowMs) {
   if (!state.account) return 'Sign in to back up your cars, places, rates, holidays and parking. Photos stay on this phone.';
   if (state.otherAccount) {
     return (
       `This phone's data is backed up to ${state.owner.email ?? 'another account'}. ` +
-      'Sign in with that account to keep backing it up.'
+      'Add it to this account, or sign in with that account to keep backing it up there.'
     );
   }
   if (state.restarting) return 'This account is new, so everything on this phone is backed up to it again at the next sync.';

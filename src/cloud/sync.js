@@ -217,6 +217,21 @@ async function sync(db, pull) {
   }
 }
 
+// Adds this phone's rows to the account signed in when they are backed up to
+// another person's (PLAN.md, "How the sync works", step 9; chosen by the user
+// on 2026-10-28, when Account asks after Sign in): every row is pushed to it,
+// as at a first sign-in, and the pull starts from the beginning, so the
+// merges (src/db/pull.js) join what both have. The server keys a row by its
+// id and owner, so the same ids become rows of this account too, and the
+// other account keeps its backup. A sync running meanwhile ends first, so it
+// cannot mark rows pushed after the reset. Returns what syncNow returns.
+export async function addPhoneDataToAccount(db) {
+  await running;
+  const { account, otherAccount } = await syncState.get(db);
+  if (account && otherAccount) await syncState.startOver(db, account);
+  return syncNow(db);
+}
+
 // Sign out's last push (PLAN.md, "How the sync works", step 9), with no pull:
 // what other phones changed is no use to a phone signing out. Waits at most
 // SIGN_OUT_WAIT_MS so a weak signal cannot hold Sign out. Returns how many of

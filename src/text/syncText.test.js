@@ -1,4 +1,5 @@
 import {
+  addPhoneDataQuestion,
   dataFooterText,
   isParkedElsewhere,
   parkedElsewhereText,
@@ -56,7 +57,7 @@ describe('syncStatusText', () => {
 
   it('names the account the phone is backed up to when another one signs in', () => {
     expect(syncStatusText(otherAccount, NOW)).toBe(
-      "This phone's data is backed up to a@example.test. Sign in with that account to keep backing it up."
+      "This phone's data is backed up to a@example.test. Add it to this account, or sign in with that account to keep backing it up there."
     );
   });
 
@@ -126,6 +127,17 @@ describe('dataFooterText', () => {
     expect(dataFooterText(state({ account: null }))).toBe('Your data stays on this phone.');
     expect(dataFooterText(otherAccount)).toBe('Your data stays on this phone.');
     expect(dataFooterText(null)).toBe('Your data stays on this phone.');
+  });
+});
+
+describe('addPhoneDataQuestion', () => {
+  it('names both accounts and says the other one keeps its backup', () => {
+    expect(addPhoneDataQuestion(otherAccount)).toEqual({
+      title: "Add this phone's data to b@example.test?",
+      message:
+        "This phone's cars, places, rates, holidays and parking are backed up to a@example.test. " +
+        'Add them to this account and sync with it from now on, or sign out. The other account keeps its backup.',
+    });
   });
 });
 

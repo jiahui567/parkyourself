@@ -3,6 +3,7 @@ import { holidays, onPulledChange, places, sessions, settings, syncRows, syncSta
 import { DELETE_TIMED_OUT_TEXT, LOCAL_SYNC_ERROR_TEXT, SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
 import { deleteAccount, pullSyncedRows, pushSyncedRows, signedInAccount, signOut } from './supabase';
 import {
+  addPhoneDataToAccount,
   batches,
   CALL_TIMEOUT_MS,
   DELETE_TIMEOUT_MS,
@@ -418,5 +419,52 @@ describe('deleteAccountAndForget', () => {
 
     await expect(deleteAccountAndForget(db)).rejects.toThrow(OFFLINE);
     expect(await syncState.get(db)).toMatchObject({ account: A, owner: A, pending: 0 });
+  });
+});
+
+describe('addPhoneDataToAccount', () => {
+  it('pushes every row to the account signed in, and pulls it from the beginning', async () => {
+    await vehicles.add(db, { name: 'My Myvi' });
+    await syncNow(db);
+    await settings.set(db, 'sync_pulled_vehicle', '5000000000');
+    pushSyncedRows.mockClear();
+    pullSyncedRows.mockClear();
+    signedInAccount.mockResolvedValue(B);
+    await syncState.setAccount(db, B);
+
+    expect((await addPhoneDataToAccount(db)).status).toBe('synced');
+    expect(pushedTables()).toEqual(['vehicle']);
+    expect(pullSyncedRows.mock.calls[0][1]).toEqual({ afterUs: null, afterId: null, limit: PULL_PAGE });
+    expect(await syncState.get(db)).toMatchObject({ account: B, owner: B, otherAccount: false, pending: 0 });
+  });
+
+  it('waits for a push in progress, so it cannot mark rows pushed after the reset', async () => {
+    await vehicles.add(db, { name: 'My Myvi' });
+    let finishPush;
+    pushSyncedRows.mockReturnValueOnce(new Promise((resolve) => (finishPush = resolve)));
+    const syncing = syncNow(db);
+    await new Promise((resolve) => setImmediate(resolve));
+    signedInAccount.mockResolvedValue(B);
+    await syncState.setAccount(db, B);
+
+    const adding = addPhoneDataToAccount(db);
+    await new Promise((resolve) => setImmediate(resolve));
+    finishPush([]);
+    await syncing;
+
+    expect((await adding).status).toBe('synced');
+    // Once to A as the push in progress ends, then again to B.
+    expect(pushedTables()).toEqual(['vehicle', 'vehicle']);
+    expect(await syncState.get(db)).toMatchObject({ owner: B, pending: 0 });
+  });
+
+  it('only syncs when the phone is already backed up to the account signed in', async () => {
+    await vehicles.add(db, { name: 'My Myvi' });
+    await syncNow(db);
+    pushSyncedRows.mockClear();
+
+    expect((await addPhoneDataToAccount(db)).status).toBe('synced');
+    expect(pushSyncedRows).not.toHaveBeenCalled();
+    expect(await syncState.get(db)).toMatchObject({ owner: A, pending: 0 });
   });
 });

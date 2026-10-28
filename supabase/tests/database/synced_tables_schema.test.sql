@@ -1,5 +1,5 @@
 begin;
-select plan(29);
+select plan(34);
 
 select hasnt_table('public', 'connection_check', 'C0''s connection_check is gone');
 
@@ -55,6 +55,11 @@ select ok(
   )),
   'row level security is on for all five'
 );
+
+-- A row is known by its id and its owner, so one phone's rows can be backed
+-- up to two accounts (PLAN.md, "How the sync works", step 9).
+select col_is_pk('public', t, array['id', 'owner_id']::name[], t || ' is keyed by id and owner')
+from unnest(array['vehicle', 'place', 'place_rate', 'public_holiday', 'parking_session']) as t;
 
 -- Without it a table's updates keep their old stamp and the pull misses them;
 -- the column default alone hides that on insert.

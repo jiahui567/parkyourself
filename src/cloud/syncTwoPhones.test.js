@@ -2,7 +2,7 @@ import { createFakeServer } from '../../test/fakeServer';
 import { openMigratedTestDatabase } from '../../test/testDatabase';
 import { holidays, places, sessions, SYNCED_TABLES, syncRows, syncState, toServerRow, vehicles } from '../db';
 import { pullSyncedRows, pushSyncedRows, signedInAccount } from './supabase';
-import { PUSH_BATCH, syncNow } from './sync';
+import { addPhoneDataToAccount, PUSH_BATCH, syncNow } from './sync';
 
 // Two phones signed in to one account, against an in-memory server
 // (test/fakeServer.js): PLAN.md, "Testing", for the sync. "Offline" is a
@@ -17,6 +17,7 @@ jest.mock('./supabase', () => ({
 }));
 
 const A = { id: 'user-a', email: 'a@example.test' };
+const B = { id: 'user-b', email: 'b@example.test' };
 const at = (t) => new Date(t).getTime();
 
 let server;
@@ -232,4 +233,41 @@ it('a long history reaches a new phone in pages', async () => {
   expect(await syncNow(two)).toMatchObject({ status: 'synced', pulled: 0 });
   const holidaysRead = pull.mock.calls.flatMap(([table], i) => (table === 'public_holiday' ? pull.mock.results[i].value : []));
   expect(holidaysRead).toHaveLength(PUSH_BATCH);
+});
+
+// Each account's rows are its own on the server, even with the same ids, so
+// each account here has a server of its own. That the server keeps them apart
+// (supabase/migrations/20261028014940_synced_rows_per_account.sql) is
+// pgTAP's to test (sync_push.test.sql); this is the phone's side.
+it('a phone backed up to one account adds its data to another, and the same car becomes one', async () => {
+  const one = await newPhone();
+  time('2026-10-01T09:00');
+  const carId = await vehicles.add(one, { name: 'My Myvi' });
+  await places.create(one, { name: 'Mid Valley' });
+  await syncNow(one);
+
+  // Someone else's phone, with their own account and a car of the same name.
+  server = createFakeServer();
+  signedInAccount.mockResolvedValue(B);
+  const two = await newPhone();
+  time('2026-10-20T09:00');
+  const theirCar = await vehicles.add(two, { name: 'my myvi' });
+  await syncNow(two);
+
+  // Phone one signs in to B: nothing goes until the user says so.
+  await syncState.setAccount(one, B);
+  expect((await syncNow(one)).status).toBe('other account');
+  time('2026-10-28T09:00');
+  expect((await addPhoneDataToAccount(one)).status).toBe('synced');
+  await syncNow(two);
+
+  for (const phone of [one, two]) {
+    expect(await vehicles.list(phone)).toEqual([expect.objectContaining({ id: carId, is_default: 1 })]);
+    expect((await places.listWithVisits(phone)).map((p) => p.name)).toEqual(['Mid Valley']);
+    await expectInStep(phone);
+  }
+  expect(await two.getFirstAsync('SELECT merged_into FROM vehicle WHERE id = ?', [theirCar])).toEqual({
+    merged_into: carId,
+  });
+  expect(await syncState.get(one)).toMatchObject({ owner: B, otherAccount: false, pending: 0 });
 });

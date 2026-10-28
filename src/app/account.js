@@ -4,7 +4,15 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { myReports, sendSignInCode, signInWithCode } from '../cloud/supabase';
-import { deleteAccountAndForget, errorTextFor, loadAccount, pushBeforeSignOut, signOutKeepingData, syncNow } from '../cloud/sync';
+import {
+  addPhoneDataToAccount,
+  deleteAccountAndForget,
+  errorTextFor,
+  loadAccount,
+  pushBeforeSignOut,
+  signOutKeepingData,
+  syncNow,
+} from '../cloud/sync';
 import { Button } from '../components/Button';
 import { useDialog } from '../components/Dialog';
 import { ErrorText } from '../components/ErrorText';
@@ -20,7 +28,7 @@ import { useNow } from '../hooks/useNow';
 import { readCode, readEmail } from '../lib/signIn';
 import { ACCOUNT_RESET_FAILED_TEXT } from '../text/cloudText';
 import { myReportText } from '../text/reportText';
-import { signOutWarning, syncErrorText, syncStatusText } from '../text/syncText';
+import { addPhoneDataQuestion, signOutWarning, syncErrorText, syncStatusText } from '../text/syncText';
 
 // Account (C2, C3): sign in with an email and the code emailed to it, which
 // backs up your cars, places, rates, holidays and parking (never photos) and
@@ -52,8 +60,15 @@ export default function AccountScreen() {
 
   // The first push starts at once (a second phone on the same account needs
   // nothing more than the code); this screen shows how it went once it ends.
+  // Another person's account is asked first whether to take this phone's data.
   const signedIn = async (account) => {
     await syncState.setAccount(db, account);
+    const sync = await syncState.get(db);
+    if (sync.otherAccount) {
+      await reload();
+      askToAddPhoneData(sync);
+      return;
+    }
     if (from === 'report' && router.canGoBack()) {
       syncNow(db);
       router.back();
@@ -72,6 +87,33 @@ export default function AccountScreen() {
       setBusy(null);
     }
   };
+
+  // Back to the report once the data is added, as after a plain sign-in.
+  const addPhoneData = async () => {
+    setBusy('sync');
+    // A sync that failed (no signal) stays here, so the card shows why.
+    let added = false;
+    try {
+      added = (await addPhoneDataToAccount(db)).status === 'synced';
+    } catch (e) {
+      showDialog({ title: "Could not add this phone's data", message: errorTextFor(e) });
+    } finally {
+      await reload();
+      setBusy(null);
+    }
+    if (added && from === 'report' && router.canGoBack()) router.back();
+  };
+
+  // Not now leaves the backup paused; the Back up and sync card asks again.
+  const askToAddPhoneData = (sync) =>
+    showDialog({
+      ...addPhoneDataQuestion(sync),
+      buttons: [
+        { text: 'Add to this account', onPress: addPhoneData },
+        { text: 'Sign out', onPress: leave },
+        { text: 'Not now', style: 'cancel' },
+      ],
+    });
 
   // Reloads whatever happened, so the screen shows the account as it is: one
   // that could not sign out is still signed in. The phone keeps its rows and
@@ -166,6 +208,7 @@ export default function AccountScreen() {
         busy={busy}
         signOutError={signOutError}
         onSync={syncAgain}
+        onAddPhoneData={() => askToAddPhoneData(data.sync)}
         onSignOut={leave}
       />
     ) : (
@@ -311,7 +354,7 @@ function SignIn({ onSignedIn }) {
 }
 
 // busy: 'sync', 'signOut' or 'delete' while AccountScreen runs one.
-function SignedIn({ email, sync, reports, reportsError, busy, signOutError, onSync, onSignOut }) {
+function SignedIn({ email, sync, reports, reportsError, busy, signOutError, onSync, onAddPhoneData, onSignOut }) {
   const styles = useThemedStyles(createStyles);
   const now = useNow(60 * 1000);
   return (
@@ -325,9 +368,17 @@ function SignedIn({ email, sync, reports, reportsError, busy, signOutError, onSy
         <View style={styles.syncRow}>
           <Text style={styles.syncText}>{syncStatusText(sync, now)}</Text>
           <ErrorText error={syncErrorText(sync)} />
-          {/* Nothing to sync while the phone is backed up to another account. */}
-          {!sync.otherAccount && (
-            <View style={styles.row}>
+          {/* Nothing syncs while the phone is backed up to another account, until its data is added. */}
+          <View style={styles.row}>
+            {sync.otherAccount ? (
+              <Button
+                title={busy === 'sync' ? 'Adding…' : "Add this phone's data"}
+                variant="tonal"
+                size="small"
+                onPress={onAddPhoneData}
+                disabled={Boolean(busy)}
+              />
+            ) : (
               <Button
                 title={busy === 'sync' ? 'Syncing…' : 'Sync now'}
                 variant="tonal"
@@ -335,8 +386,8 @@ function SignedIn({ email, sync, reports, reportsError, busy, signOutError, onSy
                 onPress={onSync}
                 disabled={Boolean(busy)}
               />
-            </View>
-          )}
+            )}
+          </View>
         </View>
       </ListSection>
 
