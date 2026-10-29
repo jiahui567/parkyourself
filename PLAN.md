@@ -1,6 +1,6 @@
 # Park Yourself: build plan
 
-Last updated: 2026-10-27 (C4's merge decisions made, and C4 built). Status: M0 to M12 are done, checked on the phone by the user (M0 to M7 on 2026-10-23, M8 to M12 on 2026-10-25 with a release build). M13 (History filters and a battery hint) and M14 (the app's own dialogs, the car park list on Places) were checked on the phone on 2026-10-26. Version 2: C0 is done; C1, C2 and C10 are built, pass on local Supabase and are on hosted dev; their server parts (sign-in, Delete account, reports) are not yet checked on the phone. Working name in earlier drafts: Parking Saver.
+Last updated: 2026-10-29 (C3 and C4 built and on hosted dev; a second account on one phone and `synced_rows_per_account`; C5 to C8 dropped; C9's web pages built ahead and deployed). Status: M0 to M12 are done, checked on the phone by the user (M0 to M7 on 2026-10-23, M8 to M12 on 2026-10-25 with a release build). M13 (History filters and a battery hint) and M14 (the app's own dialogs, the car park list on Places) were checked on the phone on 2026-10-26. Version 2: C0 is done; C1, C2 and C10 are built, pass on local Supabase and are on hosted dev; their server parts (sign-in, Delete account, reports) are not yet checked on the phone. C3 (the push) and C4 (the pull and the merges) are built, pass pgTAP on local Supabase and are on hosted dev since 2026-10-28; not yet checked on the phone. C4's migration `synced_rows_per_account` (2026-10-28) has not run on local Supabase or been pushed. C5 to C8 were dropped on 2026-10-28. C9's privacy policy and account deletion page are on GitHub Pages since 2026-10-28; the rest of C9 is left. Working name in earlier drafts: Parking Saver.
 
 An Android app (iPhone later) that remembers where you parked: a photo of the pillar sign, the level, bay number and zone colour read from that photo, the first shop you saw after leaving the lift or escalator, and a note. It remembers each car park's rates (weekday, weekend, and an optional fixed public holiday amount), calculates the fee, reminds you before paid parking runs out, lets you share your spot with someone, and shows your monthly parking spend. It supports several cars. All data stays on the phone.
 
@@ -842,7 +842,7 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 |---|---|
 | Environments | Local (Docker), hosted `dev` and hosted `prod`; see "Environments" |
 | Migrations | Supabase CLI, versioned in git in `supabase/migrations/`, checked on local, then pushed to dev, then prod |
-| Error tracking | Sentry for the app |
+| Error tracking | None: Sentry was dropped on 2026-10-29 (decided by the user), so the app keeps to "no crash reporting" (AGENTS.md, "Privacy") and the privacy policy stays true |
 | App updates | EAS Update for JavaScript-only fixes; a new build when native libraries change |
 | Domain | Not needed since share links were dropped (C8, 2026-10-28); the web pages are on GitHub Pages (2026-10-28) |
 | Cost | Free tier is enough for you and friends (no storage used). A free project pauses after a period of inactivity; check current limits |
@@ -857,6 +857,7 @@ Three environments, so both local Docker and the hosted service get learned. Sch
 - Policy tests with two users for every table (pgTAP, `supabase test db`, run on local).
 - CI (2026-10-25): every push and pull request applies all migrations to an empty Postgres and runs the pgTAP tests (the "Supabase migrations" job). It fails when a change edits, renames or deletes an existing migration, or adds one named before the newest existing one (compared with a pull request's base, or the commit before a push). It cannot see a migration pushed to a hosted project from a branch and then edited before merging: push to hosted only from what is on `master`. Local and CI need explicit GRANTs like hosted (`auto_expose_new_tables = false` in `supabase/config.toml`). Pushing to a hosted project stays manual.
 - A different account signing in on a phone that is backed up to another: Add to this account (the phone's rows go to it and the merges join the same car or place), and Sign out.
+- The account deletion page (C9): delete a throwaway account on the page, with a report photo, and check in the dashboard that the user, its rows and the photo are gone.
 
 ### Milestones
 
