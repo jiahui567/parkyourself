@@ -15,6 +15,7 @@ import { useThemedStyles } from '../../components/ThemeProvider';
 import { places, useDatabase } from '../../db';
 import { changedPlaceRates, placeRatesFormFrom, ratesFromPlaceRatesForm } from '../../fees';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
+import { MAX_LENGTH } from '../../lib/textLimits';
 import { dayTypeLabel } from '../../text/rateText';
 
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/places'));
@@ -53,9 +54,11 @@ function PlaceForm({ db, place, rates }) {
   const showDialog = useDialog();
   const [name, setName] = useState(place.name);
   const [form, setForm] = useState(() => placeRatesFormFrom(rates));
-  // Save writes only the day types changed since the form opened. A reload on
-  // focus can bring rates another phone saved meanwhile (C4); comparing with
-  // those would write the form's older values over them.
+  // Save writes only the name and day types changed since the form opened.
+  // A pull or a reload on focus can bring a name or rates another phone saved
+  // meanwhile (C4); comparing with those would write the form's older values
+  // over them.
+  const [openedName] = useState(place.name);
   const [openedRates] = useState(rates);
   // 'save' or 'delete' while one runs; both lock the whole form.
   const [busy, setBusy] = useState(null);
@@ -81,7 +84,10 @@ function PlaceForm({ db, place, rates }) {
       setSaveError(new Error(error));
       return;
     }
-    run('save', () => places.saveDetails(db, place.id, { name, rates: changedPlaceRates(openedRates, changes) }));
+    const changedName = name.trim() === openedName ? undefined : name;
+    run('save', () =>
+      places.saveDetails(db, place.id, { name: changedName, rates: changedPlaceRates(openedRates, changes) })
+    );
   };
 
   // A failure shows in a dialog: Delete is in the header, far above the
@@ -122,7 +128,7 @@ function PlaceForm({ db, place, rates }) {
                 <IconButton
                   icon={FlagIcon}
                   label="Report rates to the car park list"
-                  onPress={() => router.push(`/report/${place.id}`)}
+                  onPress={() => router.navigate(`/report/${place.id}`)}
                   disabled={Boolean(busy)}
                 />
                 <IconButton
@@ -136,7 +142,7 @@ function PlaceForm({ db, place, rates }) {
             ),
           }}
         />
-        <Field label="Name" value={name} onChangeText={setName} editable={!busy} />
+        <Field label="Name" value={name} onChangeText={setName} maxLength={MAX_LENGTH.place.name} editable={!busy} />
 
         {['weekday', 'weekend'].map((dayType) => (
           <View key={dayType} style={styles.card}>

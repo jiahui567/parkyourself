@@ -1,4 +1,4 @@
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -45,7 +45,9 @@ import { useFocusedLoad } from '../hooks/useFocusedLoad';
 import { useParkLocation } from '../hooks/useParkLocation';
 import { isUsableReading } from '../lib/geo';
 import { indexAfterRemoval } from '../lib/listIndex';
+import { oneParam } from '../lib/params';
 import { typedPlaceToConfirm } from '../lib/placeName';
+import { MAX_LENGTH } from '../lib/textLimits';
 import { localDateKey } from '../lib/time';
 import { placeForReading, shouldFillPlace } from '../location/autoPlace';
 import { lookUpPlaceName } from '../location/readLocation';
@@ -99,7 +101,7 @@ export default function Park() {
   const showDialog = useDialog();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const { vehicleId } = useLocalSearchParams();
+  const vehicleId = oneParam(useLocalSearchParams().vehicleId);
   const load = useCallback(async () => {
     const [car, holidayDates, prefs] = await Promise.all([
       vehicles.get(db, vehicleId),
@@ -144,13 +146,25 @@ export default function Park() {
   const [photoError, setPhotoError] = useState(null);
   const photoUris = taken.map((photo) => photo.uri);
   // Photos taken but never saved are deleted when Park closes. Saving has
-  // already deleted the ones it kept copies of, so those are skipped.
+  // already deleted the ones it kept copies of, so those are skipped. One
+  // still being prepared or read then is deleted once ready (addPhoto).
   const unsavedPhotos = useRef([]);
   useEffect(() => {
     unsavedPhotos.current = taken.map((photo) => photo.uri);
   }, [taken]);
-  useEffect(() => () => deletePhotoFiles(unsavedPhotos.current), []);
+  const closed = useRef(false);
+  useEffect(() => {
+    // Set again on every run: Fast Refresh runs the cleanup, then this again.
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      deletePhotoFiles(unsavedPhotos.current);
+    };
+  }, []);
   const [saving, setSaving] = useState(false);
+  // Back is held while saving: the photos it is copying would be deleted as
+  // Park closes, and the Find it opens after would replace the screen below.
+  const allowLeaving = usePreventRemove(saving);
   const [saveError, setSaveError] = useState(null);
   // Only the latest place choice may fill in the rates.
   const placeRequest = useRef(0);
@@ -166,8 +180,10 @@ export default function Park() {
   // True while the chosen place is the one the location filled in.
   const [placeFromLocation, setPlaceFromLocation] = useState(false);
   // Set once the user picks or types a place: from then on the location
-  // never replaces their choice.
+  // never replaces their choice. The ref is for a lookup that ends later; the
+  // state hides what the location says about the place, and Try again.
   const placeTouched = useRef(false);
+  const [touched, setTouched] = useState(false);
   // The place is filled in once (autoPlace.js); busy while it is looked up.
   const filling = useRef({ busy: false, done: false });
   const fillPlace = useRef(null);
@@ -210,6 +226,10 @@ export default function Park() {
       setPhotoStep(null);
       return;
     }
+    if (closed.current) {
+      deletePhotoFiles([uri]);
+      return;
+    }
     let read = null;
     let sampled = null;
     if (shouldReadNextPhoto(taken.map((photo) => photo.read))) {
@@ -232,6 +252,10 @@ export default function Park() {
           }
         }
       }
+    }
+    if (closed.current) {
+      deletePhotoFiles([uri]);
+      return;
     }
     // taken is still the current list: the strip and Add photo are disabled
     // while a photo is prepared or read, so nothing changed it meanwhile.
@@ -324,13 +348,18 @@ export default function Park() {
   }, [gps.reading, gps.finding]);
 
   // The user's own choice, which the location never replaces.
-  const pickPlace = (next) => {
+  const touchPlace = () => {
     placeTouched.current = true;
+    setTouched(true);
+    setLocationError(null);
+  };
+  const pickPlace = (next) => {
+    touchPlace();
     setPlaceFromLocation(false);
     choosePlace(next);
   };
   const typePlace = (text) => {
-    if (text) placeTouched.current = true;
+    if (text) touchPlace();
     setTypedPlace(text);
   };
 
@@ -387,7 +416,10 @@ export default function Park() {
     });
   const note = form.note.trim();
   const locationToSave = gps.inUse && isUsableReading(gps.reading) ? gps.reading : null;
+  // Once the user has picked (No place too) or typed, the location no longer
+  // fills the place, so it has nothing to say about it.
   const placeHint =
+    !touched &&
     (gps.inUse || gps.blocked) &&
     parkPlaceHint({
       hasPlace: Boolean(place),
@@ -401,7 +433,7 @@ export default function Park() {
     });
   // Underground there is often no fix at first; near the entrance there may be one.
   const canRetryLocation =
-    gps.inUse && !gps.finding && !place && (noName || locationError || !isUsableReading(gps.reading));
+    !touched && gps.inUse && !gps.finding && !place && (noName || locationError || !isUsableReading(gps.reading));
 
   const start = async ({
     started_at,
@@ -426,6 +458,8 @@ export default function Park() {
           location: locationToSave,
         })
       );
+      setSaving(false);
+      allowLeaving();
       // savedAt makes Find show "Parked" with a check mark as it opens.
       router.replace({ pathname: '/session/[id]', params: { id, savedAt: String(started_at) } });
     } catch (e) {
@@ -654,6 +688,7 @@ export default function Park() {
               value={form.level}
               onChangeText={setField('level')}
               placeholder="e.g. B2"
+              maxLength={MAX_LENGTH.parking_session.level}
               autoCapitalize="characters"
             />
           </View>
@@ -663,6 +698,7 @@ export default function Park() {
               value={form.bay}
               onChangeText={setField('bay')}
               placeholder="e.g. C14"
+              maxLength={MAX_LENGTH.parking_session.bay}
               autoCapitalize="characters"
             />
           </View>
@@ -690,6 +726,7 @@ export default function Park() {
               value={form.note}
               onChangeText={setField('note')}
               placeholder="Anything that helps you find the car"
+              maxLength={MAX_LENGTH.parking_session.note}
               multiline
               autoFocus
             />

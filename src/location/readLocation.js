@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 
 import { placeNameFromAddress } from '../lib/placeName';
+import { withTimeout } from '../lib/timeout';
 
 // The only code that calls expo-location. Location is read in the foreground
 // only, while Park is open, and never tracked (PLAN.md, "Location"). Readings
@@ -12,6 +13,8 @@ const LAST_KNOWN_MAX_AGE_MS = 5 * 60 * 1000;
 // getCurrentPositionAsync has no time limit of its own, and underground it
 // may never find one.
 const FRESH_TIMEOUT_MS = 10 * 1000;
+// How long the place name lookup may take (lookUpPlaceName).
+const LOOKUP_TIMEOUT_MS = 10 * 1000;
 
 const toReading = (position) =>
   position && {
@@ -60,7 +63,15 @@ export async function currentLocation() {
 // A name for the place at reading, looked up online by Android's geocoder,
 // which sends the location to Google (accepted by the user on 2026-10-23,
 // AGENTS.md "Privacy"). null when it finds nothing that reads as a name.
+// Time-limited: on Android 13 and later, expo-location 58 waits only for the
+// geocoder's answer and never hears its error (no signal), so the lookup
+// would never end and Park could never say so or try again. The message
+// follows "Could not name this place:" on Park.
 export async function lookUpPlaceName(reading) {
-  const [address] = await Location.reverseGeocodeAsync({ latitude: reading.lat, longitude: reading.lng });
+  const [address] = await withTimeout(
+    Location.reverseGeocodeAsync({ latitude: reading.lat, longitude: reading.lng }),
+    LOOKUP_TIMEOUT_MS,
+    'the lookup took too long'
+  );
   return placeNameFromAddress(address);
 }

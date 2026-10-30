@@ -6,13 +6,21 @@ on:
   pull_request:
     branches: [master]
 
+# Nothing here writes to the repository: the token can only read it.
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Lint and test
     runs-on: ubuntu-latest
     steps:
+      # Nothing here pushes, so the token is not left in the checkout, where
+      # the install scripts npm ci runs could read it.
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -31,7 +39,8 @@ jobs:
 
   # The version 2 server (supabase/): every migration must build a database
   # from scratch and pass the pgTAP tests before it can be pushed to a
-  # hosted project. Uses the CLI pinned in package.json, as on the laptop.
+  # hosted project. Uses the CLI version in package-lock.json (npm ci), as on
+  # the laptop.
   database:
     name: Supabase migrations
     runs-on: ubuntu-latest
@@ -42,6 +51,7 @@ jobs:
         with:
           # The commits before this change are needed to compare migrations.
           fetch-depth: 0
+          persist-credentials: false
 
       # A migration that has been pushed to a hosted project must never change
       # (PLAN.md, "Changing the schema in two databases"): only new files, each
@@ -56,11 +66,20 @@ jobs:
         run: |
           if [ "$EVENT" = pull_request ]; then
             base=$(git merge-base "origin/$BASE_REF" HEAD)
-          elif [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
-            || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            echo "No earlier commit to compare with (a new branch or a force-push); skipped."
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
+            echo "No earlier commit to compare with (a new branch); skipped."
             exit 0
           else
+            # After a force-push the commit before is not in the history
+            # fetched above, so it is fetched by itself (with no token, which a
+            # public repository does not need); a push whose migrations cannot
+            # be compared fails rather than passing unchecked.
+            if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
+              && ! git fetch --no-tags --quiet origin "$BEFORE"; then
+              echo "The commit before this push ($BEFORE) cannot be fetched, so the migrations cannot be compared."
+              echo "Check by hand that no migration already pushed to a hosted project changed."
+              exit 1
+            fi
             base=$BEFORE
           fi
           changed=$(git diff --name-only --diff-filter=MDR "$base" HEAD -- supabase/migrations)

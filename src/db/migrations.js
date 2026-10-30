@@ -209,4 +209,79 @@ export const MIGRATIONS = [
   ALTER TABLE vehicle ADD COLUMN merged_into TEXT;
   ALTER TABLE parking_session ADD COLUMN parked_here INTEGER NOT NULL DEFAULT 1;
   `,
+
+  // v7: indexes for History (newest first), each place's visits on Places and
+  // the sync's merges, and a session's photos, which read every row without
+  // them: slow with years of parking. Indexes are the phone's own; they do
+  // not sync.
+  `
+  CREATE INDEX parking_session_history ON parking_session (status, started_at) WHERE deleted_at IS NULL;
+  CREATE INDEX parking_session_place ON parking_session (place_id);
+  CREATE INDEX photo_session ON photo (session_id);
+  `,
+
+  // v8: text saved before the limits of 2026-10-30 (src/lib/textLimits.js)
+  // cut to them, and a zone colour hex that is not #RRGGBB (saved before
+  // 2026-10-23) cleared: the server checks the same rules on every row a push
+  // sends, so a longer value would have it refused at every push, in rows the
+  // app cannot edit any more (a session's level, bay and note). The server
+  // cuts its own rows with the same expressions (*_synced_text_limits.sql), so
+  // both sides end with the same text. Deleted rows too, since they sync.
+  //
+  // Text is cut and its trailing spaces trimmed, as the app stores text. A
+  // car or place name becomes its first 91 characters, a space and the first
+  // 8 characters of its id: two names cut to the same 100 characters would be
+  // one place to the unique index (and this step would fail at every start)
+  // or two cars the sync merges for good. OR IGNORE skips a place whose new
+  // name still clashes (its note is cut on its own), so the app always opens;
+  // the server skips the same place (*_synced_text_limits.sql).
+  //
+  // A changed row is stamped updated_at + 1, once, not now (core.js
+  // updateRow): a copy here may be older than a change another phone made
+  // since, which a later stamp would undo; the server keeps that newer row,
+  // already cut by its own migration, and the pull brings it. So the server
+  // migration goes out before any phone runs this step (PLAN.md, text limits):
+  // without its checks an older app could still save longer text, which a
+  // phone past this step would pull and never cut.
+  `
+  UPDATE vehicle SET
+    name = CASE WHEN length(name) > 100 THEN rtrim(substr(name, 1, 91)) || ' ' || substr(id, 1, 8) ELSE name END,
+    colour = CASE WHEN length(colour) > 100 THEN rtrim(substr(colour, 1, 100)) ELSE colour END,
+    updated_at = updated_at + 1,
+    dirty = 1
+  WHERE length(name) > 100 OR length(colour) > 100;
+
+  UPDATE OR IGNORE place SET
+    name = CASE WHEN length(name) > 100 THEN rtrim(substr(name, 1, 91)) || ' ' || substr(id, 1, 8) ELSE name END,
+    note = CASE WHEN length(note) > 500 THEN rtrim(substr(note, 1, 500)) ELSE note END,
+    updated_at = updated_at + 1,
+    dirty = 1
+  WHERE length(name) > 100 OR length(note) > 500;
+
+  -- Only the places OR IGNORE skipped are left over the note's limit.
+  UPDATE place SET
+    note = rtrim(substr(note, 1, 500)),
+    updated_at = updated_at + 1,
+    dirty = 1
+  WHERE length(note) > 500;
+
+  UPDATE public_holiday SET
+    name = rtrim(substr(name, 1, 100)),
+    updated_at = updated_at + 1,
+    dirty = 1
+  WHERE length(name) > 100;
+
+  UPDATE parking_session SET
+    level = CASE WHEN length(level) > 20 THEN rtrim(substr(level, 1, 20)) ELSE level END,
+    bay = CASE WHEN length(bay) > 20 THEN rtrim(substr(bay, 1, 20)) ELSE bay END,
+    zone_colour_name = CASE WHEN length(zone_colour_name) > 100 THEN rtrim(substr(zone_colour_name, 1, 100)) ELSE zone_colour_name END,
+    landmark = CASE WHEN length(landmark) > 100 THEN rtrim(substr(landmark, 1, 100)) ELSE landmark END,
+    note = CASE WHEN length(note) > 500 THEN rtrim(substr(note, 1, 500)) ELSE note END,
+    zone_colour_hex = CASE WHEN zone_colour_hex GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]' THEN zone_colour_hex END,
+    updated_at = updated_at + 1,
+    dirty = 1
+  WHERE length(level) > 20 OR length(bay) > 20 OR length(zone_colour_name) > 100 OR length(landmark) > 100
+    OR length(note) > 500
+    OR NOT zone_colour_hex GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]';
+  `,
 ];

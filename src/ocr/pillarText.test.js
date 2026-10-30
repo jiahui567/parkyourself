@@ -170,6 +170,9 @@ describe('isNotSignLine', () => {
     { rule: 'a level and bay', text: 'B2 C14', not: false },
     { rule: 'a level word and code', text: 'LEVEL B2', not: false },
     { rule: 'a level that looks like plate letters', text: 'LG 12', not: false },
+    { rule: 'a level with a zone letter', text: 'B1 C', not: false },
+    { rule: 'a level with a zone letter, no space', text: 'P2A', not: false },
+    { rule: 'an upper level with a zone letter', text: 'L3 B', not: false },
     { rule: 'a Malay zone word and number', text: 'ZON 3', not: false },
     { rule: 'a bay code', text: 'C 14', not: false },
   ])('$rule: $text', ({ text, not }) => {

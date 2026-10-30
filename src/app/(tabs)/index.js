@@ -27,6 +27,7 @@ import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { homeCarMove } from '../../lib/motion';
+import { oneParam } from '../../lib/params';
 import { formatDuration } from '../../lib/time';
 import { syncNotifications } from '../../notify/notifications';
 import { feeSoFarText } from '../../text/findText';
@@ -49,7 +50,9 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(null);
   // Set by Found my car, so the car drives off with a small celebration.
-  const { foundAt, foundCarId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const foundAt = oneParam(params.foundAt);
+  const foundCarId = oneParam(params.foundCarId);
   const load = useCallback(async () => {
     const [cars, active, holidayDates] = await Promise.all([
       vehicles.list(db),
@@ -164,8 +167,8 @@ export default function Home() {
           accessibilityLabel={session ? `Find ${car.name}` : `Park ${car.name}`}
           onPress={() =>
             session
-              ? router.push(`/session/${session.id}`)
-              : router.push({ pathname: '/park', params: { vehicleId: car.id } })
+              ? router.navigate(`/session/${session.id}`)
+              : router.navigate({ pathname: '/park', params: { vehicleId: car.id } })
           }
           style={styles.parkRing}
         >
@@ -243,7 +246,7 @@ function SpotCard({ session, now, holidayDates, styles }) {
     <Pressable
       accessibilityRole="button"
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={() => router.push(`/session/${session.id}`)}
+      onPress={() => router.navigate(`/session/${session.id}`)}
     >
       <View style={styles.spotRow}>
         {swatch && <View style={[styles.swatch, { backgroundColor: swatch }]} />}

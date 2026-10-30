@@ -368,6 +368,31 @@ export async function runSelfTest() {
       const stored = await vehicles.get(db, pulled.id);
       assert(stored?.name === 'Pulled Axia' && stored.dirty === 0, `got ${JSON.stringify(stored)}`);
     });
+
+    await check('A session deleted on another phone removes its photos for real', async () => {
+      const sessionId = await sessions.create(db, {
+        vehicle_id: vehicleId,
+        status: 'ended',
+        started_at: Date.now() - 3600000,
+        ended_at: Date.now(),
+      });
+      const file = new File(Paths.cache, 'selftest-pulled-photo.jpg');
+      file.create({ overwrite: true });
+      file.writeSync('not really a photo');
+      await photos.add(db, { session_id: sessionId, file_uri: file.uri, ocr_text: null });
+      const local = await sessions.get(db, sessionId);
+      const deletedAt = local.updated_at + 1;
+
+      await syncPull.apply(db, {
+        parking_session: [{ ...local, deleted_at: deletedAt, updated_at: deletedAt, server_updated_us: 3 }],
+      });
+      const { n } = await db.getFirstAsync('SELECT COUNT(*) AS n FROM photo WHERE session_id = ?', [
+        sessionId,
+      ]);
+      assert((await sessions.get(db, sessionId)) === null, 'the session should be deleted');
+      assert(n === 0, `${n} photo rows left`);
+      assert(!new File(file.uri).exists, 'image file still on disk');
+    });
   } catch (e) {
     results.push({ name: 'Self-test setup', ok: false, detail: String(e?.message ?? e) });
   } finally {

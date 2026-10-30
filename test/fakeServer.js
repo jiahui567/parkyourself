@@ -2,9 +2,10 @@
 // push_synced_rows and pull_synced_rows (supabase/migrations/), so Jest can
 // run two phones against one server (src/cloud/syncTwoPhones.test.js). It
 // keeps the rules the phones meet there: last write wins by updated_at, only
-// the columns sent are written, the unique rules and foreign keys refuse a row
-// alone, and every row of one call shares one stamp, as rows of one
-// transaction share now(). pgTAP tests the real functions.
+// the columns sent are written, the text limits, unique rules and foreign keys
+// refuse a row alone, and every row of one call shares one stamp, as rows of
+// one transaction share now(). pgTAP tests the real functions.
+import { characterCount, MAX_LENGTH } from '../src/lib/textLimits';
 
 const TABLES = ['vehicle', 'place', 'place_rate', 'public_holiday', 'parking_session'];
 
@@ -40,6 +41,27 @@ export function createFakeServer() {
   const tables = Object.fromEntries(TABLES.map((table) => [table, new Map()]));
   let clock = Date.UTC(2026, 9, 1) * 1000;
 
+  // The checks of *_synced_text_limits.sql on the row as sent, which
+  // PostgreSQL tests before it looks for the row's id, so even a change that
+  // would be skipped as older is refused. char_length counts characters, not
+  // UTF-16 units.
+  function brokenCheck(table, sent) {
+    const check = (constraint) => ({ id: sent.id, code: '23514', constraint, other: null });
+    const tooLong = Object.entries(MAX_LENGTH[table] ?? {}).find(
+      ([column, max]) => column !== 'rate_snapshot' && typeof sent[column] === 'string' && characterCount(sent[column]) > max
+    );
+    if (tooLong) return check(`${table}_${tooLong[0]}_length`);
+    if (table !== 'parking_session') return null;
+    if (sent.zone_colour_hex != null && !/^#[0-9A-Fa-f]{6}$/.test(sent.zone_colour_hex)) {
+      return check('parking_session_zone_colour_hex_format');
+    }
+    // The server measures its own printing of the JSON, a little longer than this.
+    if (sent.rate_snapshot != null && JSON.stringify(sent.rate_snapshot).length > 8192) {
+      return check('parking_session_rate_snapshot_size');
+    }
+    return null;
+  }
+
   function refusal(table, sent, next) {
     const missing = (FOREIGN[table] ?? []).find(
       ([column, parent]) => next[column] != null && !tables[parent].has(next[column])
@@ -64,6 +86,11 @@ export function createFakeServer() {
       const stamp = clock;
       const refused = [];
       for (const sent of overTheWire(rows)) {
+        const broken = brokenCheck(table, sent);
+        if (broken) {
+          refused.push(broken);
+          continue;
+        }
         const current = tables[table].get(sent.id);
         // An older change is skipped, not refused.
         if (current && !(sent.updated_at > current.updated_at)) continue;

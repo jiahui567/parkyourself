@@ -41,11 +41,27 @@ describe('parseRM', () => {
     ['RM 3.00', 300],
     ['rm3', 300],
     [' 1,234.50 ', 123450],
+    ['1,234', 123400],
+    ['1,000,000.5', 100000050],
+    ['999999999.99', 99999999999],
   ])('%p -> %i sen', (text, sen) => {
     expect(parseRM(text)).toBe(sen);
   });
 
   it.each(['', '.', 'abc', '-3', '3.505', '3,50.1.2', null, undefined])('%p -> null', (text) => {
     expect(parseRM(text)).toBeNull();
+  });
+
+  // A decimal comma ('3,50' on some number pads) is never read as RM 350.
+  it.each(['3,50', '3,5', '12,5', ',50', '1,23,456', '1234,567', '1,234,', '1,234.505'])(
+    'a comma that does not group thousands: %p -> null',
+    (text) => {
+      expect(parseRM(text)).toBeNull();
+    }
+  );
+
+  it('refuses more than nine digits of ringgit, a typo (and from 14 digits, sen would be lost)', () => {
+    expect(parseRM('1000000000')).toBeNull();
+    expect(parseRM('99999999999999999')).toBeNull();
   });
 });

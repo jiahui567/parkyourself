@@ -7,7 +7,20 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const CODE_PATHS = ['src', 'test', 'package.json', 'package-lock.json', 'jest.config.js', 'eslint.config.js', 'app.json'];
+// scripts/, supabase/ and plugins/ too: test/carParkSql.test.js, serverColumns.test.js,
+// serverLimits.test.js and withNoDeviceTransfer.test.js read them.
+const CODE_PATHS = [
+  'src',
+  'test',
+  'scripts',
+  'supabase',
+  'plugins',
+  'package.json',
+  'package-lock.json',
+  'jest.config.js',
+  'eslint.config.js',
+  'app.json',
+];
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const sha1 = (text) => crypto.createHash('sha1').update(text).digest('hex');

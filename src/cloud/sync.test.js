@@ -1,6 +1,12 @@
 import { openMigratedTestDatabase } from '../../test/testDatabase';
 import { holidays, onPulledChange, places, sessions, settings, syncRows, syncState, vehicles } from '../db';
-import { DELETE_TIMED_OUT_TEXT, LOCAL_SYNC_ERROR_TEXT, SIGN_OUT_TIMED_OUT_TEXT, TIMED_OUT_TEXT } from '../text/cloudText';
+import {
+  ACCOUNT_CHANGED_TEXT,
+  DELETE_TIMED_OUT_TEXT,
+  LOCAL_SYNC_ERROR_TEXT,
+  SIGN_OUT_TIMED_OUT_TEXT,
+  TIMED_OUT_TEXT,
+} from '../text/cloudText';
 import { deleteAccount, pullSyncedRows, pushSyncedRows, signedInAccount, signOut } from './supabase';
 import {
   addPhoneDataToAccount,
@@ -261,6 +267,31 @@ describe('syncNow', () => {
 
     expect(pushSyncedRows.mock.calls.map(([, rows]) => rows.length)).toEqual([PUSH_BATCH, 1]);
     expect(await syncRows.countDirty(db)).toBe(0);
+  });
+
+  it('sends every call of a run to the account it started with', async () => {
+    await vehicles.add(db, { name: 'My Myvi' });
+
+    await syncNow(db);
+
+    expect(pushSyncedRows.mock.calls.map(([, , accountId]) => accountId)).toEqual([A.id]);
+    expect(pullSyncedRows.mock.calls.map(([, , accountId]) => accountId)).toEqual(Array(5).fill(A.id));
+  });
+
+  it('stops when another account signs in during the run, keeping what was not sent and no error', async () => {
+    const day = at('2026-01-01T12:00');
+    for (let i = 0; i <= PUSH_BATCH; i++) {
+      const date = new Date(day + i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      await holidays.add(db, { holiday_date: date });
+    }
+    // What src/cloud/supabase.js does once the session is another account's.
+    pushSyncedRows
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(Object.assign(new Error(ACCOUNT_CHANGED_TEXT), { accountChanged: true }));
+
+    expect(await syncNow(db)).toEqual({ status: 'account changed' });
+    expect(pullSyncedRows).not.toHaveBeenCalled();
+    expect(await syncState.get(db)).toMatchObject({ pending: 1, lastSyncedAt: null, lastError: null });
   });
 
   it('runs once more when asked during a push, so a change made then is not left waiting', async () => {

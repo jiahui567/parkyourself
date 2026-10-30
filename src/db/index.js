@@ -15,5 +15,5 @@ export { onPulledChange, syncPull, tellPulledChange } from './pull';
 export { runSelfTest } from './selfTest';
 export { sessions } from './sessions';
 export { settings } from './settings';
-export { accountMatch, SYNCED_TABLES, syncRows, syncState, toServerRow } from './sync';
+export { accountMatch, onSyncStateChange, SYNCED_TABLES, syncRows, syncState, toServerRow } from './sync';
 export { vehicles } from './vehicles';

@@ -35,6 +35,14 @@ const liveRows = async (table) =>
   (await db.getFirstAsync(`SELECT COUNT(*) AS n FROM ${table} WHERE deleted_at IS NULL`)).n;
 
 describe('sessions.start', () => {
+  // toUpperCase makes some letters longer ('ß' is 'SS'); a code the field
+  // took (20 characters at most) must still fit the limit.
+  it('puts only a to z in capitals, so a code never grows past its limit', async () => {
+    const id = await sessions.start(db, { vehicle_id: myvi, level: 'ß'.repeat(20), bay: 'ﬁ'.repeat(19) + 'b' });
+
+    expect(await sessions.get(db, id)).toMatchObject({ level: 'ß'.repeat(20), bay: 'ﬁ'.repeat(19) + 'B' });
+  });
+
   it('stores level and bay in capitals and empty text as null', async () => {
     const id = await sessions.start(db, {
       vehicle_id: myvi,

@@ -1,4 +1,5 @@
 import { inTransaction, now } from './core';
+import { deletePhotoFiles } from './photos';
 import { settings } from './settings';
 import { PHONE_ONLY_COLUMNS, pulledKey, SYNCED_TABLES } from './sync';
 
@@ -118,6 +119,17 @@ async function writeRow(txn, ctx, row, dirty) {
   );
 }
 
+// A session deleted on another phone: its photos never sync, so their rows go
+// here as they do with Delete on this phone (sessions.remove), and their files
+// once the transaction has committed (applyTable), rows first as
+// deletePhotoFiles asks.
+async function dropPhotos(txn, ctx, sessionId) {
+  const rows = await txn.getAllAsync('SELECT file_uri FROM photo WHERE session_id = ?', [sessionId]);
+  if (rows.length === 0) return;
+  await txn.runAsync('DELETE FROM photo WHERE session_id = ?', [sessionId]);
+  ctx.photoFiles.push(...rows.map((r) => r.file_uri));
+}
+
 // row as a deletion the sync makes, to push.
 const deletionOf = (row, t) => ({ ...row, deleted_at: after(row, t), updated_at: after(row, t) });
 
@@ -230,6 +242,9 @@ async function applyRow(txn, ctx, row, resolve) {
     if (!clash.dirty || table === 'parking_session') return { outcome: 'held', dirtied: 0 };
     return { outcome: 'merged', dirtied: await MERGE[table](txn, ctx, row, clash) };
   }
+  if (table === 'parking_session' && row.deleted_at != null && local && local.deleted_at == null) {
+    await dropPhotos(txn, ctx, row.id);
+  }
   await writeRow(txn, ctx, row, 0);
   return { outcome: 'written', dirtied: 0 };
 }
@@ -262,8 +277,15 @@ async function applyTable(db, table, pulledRows, pulled, t, counts) {
     counts.dirtied += dirtied;
   };
   const setAside = [];
+  // The photo files of the sessions a transaction deleted (dropPhotos), kept
+  // until it commits: after a rollback their rows are back.
+  const write = async (task) => {
+    ctx.photoFiles = [];
+    await inTransaction(db, task);
+    deletePhotoFiles(ctx.photoFiles);
+  };
   for (let start = 0; start < rows.length; start += WRITE_CHUNK) {
-    await inTransaction(db, async (txn) => {
+    await write(async (txn) => {
       for (const row of rows.slice(start, start + WRITE_CHUNK)) {
         const result = await applyRow(txn, ctx, row, false);
         if (result.outcome === 'clash') setAside.push(row);
@@ -272,7 +294,7 @@ async function applyTable(db, table, pulledRows, pulled, t, counts) {
     });
   }
   const latest = rows.reduce((max, row) => Math.max(max, row.server_updated_us), 0);
-  await inTransaction(db, async (txn) => {
+  await write(async (txn) => {
     for (const row of setAside) tally(row, await applyRow(txn, ctx, row, true));
     await settings.set(txn, pulledKey(table), String(Math.min(latest, heldAt - 1)));
   });

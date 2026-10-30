@@ -1,5 +1,6 @@
 import { ratesInEffect } from '../carparks/ratesInEffect';
 import { feeFields } from '../fees';
+import { characterCount, MAX_LENGTH } from '../lib/textLimits';
 import { inTransaction } from './core';
 import { assertPlaceRate, escapeLike } from './places';
 import { settings } from './settings';
@@ -31,6 +32,10 @@ export function assertCarParkList(list) {
   for (const carPark of list.carParks) {
     const where = `Car park ${carPark.id ?? carPark.name}`;
     if (!carPark.id || !carPark.name) throw new Error(`${where} needs an id and a name.`);
+    // Parking there makes the name a place's, which takes at most this many characters.
+    if (characterCount(carPark.name) > MAX_LENGTH.place.name) {
+      throw new Error(`${where}'s name is longer than ${MAX_LENGTH.place.name} characters, the most a place takes.`);
+    }
     if (ids.has(carPark.id)) throw new Error(`${where} is listed twice.`);
     ids.add(carPark.id);
     if (!carPark.source_url || !DATE_KEY.test(carPark.checked_on ?? '')) {
@@ -103,7 +108,11 @@ export const carParks = {
       if (await carParks.refresh(db, list, 'bundled')) await settings.set(db, LIST_ERROR_KEY, '');
     } catch (e) {
       console.warn('Car park list not refreshed:', e);
-      await settings.set(db, LIST_ERROR_KEY, String(e?.message ?? e));
+      // Keeping the error can fail too (a full disk), which must not stop the
+      // app either.
+      await settings.set(db, LIST_ERROR_KEY, String(e?.message ?? e)).catch((saveError) => {
+        console.warn('Could not keep the car park list error:', saveError);
+      });
     }
   },
 

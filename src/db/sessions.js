@@ -16,7 +16,9 @@ const text = (value) => {
   const trimmed = String(value ?? '').trim();
   return trimmed === '' ? null : trimmed;
 };
-const code = (value) => text(value)?.toUpperCase() ?? null;
+// Level and bay codes in capitals. Only a to z: toUpperCase can make text
+// longer ('ß' is 'SS'), and a code the field took must fit its limit.
+const code = (value) => text(value)?.replace(/[a-z]/g, (c) => c.toUpperCase()) ?? null;
 
 // A session with its car and place names. The place join keeps deleted
 // places, so a past session still shows where it was after the place is gone.

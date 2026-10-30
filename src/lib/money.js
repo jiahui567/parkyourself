@@ -23,13 +23,17 @@ export function formatAmountInput(sen) {
 
 // Reads a typed amount such as '3', '3.5', 'RM 3.00' or '1,234.50' into sen.
 // Returns null for anything else: empty, negative, letters, more than two
-// decimals. Works on the digits as text, so '0.10' is exactly 10 sen.
+// decimals, more than nine digits of ringgit (a typo: no parking costs that,
+// and from 14 digits a number would lose sen), or a comma that does not
+// group thousands: some number pads have a decimal
+// comma, and '3,50' could mean RM 3.50 or RM 350, so it is refused rather than
+// guessed. Works on the digits as text, so '0.10' is exactly 10 sen.
 export function parseRM(text) {
   const cleaned = String(text ?? '')
     .trim()
-    .replace(/^RM\s*/i, '')
-    .replace(/,/g, '');
-  const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(cleaned);
+    .replace(/^RM\s*/i, '');
+  if (cleaned.includes(',') && !/^\d{1,3}(?:,\d{3})+(?:\.\d{0,2})?$/.test(cleaned)) return null;
+  const match = /^(\d{0,9})(?:\.(\d{0,2}))?$/.exec(cleaned.replace(/,/g, ''));
   if (!match || (match[1] === '' && !match[2])) return null;
   return Number(match[1] || '0') * 100 + Number((match[2] ?? '').padEnd(2, '0'));
 }

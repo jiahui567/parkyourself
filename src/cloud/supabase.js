@@ -3,7 +3,7 @@ import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import Storage from 'expo-sqlite/kv-store';
 
-import { cloudErrorText } from '../text/cloudText';
+import { ACCOUNT_CHANGED_TEXT, cloudErrorText } from '../text/cloudText';
 
 // The only code that calls @supabase/supabase-js. SQLite on the phone stays the
 // main copy (PLAN.md, "Version 2"); Supabase is reached only from here.
@@ -136,32 +136,52 @@ export async function signOut() {
   if (error) throw userError(error);
 }
 
-// Pushes rows of one synced table as the signed-in user (C3), in the order
-// given, each already in the server's shape (toServerRow in src/db/sync.js).
-// The server keeps the newer of its row and each one sent, and refuses a row
-// that breaks one of its rules without holding back the others
-// (supabase/migrations/*_push_synced_rows.sql). Returns the refused rows:
-// [{ id, code, constraint, other }].
-export async function pushSyncedRows(table, rows) {
-  await requireSession();
-  const { data, error } = await accountClient.rpc('push_synced_rows', { p_table: table, p_rows: rows });
+// The session of accountId, the account a sync run started with, for each of
+// the run's calls. Sign out does not wait for a slow sync (SIGN_OUT_WAIT_MS in
+// src/cloud/sync.js), so a run may still be going when another account signs
+// in: its calls would push this phone's rows to that account, or pull its rows
+// here, without the question Account asks first (PLAN.md, "How the sync
+// works", step 9). The call is sent with this session's token, since
+// supabase-js reads the session again as it sends, when a sign-in may have
+// replaced it.
+async function requireAccount(accountId) {
+  const session = await requireSession();
+  if (session.user?.id !== accountId) throw Object.assign(new Error(ACCOUNT_CHANGED_TEXT), { accountChanged: true });
+  return session;
+}
+
+const bearer = (session) => `Bearer ${session.access_token}`;
+
+// Pushes rows of one synced table as accountId (C3; requireAccount), in the
+// order given, each already in the server's shape (toServerRow in
+// src/db/sync.js). The server keeps the newer of its row and each one sent,
+// and refuses a row that breaks one of its rules without holding back the
+// others (supabase/migrations/*_push_synced_rows.sql). Returns the refused
+// rows: [{ id, code, constraint, other }].
+export async function pushSyncedRows(table, rows, accountId) {
+  const session = await requireAccount(accountId);
+  const { data, error } = await accountClient
+    .rpc('push_synced_rows', { p_table: table, p_rows: rows })
+    .setHeader('Authorization', bearer(session));
   if (error) throw userError(error);
   return data ?? [];
 }
 
-// The signed-in user's rows of one synced table that changed on the server
-// after a point (C4), deleted ones too, oldest change first, at most limit:
-// the point is (afterUs, afterId), a server_updated_us and an id, each null
-// for none (supabase/migrations/*_pull_synced_rows.sql). Each row is in the
-// server's shape with its server_updated_us.
-export async function pullSyncedRows(table, { afterUs, afterId, limit }) {
-  await requireSession();
-  const { data, error } = await accountClient.rpc('pull_synced_rows', {
-    p_table: table,
-    p_after_us: afterUs,
-    p_after_id: afterId,
-    p_limit: limit,
-  });
+// accountId's rows of one synced table (requireAccount) that changed on the
+// server after a point (C4), deleted ones too, oldest change first, at most
+// limit: the point is (afterUs, afterId), a server_updated_us and an id, each
+// null for none (supabase/migrations/*_pull_synced_rows.sql). Each row is in
+// the server's shape with its server_updated_us.
+export async function pullSyncedRows(table, { afterUs, afterId, limit }, accountId) {
+  const session = await requireAccount(accountId);
+  const { data, error } = await accountClient
+    .rpc('pull_synced_rows', {
+      p_table: table,
+      p_after_us: afterUs,
+      p_after_id: afterId,
+      p_limit: limit,
+    })
+    .setHeader('Authorization', bearer(session));
   if (error) throw userError(error);
   return data ?? [];
 }

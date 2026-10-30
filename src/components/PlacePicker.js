@@ -3,6 +3,7 @@ import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 
 import { carParks, places, useDatabase } from '../db';
 import { isNewPlaceName } from '../lib/placeName';
+import { MAX_LENGTH } from '../lib/textLimits';
 import { addPlaceLabel, listedPlaceHint } from '../text/parkText';
 import { Button } from './Button';
 import { ErrorText } from './ErrorText';
@@ -26,8 +27,10 @@ const ICON_SIZE = 18;
 // gets the search text, trimmed, and '' once it is cleared or a row is tapped,
 // so the screen can ask about a name typed but never tapped. children are
 // drawn inside the chosen place's card, under its name (Park's rate row).
-// The screen may also set value itself (Park, from the location); hint then
-// replaces the line under the chosen name, saying where it came from.
+// The screen may also set value itself (Park, from the location). hint is a
+// line from the screen about the place (Park: what the location found): under
+// the chosen name it replaces the line saying where the place came from, and
+// while nothing is picked it shows under the list.
 export function PlacePicker({ value, onChange, onQueryChange, hint, children }) {
   const db = useDatabase();
   const { colours } = useAppTheme();
@@ -138,6 +141,7 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
               value={query}
               onChangeText={changeQuery}
               placeholder="Search or type a new place"
+              maxLength={MAX_LENGTH.place.name}
               placeholderTextColor={colours.muted}
               selectionColor={colours.accent}
               accessibilityLabel="Search places"
@@ -207,6 +211,7 @@ export function PlacePicker({ value, onChange, onQueryChange, hint, children }) 
               </View>
             </Row>
           </View>
+          {mode === 'search' && hint ? <Text style={styles.hint}>{hint}</Text> : null}
         </>
       )}
     </View>

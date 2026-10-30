@@ -1,5 +1,5 @@
 import { isDateKey } from '../lib/time';
-import { syncedTable } from './core';
+import { inTransaction, syncedTable } from './core';
 
 const base = syncedTable('public_holiday');
 
@@ -33,5 +33,16 @@ export const holidays = {
     if (!current) return base.create(db, { holiday_date: date, name: label });
     if (label && !current.name) await base.update(db, current.id, { name: label });
     return current.id;
+  },
+
+  // add in a transaction of its own, for the Public holidays screen: add
+  // reads, then writes, and a pull adding the same date in between (on its
+  // own connection) would fail the write on the unique date.
+  async addInTransaction(db, holiday) {
+    let id;
+    await inTransaction(db, async (txn) => {
+      id = await holidays.add(txn, holiday);
+    });
+    return id;
   },
 };

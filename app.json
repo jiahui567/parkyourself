@@ -12,6 +12,12 @@
     },
     "android": {
       "package": "com.parkyourself.app",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0E1013",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -45,6 +51,7 @@
       ],
       "./plugins/withCmakeVersion",
       "./plugins/withImageColorsJvmTarget",
+      "./plugins/withNoDeviceTransfer",
       "expo-mlkit-ocr",
       "expo-status-bar",
       [

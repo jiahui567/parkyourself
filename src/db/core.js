@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 
+import { characterCount, MAX_LENGTH } from '../lib/textLimits';
 import { BUSY_TIMEOUT_MS } from './migrate';
 
 // Columns callers may set on each synced table. id, created_at, updated_at and
@@ -20,13 +21,27 @@ const SYNCED_COLUMNS = {
   ],
 };
 
+// What a write longer than MAX_LENGTH (src/lib/textLimits.js) says.
+const TOO_LONG = {
+  name: (max) => `A name can be at most ${max} characters.`,
+  colour: (max) => `A colour can be at most ${max} characters.`,
+  zone_colour_name: (max) => `A colour can be at most ${max} characters.`,
+  note: (max) => `A note can be at most ${max} characters.`,
+  level: (max) => `The level can be at most ${max} characters.`,
+  bay: (max) => `The bay can be at most ${max} characters.`,
+  landmark: (max) => `The first shop can be at most ${max} characters.`,
+  rate_snapshot: () => 'These rates are too long to save.',
+};
+
 export const newId = () => Crypto.randomUUID();
 export const now = () => Date.now();
 
 // Told after each write to a synced table, so the sync can follow a few
 // seconds later (src/hooks/useSync.js). A write inside a transaction tells
 // before it commits; the wait covers that, and after a rollback the sync
-// finds nothing new to push.
+// finds nothing new to push. Each listener gets the path of the database
+// written (a transaction's connection has its database's path), since
+// Database check's self-test writes a throwaway one.
 const changeListeners = new Set();
 
 export function onSyncedChange(listener) {
@@ -34,22 +49,25 @@ export function onSyncedChange(listener) {
   return () => changeListeners.delete(listener);
 }
 
-function tellChanged() {
-  changeListeners.forEach((listener) => listener());
+function tellChanged(db) {
+  changeListeners.forEach((listener) => listener(db.databasePath));
 }
 
 function assertSyncedTable(table) {
   if (!SYNCED_COLUMNS[table]) throw new Error(`Not a synced table: ${table}`);
 }
 
-// Validates column names against the allowlist. Undefined fields are skipped
-// and booleans are stored as 0/1.
+// Validates column names against the allowlist, and text against
+// MAX_LENGTH (characterCount). Undefined fields are skipped and booleans are
+// stored as 0/1.
 function toEntries(table, values) {
   assertSyncedTable(table);
   const allowed = SYNCED_COLUMNS[table];
   const entries = Object.entries(values).filter(([, v]) => v !== undefined);
-  for (const [col] of entries) {
+  for (const [col, v] of entries) {
     if (!allowed.includes(col)) throw new Error(`Unknown column ${table}.${col}`);
+    const max = MAX_LENGTH[table]?.[col];
+    if (max != null && typeof v === 'string' && characterCount(v) > max) throw new Error(TOO_LONG[col](max));
   }
   return entries.map(([col, v]) => [col, typeof v === 'boolean' ? Number(v) : v]);
 }
@@ -65,20 +83,26 @@ export async function insertRow(db, table, values) {
     `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
     params
   );
-  tellChanged();
+  tellChanged(db);
   return id;
 }
 
 // Returns the number of rows changed (0 if the row is missing or deleted).
 // Every change marks the row dirty, to be pushed by the sync.
+//
+// A change is stamped MAX(now, updated_at + 1), so it is always later than
+// the change it replaces, even on a phone whose clock is behind the phone that
+// wrote the row: the server keeps a pushed row only when its updated_at is
+// newer (PLAN.md, "How the sync works"), and this phone would mark a skipped
+// change pushed. Every UPDATE of a synced row written by hand does the same.
 export async function updateRow(db, table, id, changes) {
   const entries = toEntries(table, changes);
-  const sets = [...entries.map(([c]) => `${c} = ?`), 'updated_at = ?', 'dirty = 1'];
+  const sets = [...entries.map(([c]) => `${c} = ?`), 'updated_at = MAX(?, updated_at + 1)', 'dirty = 1'];
   const result = await db.runAsync(
     `UPDATE ${table} SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
     [...entries.map(([, v]) => v), now(), id]
   );
-  if (result.changes) tellChanged();
+  if (result.changes) tellChanged(db);
   return result.changes;
 }
 
@@ -87,10 +111,10 @@ export async function softDeleteRow(db, table, id) {
   assertSyncedTable(table);
   const t = now();
   const result = await db.runAsync(
-    `UPDATE ${table} SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE id = ? AND deleted_at IS NULL`,
+    `UPDATE ${table} SET deleted_at = ?, updated_at = MAX(?, updated_at + 1), dirty = 1 WHERE id = ? AND deleted_at IS NULL`,
     [t, t, id]
   );
-  if (result.changes) tellChanged();
+  if (result.changes) tellChanged(db);
   return result.changes;
 }
 

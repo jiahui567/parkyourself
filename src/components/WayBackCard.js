@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StyleSheet, Text, View } from 'react-native';
 
+import { MAX_LENGTH } from '../lib/textLimits';
 import { ChipGroup } from './ChipGroup';
 import { Disclosure } from './Disclosure';
 import { ErrorText } from './ErrorText';
@@ -74,6 +75,7 @@ export function WayBackCard({ session, route, onSave, error }) {
           onChangeText={changeLandmark}
           onEndEditing={saveLandmark}
           placeholder="e.g. Starbucks"
+          maxLength={MAX_LENGTH.parking_session.landmark}
           returnKeyType="done"
         />
         <ErrorText error={error} />

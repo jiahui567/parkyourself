@@ -1,3 +1,5 @@
+import { characterCount, MAX_LENGTH } from './textLimits';
+
 // Place names are unique ignoring case and the spaces at their ends (PLAN.md,
 // "Saved places and rates"), so "pavilion bukit jalil " is Pavilion Bukit Jalil.
 const nameKey = (name) => String(name ?? '').trim().toLowerCase();
@@ -28,13 +30,14 @@ const isWordName = (text) => text !== '' && !NUMBER_LIKE.test(text) && !PLUS_COD
 // A name for a new place from a reverse-geocoded address (expo-location's
 // reverseGeocodeAsync): the building or shop name ('Sunway Velocity Mall'),
 // else the street, for parking by the road ('Jalan Cerdas'). null when
-// neither is a word.
+// neither is a word that fits a place name (MAX_LENGTH): a longer one would
+// stop Park from saving, and the user picks or types the place instead.
 export function placeNameFromAddress(address) {
   if (!address) return null;
   const number = String(address.streetNumber ?? '').trim();
   for (const field of [address.name, address.street]) {
     const text = String(field ?? '').trim();
-    if (isWordName(text) && text !== number) return text;
+    if (isWordName(text) && text !== number && characterCount(text) <= MAX_LENGTH.place.name) return text;
   }
   return null;
 }

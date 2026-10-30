@@ -91,14 +91,16 @@ function ReportForm({ place, rates, listed, email, accountError }) {
   useEffect(() => {
     photoRef.current = photoUri;
   }, [photoUri]);
-  // A photo still being prepared when the screen closes is deleted once ready.
+  // A photo still being prepared when the screen closes is deleted once ready,
+  // and one being sent once the send ends: the upload reads the file.
   const closed = useRef(false);
+  const sendingPhoto = useRef(false);
   useEffect(() => {
     // Set again on every run: Fast Refresh runs the cleanup, then this again.
     closed.current = false;
     return () => {
       closed.current = true;
-      deletePhotoFiles(photoRef.current ? [photoRef.current] : []);
+      if (!sendingPhoto.current) deletePhotoFiles(photoRef.current ? [photoRef.current] : []);
     };
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -142,6 +144,7 @@ function ReportForm({ place, rates, listed, email, accountError }) {
     }
     setSending(true);
     setSendError(null);
+    sendingPhoto.current = true;
     let sent;
     try {
       sent = await sendReport({
@@ -154,14 +157,25 @@ function ReportForm({ place, rates, listed, email, accountError }) {
         photoUri,
       });
     } catch (e) {
+      sendingPhoto.current = false;
+      // Closed while sending: the error line went with the form, so the
+      // root layout's dialog says it, as it says a report that went.
+      if (closed.current) {
+        deletePhotoFiles(photoUri ? [photoUri] : []);
+        showDialog({ title: 'Your report was not sent', message: String(e?.message ?? e) });
+        return;
+      }
       setSendError(e);
       setSending(false);
       return;
     }
+    sendingPhoto.current = false;
     if (photoUri) removePhoto();
     // The dialog belongs to the root layout, so it stays up on the place.
     showDialog(reportSentText(sent.photoError));
-    goBack();
+    // Back may have closed this screen while it was sending (a weak signal
+    // can take long): the screen in front now is not this one's to close.
+    if (!closed.current) goBack();
   };
 
   return (
@@ -252,7 +266,7 @@ function ReportForm({ place, rates, listed, email, accountError }) {
           ) : (
             <Button
               title="Sign in to send"
-              onPress={() => router.push({ pathname: '/account', params: { from: 'report' } })}
+              onPress={() => router.navigate({ pathname: '/account', params: { from: 'report' } })}
               disabled={busy}
             />
           )}

@@ -36,6 +36,7 @@ import { useNow } from '../../hooks/useNow';
 import { useOnAppActive } from '../../hooks/useOnAppActive';
 import { indexAfterRemoval } from '../../lib/listIndex';
 import { formatRM } from '../../lib/money';
+import { oneParam } from '../../lib/params';
 import { formatDate, formatDuration, formatTime } from '../../lib/time';
 import { syncNotifications } from '../../notify/notifications';
 import { endedFeeText, extendTimerText, stayTimesText } from '../../text/findText';
@@ -63,7 +64,10 @@ export default function SessionScreen() {
   const showDialog = useDialog();
   // extendedAt: set when Extend timer on a notification opened this screen.
   // savedAt: set when Park has just saved this session.
-  const { id, extendedAt, savedAt } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { id } = params;
+  const extendedAt = oneParam(params.extendedAt);
+  const savedAt = oneParam(params.savedAt);
   const load = useCallback(async () => {
     const [session, holidayDates, prefs, sessionPhotos, refusal] = await Promise.all([
       sessions.getDetails(db, id),
@@ -463,7 +467,7 @@ export default function SessionScreen() {
       {active && (
         <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
           <ErrorText error={actionError ?? notifyError} />
-          <Button title="Found my car" onPress={() => router.push(`/session/end/${session.id}`)} disabled={busy} />
+          <Button title="Found my car" onPress={() => router.navigate(`/session/end/${session.id}`)} disabled={busy} />
         </View>
       )}
     </View>

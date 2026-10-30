@@ -70,13 +70,13 @@ export default function Cars() {
                   onPress={() => run(() => vehicles.setDefault(db, car.id))}
                 />
               )}
-              <IconButton icon={PencilIcon} label={`Rename ${car.name}`} onPress={() => router.push(`/vehicles/${car.id}`)} />
+              <IconButton icon={PencilIcon} label={`Rename ${car.name}`} onPress={() => router.navigate(`/vehicles/${car.id}`)} />
               <IconButton icon={ArchiveIcon} label={`Archive ${car.name}`} tone="danger" onPress={() => confirmArchive(car)} />
             </View>
           ))}
         </View>
       )}
-      <Button title="Add a car" variant="tonal" size="small" icon={PlusIcon} onPress={() => router.push('/vehicles/new')} />
+      <Button title="Add a car" variant="tonal" size="small" icon={PlusIcon} onPress={() => router.navigate('/vehicles/new')} />
     </ScrollView>
   );
 }

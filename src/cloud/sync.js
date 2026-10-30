@@ -98,8 +98,9 @@ let pullAgain = false;
 // Never throws: a failure (no signal in a basement, a paused server) is kept
 // for Settings and Account, and the next open, save or Sync now tries again.
 // Returns what happened: { status }, one of 'not set up', 'up to date' (a
-// push alone, with nothing to send), 'signed out', 'other account', 'synced'
-// or 'failed'; 'synced' also has refused, the rows
+// push alone, with nothing to send), 'signed out', 'other account', 'account
+// changed' (another account signed in before it ended), 'synced' or
+// 'failed'; 'synced' also has refused, the rows
 // the server refused at the last push, and pulled, how many rows the pull
 // changed on this phone.
 export function syncNow(db, { pull = true } = {}) {
@@ -124,14 +125,16 @@ export function syncNow(db, { pull = true } = {}) {
   return running;
 }
 
-// Sends the rows that wait, a table at a time, parents first. Returns the
-// rows the server refused, each with its table and the updated_at sent.
-async function pushChanges(db) {
+// Sends the rows that wait to accountId, a table at a time, parents first.
+// Returns the rows the server refused, each with its table and the updated_at
+// sent.
+async function pushChanges(db, accountId) {
   const refused = [];
   for (const table of SYNCED_TABLES) {
     const rows = await syncRows.listDirty(db, table);
     for (const batch of batches(rows, PUSH_BATCH)) {
-      const refusedHere = await timed(pushSyncedRows(table, batch.map((row) => toServerRow(table, row))));
+      const serverRows = batch.map((row) => toServerRow(table, row));
+      const refusedHere = await timed(pushSyncedRows(table, serverRows, accountId));
       const refusedIds = new Set(refusedHere.map((refusal) => refusal.id));
       // A refused row stays dirty, so it is tried again at every push.
       await syncRows.markPushed(db, table, batch.filter((row) => !refusedIds.has(row.id)));
@@ -144,10 +147,10 @@ async function pushChanges(db) {
   return refused;
 }
 
-// What the server changed for this account since each table's last pull,
-// every page of it: { table: rows }. Nothing is written until all of it is in,
-// so a place's rates are known when two places are merged.
-async function fetchChanges(db) {
+// What the server changed for accountId since each table's last pull, every
+// page of it: { table: rows }. Nothing is written until all of it is in, so a
+// place's rates are known when two places are merged.
+async function fetchChanges(db, accountId) {
   const pulled = {};
   for (const table of SYNCED_TABLES) {
     const cursor = await syncPull.cursor(db, table);
@@ -155,7 +158,7 @@ async function fetchChanges(db) {
     let afterId = null;
     const rows = [];
     for (;;) {
-      const page = await timed(pullSyncedRows(table, { afterUs, afterId, limit: PULL_PAGE }));
+      const page = await timed(pullSyncedRows(table, { afterUs, afterId, limit: PULL_PAGE }, accountId));
       rows.push(...page);
       if (page.length < PULL_PAGE) break;
       afterUs = page[page.length - 1].server_updated_us;
@@ -195,15 +198,21 @@ async function sync(db, pull) {
     // the pull's merges changed rows, or when the server refused rows and the
     // pull changed something that may have freed them (the other phone's
     // parking ended), so neither waits for the next sync.
-    let refused = await pushChanges(db);
+    // Every call goes to this account alone, even if another signs in before
+    // the run ends (requireAccount in src/cloud/supabase.js).
+    let refused = await pushChanges(db, account.id);
     if (pull) {
-      const { changed, dirtied } = await syncPull.apply(db, await fetchChanges(db));
+      const { changed, dirtied } = await syncPull.apply(db, await fetchChanges(db, account.id));
       pulled = changed;
-      if (dirtied > 0 || (refused.length > 0 && changed > 0)) refused = await pushChanges(db);
+      if (dirtied > 0 || (refused.length > 0 && changed > 0)) refused = await pushChanges(db, account.id);
     }
     await syncState.finished(db, Date.now(), refused);
     return { status: 'synced', refused, pulled };
   } catch (e) {
+    // Not a failure to show: the rows not sent yet wait, and the account now
+    // signed in syncs on its own (Account asks first when the rows are
+    // another person's).
+    if (e?.accountChanged) return { status: 'account changed' };
     console.warn('Sync failed:', e);
     await syncState.failed(db, e?.fromServer ? String(e.message) : LOCAL_SYNC_ERROR_TEXT).catch((saveError) => {
       // Nothing else can be done: the screens that would show it read the same database.

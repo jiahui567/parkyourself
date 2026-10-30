@@ -19,6 +19,10 @@
   // did not match its hash): the page keeps saying so, and only the app and
   // email are offered. It says so until here, in case this file fails too.
   if (!config.supabaseUrl || !config.publishableKey || !window.supabase) return;
+  // The same inside another site's frame, which could dress the page up to
+  // trick a tap on Delete. GitHub Pages cannot send the header that forbids
+  // framing, and a meta tag cannot set it.
+  if (window.top !== window.self) return;
   el('web-unavailable').hidden = true;
 
   // Nothing is kept in the browser: the session lasts only while the page is open.
@@ -75,7 +79,7 @@
     const noAccount = error && (error.code === 'otp_disabled' || /signups not allowed/i.test(error.message || ''));
     if (error && !noAccount) throw error;
     email = address;
-    el('code-sent').textContent = `If an account uses ${address}, we emailed it a code. It works for an hour.`;
+    el('code-sent').textContent = `If an account uses ${address}, we emailed it a code. It works for 10 minutes.`;
     el('code').value = '';
     show('code-step');
   };

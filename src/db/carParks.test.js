@@ -130,6 +130,12 @@ describe('carParks.refreshAtStart and info', () => {
     expect(await carParks.get(db, 'sunway-pyramid', TODAY)).not.toBeNull();
     expect((await carParks.info(db)).error).toMatch('needs a source_url');
   });
+
+  it('does not fail the start when even the error cannot be kept', async () => {
+    await db.execAsync('DROP TABLE setting');
+
+    await expect(carParks.refreshAtStart(db, LIST)).resolves.toBeUndefined();
+  });
 });
 
 describe('assertCarParkList', () => {
@@ -137,6 +143,7 @@ describe('assertCarParkList', () => {
     ['a missing version', { carParks: [] }, 'needs a version'],
     ['a repeated id', { version: 'x', carParks: [VELOCITY, VELOCITY] }, 'listed twice'],
     ['no source', { version: 'x', carParks: [{ ...VELOCITY, source_url: '' }] }, 'needs a source_url'],
+    ['a name too long for a place', { version: 'x', carParks: [{ ...VELOCITY, name: 'N'.repeat(101) }] }, 'longer than 100'],
     [
       'a bad date',
       { version: 'x', carParks: [{ ...VELOCITY, rates: [hourly('weekday', 'Jan 2025', 300)] }] },

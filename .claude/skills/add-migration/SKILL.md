@@ -12,7 +12,7 @@ Phones keep their database between app versions. Every schema change is a new st
 1. Append a new template string to `MIGRATIONS` with a comment `// vN: <what it changes>`. Never edit an earlier step: phones have already run it.
 2. Prefer additive changes: `CREATE TABLE`, `CREATE INDEX`, `ALTER TABLE ... ADD COLUMN` (nullable or with a `DEFAULT`). To rename a column or change its type, create a new table, copy the rows, drop the old table and rename the new one, all inside the same step.
 3. A new **synced** table has `id TEXT PRIMARY KEY`, `created_at`, `updated_at` and `deleted_at`; unique indexes end with `WHERE deleted_at IS NULL`; add its writable columns to `SYNCED_COLUMNS` in `src/db/core.js`. A **local-only** table says so in a SQL comment.
-4. A new column on a synced table also goes into `SYNCED_COLUMNS`, otherwise writes through `core.js` reject it.
+4. A new column on a synced table also goes into `SYNCED_COLUMNS`, otherwise writes through `core.js` reject it. A new free-text column the user types (not an id, date or fixed value) also gets a longest length in `MAX_LENGTH` (`src/lib/textLimits.js`), the same `char_length` check on the server in a new migration, and `maxLength` on the field that types it (`test/serverLimits.test.js` compares the two sides). Lowering a limit also cuts the text already saved, in a phone step and in the server migration before its check, with the same expressions (see v8), and the server migration is pushed before any phone runs that step.
 5. Tests:
    - Update the table list in `src/db/migrate.test.js` if tables changed.
    - Test new data functions with `openMigratedTestDatabase()` from `test/testDatabase.js`.

@@ -8,6 +8,7 @@ import { Field } from '../../components/Field';
 import { space } from '../../components/theme';
 import { useDatabase, vehicles } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
+import { MAX_LENGTH } from '../../lib/textLimits';
 import { syncNotifications } from '../../notify/notifications';
 
 // Rename a car, opened from Cars. Its past and current parking show the new name.
@@ -46,7 +47,14 @@ export default function RenameCar() {
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Rename car' }} />
-      <Field label="Name" value={typed} onChangeText={setName} placeholder="e.g. My Myvi" autoFocus />
+      <Field
+        label="Name"
+        value={typed}
+        onChangeText={setName}
+        placeholder="e.g. My Myvi"
+        maxLength={MAX_LENGTH.vehicle.name}
+        autoFocus
+      />
       <ErrorText error={saveError} />
       <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
     </ScrollView>

@@ -59,7 +59,7 @@ export default function Places() {
                 key={place.id}
                 label={place.name}
                 value={visitsText(place.visits)}
-                onPress={() => router.push(`/places/${place.id}`)}
+                onPress={() => router.navigate(`/places/${place.id}`)}
                 first={index === 0}
               />
             ))
@@ -73,7 +73,7 @@ export default function Places() {
             <ListRow
               key={carPark.id}
               label={carPark.name}
-              onPress={() => router.push(`/car-parks/${carPark.id}`)}
+              onPress={() => router.navigate(`/car-parks/${carPark.id}`)}
               first={index === 0}
             />
           ))}

@@ -22,6 +22,20 @@ function assertTable(table) {
 // change tracking (C3) and which sessions it parked (C4). Never sent or pulled.
 export const PHONE_ONLY_COLUMNS = ['dirty', 'parked_here'];
 
+// Told after syncState below changes (the account, a sync that ended or
+// failed), so Settings shows how the backup stands while it is in front: a
+// sync that pulled nothing tells no screen through onPulledChange.
+const stateListeners = new Set();
+
+export function onSyncStateChange(listener) {
+  stateListeners.add(listener);
+  return () => stateListeners.delete(listener);
+}
+
+function tellStateChanged() {
+  stateListeners.forEach((listener) => listener());
+}
+
 // A phone row in the server's shape (PLAN.md, "Type mapping"): none of the
 // phone-only columns, the 0/1 flags as booleans and the rate snapshot as JSON
 // instead of its text.
@@ -185,8 +199,9 @@ export const syncState = {
   },
 
   // account: { id, email }, or null once signed out.
-  setAccount(db, account) {
-    return writeAccount(db, KEY.accountId, KEY.accountEmail, account);
+  async setAccount(db, account) {
+    await writeAccount(db, KEY.accountId, KEY.accountEmail, account);
+    tellStateChanged();
   },
 
   setOwner(db, account) {
@@ -199,10 +214,12 @@ export const syncState = {
     await settings.set(db, KEY.lastSyncedAt, String(atMs));
     await settings.set(db, KEY.lastError, '');
     await settings.set(db, KEY.refused, JSON.stringify(refused));
+    tellStateChanged();
   },
 
-  failed(db, message) {
-    return settings.set(db, KEY.lastError, message);
+  async failed(db, message) {
+    await settings.set(db, KEY.lastError, message);
+    tellStateChanged();
   },
 
   // For when the server no longer has this phone's rows (the account they

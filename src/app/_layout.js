@@ -4,6 +4,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect, useMemo } from 'react';
 import { Appearance } from 'react-native';
 
+import { AppError } from '../components/AppError';
 import { DialogProvider } from '../components/Dialog';
 import { ParkingIntro } from '../components/ParkingIntro';
 import { AppThemeProvider, navigationThemeFor, useAppTheme } from '../components/ThemeProvider';
@@ -11,6 +12,14 @@ import { DatabaseProvider } from '../db';
 import { useDailyCarParkUpdate } from '../hooks/useDailyCarParkUpdate';
 import { useNotificationResponses } from '../hooks/useNotificationResponses';
 import { useSync } from '../hooks/useSync';
+
+// expo-router shows this instead of the app when the layout or any screen
+// throws while drawing, such as when the database cannot be opened or
+// migrated (expo-sqlite throws while rendering): without it a release build
+// closes, and in that case at every start.
+export function ErrorBoundary({ error, retry }) {
+  return <AppError error={error} retry={retry} />;
+}
 
 export default function RootLayout() {
   return (

@@ -9,6 +9,7 @@ import { SessionCard } from '../components/SessionCard';
 import { useThemedStyles } from '../components/ThemeProvider';
 import { places, sessions, useDatabase, vehicles } from '../db';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
+import { oneParam } from '../lib/params';
 import { formatMonth } from '../lib/time';
 import { ownerName, sessionsFilter } from '../spending/sessionsFilter';
 import { monthSummary } from '../spending/summary';
@@ -19,7 +20,10 @@ import { noSessionsText, totalLineText } from '../text/spendingText';
 export default function Sessions() {
   const db = useDatabase();
   const styles = useThemedStyles(createStyles);
-  const { month, placeId, vehicleId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const month = oneParam(params.month);
+  const placeId = oneParam(params.placeId);
+  const vehicleId = oneParam(params.vehicleId);
   const { filter, error: paramsError } = useMemo(
     () => sessionsFilter({ month, placeId, vehicleId }),
     [month, placeId, vehicleId]

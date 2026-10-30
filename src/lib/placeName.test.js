@@ -36,6 +36,10 @@ describe('placeNameFromAddress', () => {
     { rule: 'a plus code falls back to the street', fields: { name: '4QGF+5X', street: 'Jalan Peel' }, name: 'Jalan Peel' },
     { rule: 'surrounding spaces are trimmed', fields: { name: '  Mid Valley Megamall ' }, name: 'Mid Valley Megamall' },
     { rule: 'nothing usable gives null', fields: { name: '12', streetNumber: '12' }, name: null },
+    // A place name takes at most 100 characters (src/lib/textLimits.js).
+    { rule: 'a name too long for a place falls back to the street', fields: { name: 'M'.repeat(101), street: 'Jalan Peel' }, name: 'Jalan Peel' },
+    { rule: 'a name of 100 characters is used', fields: { name: 'M'.repeat(100) }, name: 'M'.repeat(100) },
+    { rule: 'nothing short enough gives null', fields: { name: 'M'.repeat(101), street: 'J'.repeat(101) }, name: null },
   ])('$rule', ({ fields, name }) => {
     expect(placeNameFromAddress(address(fields))).toBe(name);
   });

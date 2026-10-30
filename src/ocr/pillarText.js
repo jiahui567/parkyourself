@@ -146,12 +146,13 @@ const wordsOf = (text) =>
 // A Malaysian car plate: two or three letters then three or four digits
 // (WXY 1234), or one letter with four digits or a letter after (W 1234 A).
 // Letters that are a level (LG, GF) or a sign word (ZON, LOT) are the sign,
-// and so is a short number after two letters (a zone such as AA 12).
+// and so is a level with a zone letter after (B1 C, P2 A) and a short number
+// after two letters (a zone such as AA 12).
 function isPlate(line) {
   const match = PLATE.exec(line);
   if (!match) return false;
   const [, letters, digits, suffix] = match;
-  if (LEVEL.test(letters) || SIGN_WORDS.has(letters)) return false;
+  if (LEVEL.test(letters) || LEVEL.test(letters + digits) || SIGN_WORDS.has(letters)) return false;
   if (letters.length > 1) return digits.length >= 3;
   return digits.length === 4 || suffix !== '';
 }

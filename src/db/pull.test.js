@@ -1,13 +1,20 @@
 import { openMigratedTestDatabase } from '../../test/testDatabase';
 import { holidays } from './holidays';
+import { deletePhotoFiles } from './photos';
 import { placeRates, places } from './places';
 import { fromServerRow, onPulledChange, placeLastChange, syncPull, WRITE_CHUNK } from './pull';
 import { sessions } from './sessions';
 import { SYNCED_TABLES, syncRows, syncState } from './sync';
 import { vehicles } from './vehicles';
 
+// The image files need the phone's file system (src/db/selfTest.js checks
+// them); here, which files the pull deletes, and when.
+jest.mock('./photos', () => ({ ...jest.requireActual('./photos'), deletePhotoFiles: jest.fn() }));
+
 const at = (t) => new Date(t).getTime();
 const EARLY = at('2026-10-27T09:00');
+const PILLAR = 'file:///photos/pillar.jpg';
+const LIFT = 'file:///photos/lift.jpg';
 
 // Rows as pull_synced_rows sends them, each stamped later than the last.
 let stamp = 1000000;
@@ -47,6 +54,7 @@ beforeEach(async () => {
   db = await openMigratedTestDatabase();
   clock = jest.spyOn(Date, 'now');
   clock.mockReturnValue(at('2026-10-27T10:00'));
+  deletePhotoFiles.mockReset();
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -141,6 +149,43 @@ describe('syncPull.apply', () => {
     });
 
     expect(await places.get(db, id)).toBeNull();
+  });
+
+  it('deletes the photos of a session deleted on another phone, as Delete does here', async () => {
+    const carId = await vehicles.add(db, { name: 'My Myvi' });
+    const id = await sessions.start(db, { vehicle_id: carId, photo_files: [{ file_uri: PILLAR }, { file_uri: LIFT }] });
+    await pushEverything();
+
+    const deleted = at('2026-10-27T10:05');
+    await syncPull.apply(db, {
+      parking_session: [session(id, carId, { started_at: at('2026-10-27T10:00'), updated_at: deleted, deleted_at: deleted })],
+    });
+
+    expect(await sessions.get(db, id)).toBeNull();
+    expect(await db.getAllAsync('SELECT * FROM photo')).toEqual([]);
+    expect(deletePhotoFiles.mock.calls.flat().flat()).toEqual([PILLAR, LIFT]);
+  });
+
+  it('keeps the photo files when the pull that deleted their session is undone', async () => {
+    const carId = await vehicles.add(db, { name: 'My Myvi' });
+    const id = await sessions.start(db, { vehicle_id: carId, photo_files: [{ file_uri: PILLAR }] });
+    await pushEverything();
+    const deleted = at('2026-10-27T10:05');
+    // A row the phone cannot store fails the transaction after the deletion.
+    const broken = session('broken', carId, { status: 'ended', started_at: null });
+
+    await expect(
+      syncPull.apply(db, {
+        parking_session: [
+          session(id, carId, { started_at: at('2026-10-27T10:00'), updated_at: deleted, deleted_at: deleted }),
+          broken,
+        ],
+      })
+    ).rejects.toThrow();
+
+    expect(await sessions.get(db, id)).not.toBeNull();
+    expect((await db.getAllAsync('SELECT file_uri FROM photo')).map((p) => p.file_uri)).toEqual([PILLAR]);
+    expect(deletePhotoFiles.mock.calls.flat().flat()).toEqual([]);
   });
 
   it('counts a row that came again unchanged as no change', async () => {

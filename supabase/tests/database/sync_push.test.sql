@@ -1,5 +1,5 @@
 begin;
-select plan(40);
+select plan(42);
 
 select function_privs_are('public', 'push_synced_rows', array['text', 'jsonb'], 'anon', array[]::text[],
   'anon cannot push');
@@ -201,6 +201,29 @@ select is(
   (select owner_id from public.vehicle where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
   '00000000-0000-0000-0000-00000000000a'::uuid,
   'A sees only its own car with that id'
+);
+
+-- At most 64 rows per call (20261030115551); the phone sends 50 (PUSH_BATCH).
+select is(
+  public.push_synced_rows('public_holiday', (
+    select jsonb_agg(jsonb_build_object(
+      'id', 'bbbbbbbb-0000-0000-0000-' || lpad(n::text, 12, '0'),
+      'holiday_date', (date '2027-01-01' + n)::text,
+      'name', null,
+      'created_at', 1792800000000,
+      'updated_at', 1792800000000,
+      'deleted_at', null
+    ))
+    from generate_series(1, 64) as n
+  )),
+  '[]'::jsonb,
+  'a push of 64 rows is taken'
+);
+select throws_ok(
+  $$select public.push_synced_rows('public_holiday', (select jsonb_agg(jsonb_build_object('id', gen_random_uuid())) from generate_series(1, 65)))$$,
+  '22023',
+  'At most 64 rows per call, not 65',
+  'a push of 65 rows is refused whole'
 );
 
 select * from finish();

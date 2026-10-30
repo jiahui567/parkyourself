@@ -13,8 +13,8 @@ All your parking data stays on the phone. An account is optional (version 2, in 
 | Done (checked on the phone, 2026-10-23) | **M0 Setup**, **M1 Cars, park and find** (with pillar photos, car rename and the folded Park form), **M2 Places, rates and fees**, **M3 Notifications**, **M4 OCR and zone colour** (the sign read by text size with plates and ads left out, level, bay and zone colour filled in; tap-to-pick dropped), **M5 Share**, **M6 Monthly spending** and **M7 Location** |
 | Done (checked on the phone with a release build, 2026-10-25) | **M8 Polish** (animations, loading animation, dark system dialogs, app icon, launch screen), **M9 Camera-first Park**, **M10 Timer wheel**, **M11 Car park list** and **M12 Car park list on Supabase**; version 2's **C0 Environments** |
 | Done (checked on the phone, 2026-10-26) | **M13** (History filters by car, place and month, and a battery hint in Settings) and **M14** (the app's own dialogs instead of Android's, Report rates and Delete in the header, the car park list on Places, view only) |
-| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer). **C3** (the sync's push: while signed in, the phone backs up its cars, places, rates, holidays and parking, never photos, when the app opens or comes to the front and a few seconds after a save; Settings → Data → Back up and sync) and **C4** (the pull: what the account's other phones changed comes back, and rows two phones made offline are merged on the phone; since 2026-10-28, a different account signing in is asked whether to take this phone's data, with the migration `synced_rows_per_account` not yet run on local Supabase or pushed), built with Jest tests (two phones against an in-memory server) and passing pgTAP on local Supabase, on hosted dev since 2026-10-28; not yet checked on the phone |
-| Next | On the build laptop: `npx supabase db reset` and `npx supabase test db`, then push `synced_rows_per_account` to hosted dev (`--dry-run` first). Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line). For C3 and C4 (on hosted dev since 2026-10-28): check the backup and the sync on two phones, and a second account on one phone (PLAN.md, "Testing"). C5 to C8 were dropped on 2026-10-28. C9's web pages are on GitHub Pages since 2026-10-28: delete a throwaway account on the page, and check Settings → About → Privacy policy after the next build. The rest of C9 (prod project, release key, Play testing) is left |
+| In progress | Version 2, built, on local and hosted dev, with their server parts still to check on the phone: **C1** (the five synced tables with Row Level Security and pgTAP tests), **C2** (sign-in with an email code, Sign out, and Delete account in the header's three-dot menu) and **C10** (rate reports for the car park list, with a rate board photo, moderated by the developer). **C3** (the sync's push: while signed in, the phone backs up its cars, places, rates, holidays and parking, never photos, when the app opens or comes to the front and a few seconds after a save; Settings → Data → Back up and sync) and **C4** (the pull: what the account's other phones changed comes back, and rows two phones made offline are merged on the phone; since 2026-10-28, a different account signing in is asked whether to take this phone's data, with the migration `synced_rows_per_account`, which passes pgTAP on local Supabase since 2026-10-30 but is not pushed yet), built with Jest tests (two phones against an in-memory server) and passing pgTAP on local Supabase, on hosted dev since 2026-10-28; not yet checked on the phone |
+| Next | Push the four migrations not yet on hosted dev (`synced_rows_per_account`, `push_synced_rows_limit`, `drop_duplicate_keys` and `synced_text_limits`, all passing pgTAP on local since 2026-10-30) with `npx supabase db push --linked --dry-run`, then without `--dry-run`, before building the new app (its SQLite step v8 expects the server's text checks) and before trying Add this phone's data, and in the dashboard set Email OTP Expiration to 600 seconds and change the Magic link and Confirm signup templates from one hour to 10 minutes, as `sign_in_code.html` (Version 2 server, Sign-in emails). Regenerate `android/` with `npx expo prebuild --clean --platform android`, then build with `npx expo run:android` (since 2026-10-30 Android's own backup and phone-to-phone transfer are off, three unused permissions are blocked, and the native packages are at SDK 58's patch versions, expo-sqlite among them), then run Database check: its self-test must pass (schema v8: v7 adds indexes, and v8 cuts any text saved before the length limits; and the transaction swap after the expo-sqlite upgrade). Check C2 and C10 on the phone (sign-in, Delete account, a report and its "Not verified yet" line). For C3 and C4 (on hosted dev since 2026-10-28): check the backup and the sync on two phones, and a second account on one phone (PLAN.md, "Testing"). C5 to C8 were dropped on 2026-10-28. C9's web pages are on GitHub Pages since 2026-10-28: delete a throwaway account on the page, and check Settings → About → Privacy policy after the next build. The rest of C9 (prod project, release key, Play testing) is left |
 | Plan | [PLAN.md](PLAN.md) has every decision, the screens, the fee rules, the data model, the milestones and the version 2 cloud design |
 
 The M0 status screen (database facts and the self-test) is now **Database check**, under Settings → Developer in development builds.
@@ -46,11 +46,11 @@ The M0 status screen (database facts and the self-test) is now **Database check*
 | Navigation | Expo Router, screens in `src/app/` |
 | Database | `expo-sqlite`, plain SQL, migrations tracked by `PRAGMA user_version`, WAL mode, foreign keys compiled on |
 | IDs | `expo-crypto` (`randomUUID()`) |
-| Camera and photos | `expo-camera`, `expo-image-manipulator`, `expo-file-system`, `expo-image-picker` (a photo from the gallery; native code, so run `npx expo run:android` again after pulling it in) |
+| Camera and photos | `expo-camera`, `expo-image-manipulator`, `expo-file-system`, `expo-image-picker` (a photo from the gallery; native code with config in `app.json`, so after pulling it in run `npx expo prebuild --clean --platform android`, then `npx expo run:android`) |
 | OCR | `expo-mlkit-ocr` 0.2.7 (pinned): Google ML Kit's bundled Latin text model, read on the phone with no model download. ML Kit sends Google per-installation identifiers and diagnostics and usage metrics, with no opt-out; accepted on 2026-10-22 (AGENTS.md, Privacy) |
 | Sharing and export | React Native's `Share` for the parking info; `expo-sharing` for a photo and for Export database |
 | Notifications | `expo-notifications` |
-| Location (optional) | `expo-location`, foreground only; native config in `app.json`, so run `npx expo run:android` again after pulling it in |
+| Location (optional) | `expo-location`, foreground only; native config in `app.json`, so after pulling it in run `npx expo prebuild --clean --platform android`, then `npx expo run:android` |
 | Drawing | `react-native-svg`, also for the icons and the Home car drawing (no icon library) |
 | Charts | `react-native-gifted-charts` with `expo-linear-gradient` (its gradient peer dependency), for the Spending tab's 12-month bar chart. `expo-linear-gradient` has native code: after pulling it in, run `npx expo run:android` again |
 | Animation | `react-native-reanimated` with `react-native-worklets` (native code: run `npx expo run:android` again after pulling it in). Shared pieces in `src/components/motion.js`; the loading animation in `src/components/ParkingIntro.js`. Skipped when the phone's Reduce motion is on |
@@ -99,16 +99,21 @@ park-yourself/
 │   │                        motion (shared animations), ParkingIntro (the loading animation),
 │   │                        TimerWheel and TimerSheet (the timer wheel), FilterPill and
 │   │                        ChoiceSheet (History's filters), Dialog (the app's own dialogs, useDialog),
-│   │                        SearchField
+│   │                        SearchField, AppError (shown instead of the app when it cannot draw)
 │   ├── hooks/               useFocusedLoad (reload on return), useNow (ticking time),
 │   │                        useOnAppActive (app back in front), useNotificationResponses
-│   │                        (notification taps, in the root layout), useSync (when the sync runs)
+│   │                        (notification taps, in the root layout), useSync (when the sync runs),
+│   │                        useDailyCarParkUpdate (the daily list download), useLocationPermission
+│   │                        and useParkLocation (Settings' switch, Park's reading)
 │   ├── notify/              Notifications: plan.js (what to show, tested), notifications.js
 │   │                        (expo-notifications: channels, buttons, sync with the parked cars)
 │   ├── text/                Screen text: way back, notifications, share message, rates, timer,
 │   │                        photos, Park and Find questions and hints, Spending lines, History filters,
 │   │                        the Car park page
-│   ├── zone/                Zone colour chips and hex-to-name rules
+│   ├── zone/                Zone colour chips and hex-to-name rules (zoneColour.js), and the
+│   │                        colour read off the photo (photoColour.js)
+│   ├── location/            readLocation.js (the only code that calls expo-location), autoPlace.js
+│   │                        (the place a reading fills in)
 │   ├── ocr/                 pillarText.js (level and bay suggestions from the sign's text),
 │   │                        readText.js (OCR on the phone with expo-mlkit-ocr)
 │   ├── fees/                Fee rules: pure functions, no database or React
@@ -133,7 +138,12 @@ park-yourself/
 │   │   ├── motion.js        Easing, count-up and burst numbers for the animations
 │   │   ├── listIndex.js     Which photo to show after one is deleted
 │   │   ├── dialog.js        A dialog's buttons (order, look) and the queue of dialogs
-│   │   └── placeSearch.js   The Places search
+│   │   ├── placeSearch.js   The Places search
+│   │   ├── geo.js           Distances, and what a location reading is good for
+│   │   ├── timeout.js       Time limits for calls that may never answer
+│   │   ├── textLimits.js    The longest text each synced column takes (the server's checks too)
+│   │   └── signIn.js, wheel.js, params.js  The email and code typed to sign in, the timer
+│   │                        wheel's numbers, a screen's query params
 │   └── db/                  Data layer: the only code that runs SQL
 │       ├── index.js         What screens import
 │       ├── core.js          Insert, update, soft delete, transactions, UUIDs
@@ -158,7 +168,8 @@ park-yourself/
 ├── .claude/                 Claude Code setup: skills, subagents, hooks (see "Working with Claude Code")
 ├── plugins/
 │   ├── withCmakeVersion.js  Config plugin: newer CMake so Windows builds handle long paths
-│   └── withImageColorsJvmTarget.js  Config plugin: builds react-native-image-colors' Kotlin for Java 17
+│   ├── withImageColorsJvmTarget.js  Config plugin: builds react-native-image-colors' Kotlin for Java 17
+│   └── withNoDeviceTransfer.js  Config plugin: no backup or phone-to-phone transfer of the app's data
 ├── scripts/
 │   ├── pull-db.js           Copies the phone's database to db-snapshot/
 │   └── car-park-sql.js      Writes the Supabase migration for the car park list (npm run carparks:sql)
@@ -211,7 +222,7 @@ npx expo run:android      # generate android/, build, install on the phone
 The first build takes a while. After that:
 
 - **Day to day:** `npx expo start`, then open the app on the phone. JavaScript changes reload instantly.
-- **Rebuild** with `npx expo run:android` only after adding a library with native code or changing `app.json` plugins.
+- **Rebuild** with `npx expo run:android` only after adding a library with native code or changing `app.json` or a plugin. Once `android/` exists, `run:android` builds it as it is: after a change to `app.json` or `plugins/`, run `npx expo prebuild --clean --platform android` first.
 - **Add packages** with `npx expo install <package>`, not `npm install`, so versions match SDK 58.
 
 ## Scripts
@@ -229,11 +240,11 @@ The first build takes a while. After that:
 
 ## Version 2 server (Supabase)
 
-In progress (milestones C1, C2, C10, C3 and C4 in PLAN.md: on local and hosted dev, to check on the phone; C4's `synced_rows_per_account` migration on neither yet). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3, C4), the sync: a push of the five synced tables, then a pull of what the account's other phones changed, when the app opens or comes to the front, a few seconds after a save, after Sign in and on Sync now (before Sign out, a push only), never in the background. Signed in, every sync calls the server, for the pull. It needs the `push_synced_rows` and `pull_synced_rows` migrations on the server the build uses. Database check shows which server the build uses.
+In progress (milestones C1, C2, C10, C3 and C4 in PLAN.md: on local and hosted dev, to check on the phone; the migrations of 2026-10-28 and 2026-10-30 on local only). The app works without it. What talks to it so far: the daily download of the car park list and the rate reports waiting for review (signed out, at most once a day when the app opens, in every build); only when the user taps, sign-in and rate reports; and, while signed in (C3, C4), the sync: a push of the five synced tables, then a pull of what the account's other phones changed, when the app opens or comes to the front, a few seconds after a save, after Sign in and on Sync now (before Sign out, a push only), never in the background. Signed in, every sync calls the server, for the pull. It needs every migration in `supabase/migrations` on the server the build uses: without `synced_rows_per_account`, Add this phone's data leaves out the rows another account already has, and marks them pushed. Database check shows which server the build uses.
 
 **Rate reports, as the moderator:** open Studio (local: http://127.0.0.1:54323; hosted: the dashboard) → Table Editor → `rate_report`, and the photo under Storage → `report-photos` (`<user id>/<report id>.jpg`). To approve, add the rate to `carParkList.json` as above and push it; then set the report's `status` to `approved` (or `rejected`), which stamps `reviewed_at` and takes it off everyone's "Not verified yet" line the next day. Changing rows is fine in Studio; changing tables is not. `npm run carparks:sql` updates car parks in place, so their reports stay; taking a car park off the list deletes its reports, so delete their photos in Studio first.
 
-**Sign-in emails:** on local they land in Mailpit, http://127.0.0.1:54324. Hosted dev, once per project, in the dashboard (Authentication → Emails, email settings rather than schema): put `{{ .Token }}` in the **Magic link** and **Confirm signup** templates, like `supabase/templates/sign_in_code.html`, or the email carries a link the app cannot use. Keep **Confirm email** on (Authentication → Sign In / Providers → Email, on by default): without it anyone could sign up with a password for an email they do not own. Supabase's own sender only emails your project's team, a few an hour; that is enough for testing.
+**Sign-in emails:** on local they land in Mailpit, http://127.0.0.1:54324. Hosted dev, once per project, in the dashboard (Authentication → Emails, email settings rather than schema): put `{{ .Token }}` in the **Magic link** and **Confirm signup** templates, like `supabase/templates/sign_in_code.html`, or the email carries a link the app cannot use. Keep **Confirm email** on (Authentication → Sign In / Providers → Email, on by default): without it anyone could sign up with a password for an email they do not own. On the same page, set **Email OTP Expiration** to 600 seconds, as `otp_expiry` in `supabase/config.toml`, and make the hosted **Magic link** and **Confirm signup** templates say the code works for 10 minutes, as `sign_in_code.html` does. Supabase's own sender only emails your project's team, a few an hour; that is enough for testing.
 
 **The car park list** lives in `src/carparks/carParkList.json` (the one source), on Supabase (`car_park`, `car_park_rate`: anyone may read, only migrations write) and as a copy on the phone. To change a rate, add a row with the new `effective_from` (keep the old one), bump `version`, run `npm run carparks:sql`, check on local, and push. Phones get it within a day.
 
@@ -306,6 +317,7 @@ Rules the data layer enforces (see `src/db/core.js`):
 
 - `android/` is generated by Expo (Continuous Native Generation). Do not edit it by hand; change `app.json` or add a config plugin in `plugins/`.
 - `plugins/withCmakeVersion.js` points the Android build at CMake 3.31.6, whose Ninja handles Windows long paths. Without it, React Native's C++ build fails with `ninja: error: mkdir`.
+- `plugins/withNoDeviceTransfer.js` keeps Android from copying the app's data in a phone-to-phone transfer, which `"allowBackup": false` does not stop on some phones (decided 2026-10-30).
 - `plugins/withImageColorsJvmTarget.js` sets `react-native-image-colors`' Kotlin target to Java 17. The library sets none for the current Android Gradle Plugin, and the build otherwise fails with "Inconsistent JVM-target compatibility" (Java 17, Kotlin 21).
 - The Android package is `com.parkyourself.app`. Changing it later installs a separate app that cannot see the old database.
 
@@ -333,7 +345,7 @@ Good to know:
 | `ninja: error: mkdir(...)` during the build | Install CMake 3.31.6, enable Windows long paths, keep the project in a short path |
 | Gradle or Java version error | Point `JAVA_HOME` at Android Studio's `jbr` folder (JDK 21) |
 | `No Android connected device found` | Run `adb devices`, accept the USB debugging prompt on the phone, try another cable |
-| A native change or new library has no effect | Run `npx expo run:android` again |
+| A native change or new library has no effect | Run `npx expo run:android` again; for a change to `app.json` or `plugins/`, run `npx expo prebuild --clean --platform android` first |
 | `npm test` fails to load `node:sqlite` (the `src/db` suites) | Node is older than 22.13 or is 23.0 to 23.3, where `node:sqlite` needs a flag. Use Node 22 (`.nvmrc`), or add `node-options=--experimental-sqlite` to your user `~/.npmrc` |
 | "Compressed folder is invalid" when moving the project as a zip | Do not zip `node_modules/` or `android/`. Move the project with git (push, then clone or pull) |
 

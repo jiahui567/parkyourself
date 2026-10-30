@@ -1,5 +1,6 @@
-// PreToolUse hook (Edit, Write): blocks edits to folders that are generated or
-// hold personal data. Exit code 2 stops the edit and shows Claude the reason.
+// PreToolUse hook (Edit, Write, Bash, PowerShell): blocks edits to folders
+// that are generated or hold personal data. Exit code 2 stops the edit and
+// shows Claude the reason.
 const path = require('node:path');
 
 const PROTECTED = {
@@ -9,18 +10,42 @@ const PROTECTED = {
   node_modules: 'node_modules/ is installed by npm. Use npx expo install to change packages.',
 };
 
+// A protected folder as a path segment in a command ('android/x', "./ios/x",
+// C:\...\node_modules\x). Windows paths ignore case, so Android\ is android/.
+const FOLDER = String.raw`(?:^|[\s'"=/\\])(android|ios|db-snapshot|node_modules)[\\/]`;
+// What surely writes a file in a command: output sent into the folder, an
+// in-place editor, or a PowerShell cmdlet that writes. Reading, copying out of
+// it and deleting it (npm reinstalls) are left alone: a guess would block
+// those too.
+const WRITES = [
+  new RegExp(String.raw`>>?\s*['"]?(?:[^\s'"|;&]*[\\/])?(android|ios|db-snapshot|node_modules)[\\/]`, 'i'),
+  // -i, alone or among other flags (-Ei, -pi, -i.bak), or --in-place.
+  new RegExp(String.raw`\b(?:sed|perl)\b[^|;&\n]*\s(?:-[A-Za-z]*i|--in-place)[^|;&\n]*${FOLDER}`, 'i'),
+  new RegExp(String.raw`\b(?:Set-Content|Add-Content|Clear-Content|Out-File|New-Item|tee)\b[^|;&\n]*${FOLDER}`, 'i'),
+];
+
+function block(reason) {
+  process.stderr.write(`${reason}\n`);
+  process.exit(2);
+}
+
 let input = '';
 process.stdin.on('data', (chunk) => (input += chunk));
 process.stdin.on('end', () => {
-  const filePath = JSON.parse(input || '{}').tool_input?.file_path;
-  if (!filePath) process.exit(0);
+  const toolInput = JSON.parse(input || '{}').tool_input ?? {};
 
-  const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const relative = path.relative(root, path.resolve(root, filePath));
-  const top = relative.split(/[\\/]/)[0];
-  if (!relative.startsWith('..') && PROTECTED[top]) {
-    process.stderr.write(`Blocked edit to ${relative}: ${PROTECTED[top]}\n`);
-    process.exit(2);
+  if (toolInput.file_path) {
+    const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const relative = path.relative(root, path.resolve(root, toolInput.file_path));
+    const top = relative.split(/[\\/]/)[0].toLowerCase();
+    if (!relative.startsWith('..') && PROTECTED[top]) block(`Blocked edit to ${relative}: ${PROTECTED[top]}`);
+  }
+
+  if (typeof toolInput.command === 'string') {
+    for (const pattern of WRITES) {
+      const match = pattern.exec(toolInput.command);
+      if (match) block(`Blocked a command that writes into ${match[1]}/: ${PROTECTED[match[1].toLowerCase()]}`);
+    }
   }
   process.exit(0);
 });

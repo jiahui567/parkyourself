@@ -8,6 +8,7 @@ import { Field } from '../../components/Field';
 import { space } from '../../components/theme';
 import { useThemedStyles } from '../../components/ThemeProvider';
 import { useDatabase, vehicles } from '../../db';
+import { MAX_LENGTH } from '../../lib/textLimits';
 
 // Add a car. Home sends you here on first run, when there are no cars yet.
 export default function AddCar() {
@@ -34,7 +35,14 @@ export default function AddCar() {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: 'Add a car' }} />
       <Text style={styles.intro}>Give your car a name you will recognise, such as &quot;My Myvi&quot;.</Text>
-      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. My Myvi" autoFocus />
+      <Field
+        label="Name"
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. My Myvi"
+        maxLength={MAX_LENGTH.vehicle.name}
+        autoFocus
+      />
       <ErrorText error={error} />
       <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
     </ScrollView>

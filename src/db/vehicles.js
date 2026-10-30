@@ -54,7 +54,7 @@ export const vehicles = {
       const changed = await base.update(txn, id, { is_default: true });
       if (changed === 0) throw new Error(`No car with id ${id}`);
       await txn.runAsync(
-        'UPDATE vehicle SET is_default = 0, updated_at = ?, dirty = 1 WHERE is_default = 1 AND id <> ? AND deleted_at IS NULL',
+        'UPDATE vehicle SET is_default = 0, updated_at = MAX(?, updated_at + 1), dirty = 1 WHERE is_default = 1 AND id <> ? AND deleted_at IS NULL',
         [now(), id]
       );
     });

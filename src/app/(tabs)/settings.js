@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -12,7 +12,7 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { SwitchRow } from '../../components/SwitchRow';
 import { useAppTheme, useThemedStyles } from '../../components/ThemeProvider';
 import { TimerWheel } from '../../components/TimerWheel';
-import { exportDatabase, preferences, syncState, useDatabase } from '../../db';
+import { exportDatabase, onSyncStateChange, preferences, syncState, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useLocationPermission } from '../../hooks/useLocationPermission';
 import { useNow } from '../../hooks/useNow';
@@ -50,7 +50,10 @@ export default function Settings() {
   // What the phone remembers of the account and the last sync: Settings
   // never asks the server (Account does).
   const loadSync = useCallback(() => syncState.get(db), [db]);
-  const { data: sync, error: syncError } = useFocusedLoad(loadSync);
+  const { data: sync, error: syncError, reload: reloadSync } = useFocusedLoad(loadSync);
+  // A sync that ends while Settings is in front changes the line even when it
+  // pulled nothing (the time, an error, signed out elsewhere).
+  useFocusEffect(useCallback(() => onSyncStateChange(reloadSync), [reloadSync]));
   const now = useNow(60 * 1000);
   // The choice just made, shown at once; null until the user changes it.
   const [extendChoice, setExtendChoice] = useState(null);
@@ -204,10 +207,15 @@ export default function Settings() {
     setSavingLocation(true);
     setLocationError(null);
     try {
-      // Asked first, so a failure saves nothing; saying no in Android's dialog
-      // still saves "on", and the switch stays off until Android allows it.
-      if (next && !location.permission.granted) await location.allow();
-      await preferences.setUseLocation(db, next);
+      // Asked first, so a failure saves nothing. On is saved only once Android
+      // allows it: after a no, or a trip to Android settings (whose answer
+      // comes later; tap again once back), the choice stays off. Saved on but
+      // not allowed, the switch would show off and a tap could only ask
+      // again, so it could never be turned off, and Park would keep saying
+      // the location is not allowed.
+      const allowed = !next || location.permission.granted || Boolean((await location.allow())?.granted);
+      await preferences.setUseLocation(db, next && allowed);
+      setLocationChoice(next && allowed);
     } catch (e) {
       setLocationChoice(previous);
       setLocationError(e);
@@ -251,12 +259,12 @@ export default function Settings() {
       </ListSection>
 
       <ListSection title="Your cars">
-        <ListRow label="Cars" onPress={() => router.push('/vehicles')} />
+        <ListRow label="Cars" onPress={() => router.navigate('/vehicles')} />
       </ListSection>
 
       <ListSection title="Places and rates">
-        <ListRow label="Places" onPress={() => router.push('/places')} />
-        <ListRow label="Public holidays" onPress={() => router.push('/holidays')} first={false} />
+        <ListRow label="Places" onPress={() => router.navigate('/places')} />
+        <ListRow label="Public holidays" onPress={() => router.navigate('/holidays')} first={false} />
       </ListSection>
 
       <ListSection title="When you park">
@@ -351,7 +359,7 @@ export default function Settings() {
           <ListRow
             label="Back up and sync"
             value={sync ? syncRowValue(sync) : null}
-            onPress={() => router.push('/account')}
+            onPress={() => router.navigate('/account')}
           />
           <View style={styles.rowNote}>
             {sync && <Text style={styles.hint}>{syncStatusText(sync, now)}</Text>}
@@ -371,7 +379,7 @@ export default function Settings() {
 
       {__DEV__ && (
         <ListSection title="Developer">
-          <ListRow label="Database check" onPress={() => router.push('/debug')} />
+          <ListRow label="Database check" onPress={() => router.navigate('/debug')} />
           {/* While the export runs the row is read-only, so it cannot start twice. */}
           <ListRow
             label="Export database"

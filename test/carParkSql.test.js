@@ -31,4 +31,10 @@ describe('the car park list migration', () => {
 
     expect(sql).toContain("'Touch ''n Go Mall'");
   });
+
+  // The version is written into a comment line.
+  it('refuses a version that could end the comment', () => {
+    expect(() => carParkListSql({ version: 'x\ndrop table public.car_park;', carParks: [] })).toThrow('version');
+    expect(() => carParkListSql({ carParks: [] })).toThrow('version');
+  });
 });

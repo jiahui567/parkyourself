@@ -18,6 +18,9 @@ export const DELETE_TIMED_OUT_TEXT =
   'Deleting your account took too long. It may have been deleted already: open Account again to see.';
 // Sign out given up on: the server was not told, so the user is still signed in.
 export const SIGN_OUT_TIMED_OUT_TEXT = 'Signing out took too long, so you are still signed in. Try again with a better signal.';
+// A sync stopped because another account signed in while it ran
+// (requireAccount in src/cloud/supabase.js).
+export const ACCOUNT_CHANGED_TEXT = 'Another account signed in while this phone was syncing, so that sync stopped.';
 
 const BY_CODE = {
   // A unique index: one report waits per user and car park.

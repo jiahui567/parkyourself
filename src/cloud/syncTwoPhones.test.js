@@ -116,6 +116,75 @@ it('the later of two offline changes to one row wins on both phones', async () =
   }
 });
 
+// The server keeps only a newer change, so a phone whose clock is behind still
+// stamps its change after the row it changed (src/db/core.js, updateRow).
+it('a car found on a phone whose clock is behind is found on both phones', async () => {
+  const { one, two, carId } = await twoPhones();
+  time('2026-10-28T10:00');
+  const id = await sessions.start(one, { vehicle_id: carId, level: 'L3', bay: 'C14' });
+  time('2026-10-28T10:03');
+  await sessions.setWayBack(one, id, { landmark: 'Starbucks' });
+  await syncNow(one);
+  await syncNow(two);
+
+  // Two minutes later, on a phone whose clock is three minutes slow.
+  time('2026-10-28T10:02');
+  await sessions.end(two, id);
+  await syncNow(two);
+  await syncNow(one);
+
+  for (const phone of [one, two]) {
+    expect(await sessions.listActive(phone)).toEqual([]);
+    expect(await sessions.get(phone, id)).toMatchObject({ status: 'ended' });
+    await expectInStep(phone);
+  }
+});
+
+it('a place deleted on a phone whose clock is behind disappears on both phones, with its rates', async () => {
+  const { one, two, carId } = await twoPhones();
+  time('2026-10-28T10:00');
+  const id = await sessions.start(one, {
+    vehicle_id: carId,
+    place_name: 'Pavilion',
+    rates: { weekday: { type: 'flat', flat_sen: 300 } },
+    save_rates: ['weekday'],
+  });
+  await sessions.end(one, id);
+  await syncNow(one);
+  await syncNow(two);
+  const [place] = await places.listWithVisits(two);
+
+  time('2026-10-28T09:55');
+  await places.remove(two, place.id);
+  await syncNow(two);
+  await syncNow(one);
+
+  for (const phone of [one, two]) {
+    expect(await places.get(phone, place.id)).toBeNull();
+    expect(await places.getRates(phone, place.id)).toEqual({ weekday: null, weekend: null, holiday: null });
+    await expectInStep(phone);
+  }
+});
+
+// The server checks the text limits on every row (*_synced_text_limits.sql).
+// No write of the app makes a longer row; one made some other way is refused
+// alone and waits, and the rest of the push goes through.
+it('a row over a text limit is refused alone and waits, as on the server', async () => {
+  const { one, carId } = await twoPhones();
+  time('2026-10-28T10:00');
+  const id = await sessions.start(one, { vehicle_id: carId, level: 'L3' });
+  await one.runAsync('UPDATE parking_session SET note = ? WHERE id = ?', ['n'.repeat(501), id]);
+  const placeId = await places.create(one, { name: 'Pavilion' });
+
+  const result = await syncNow(one);
+
+  expect(result.refused).toEqual([
+    expect.objectContaining({ table: 'parking_session', id, code: '23514', constraint: 'parking_session_note_length' }),
+  ]);
+  expect(await syncRows.countDirty(one)).toBe(1);
+  expect(server.rows('place').map((p) => p.id)).toContain(placeId);
+});
+
 it('a place deleted on one phone disappears on the other', async () => {
   const { one, two } = await twoPhones();
   time('2026-10-27T10:00');

@@ -1,4 +1,4 @@
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import { localDateKey } from '../lib/time';
@@ -25,10 +25,24 @@ export async function copyDatabaseTo(db, file) {
   return file;
 }
 
+// An export's name in the cache (the self-test's copy has another).
+const EXPORT_NAME = /^park-yourself-\d{4}-\d{2}-\d{2}\.db$/;
+
 // Copies the open database to the cache as park-yourself-YYYY-MM-DD.db (local
 // date), replacing an export from earlier the same day, and returns the copy.
-export function copyDatabaseToCache(db, nowMs = now()) {
-  return copyDatabaseTo(db, new File(Paths.cache, `park-yourself-${localDateKey(nowMs)}.db`));
+// Earlier days' copies are deleted then, since each holds all the parking.
+export async function copyDatabaseToCache(db, nowMs = now()) {
+  const copy = await copyDatabaseTo(db, new File(Paths.cache, `park-yourself-${localDateKey(nowMs)}.db`));
+  try {
+    for (const item of new Directory(Paths.cache).list()) {
+      if (item instanceof File && EXPORT_NAME.test(item.name) && item.name !== copy.name) item.delete();
+    }
+  } catch (e) {
+    // Best effort, after the copy is made: an old copy left in the cache is
+    // only the phone's own data, in a folder Android may clear.
+    console.warn('Could not delete earlier database exports', e);
+  }
+  return copy;
 }
 
 // Opens the share sheet with a fresh copy, for Google Drive, email or another app.

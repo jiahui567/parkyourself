@@ -15,6 +15,7 @@ import { sessions, useDatabase } from '../../db';
 import { useFocusedLoad } from '../../hooks/useFocusedLoad';
 import { useNow } from '../../hooks/useNow';
 import { formatRM } from '../../lib/money';
+import { oneParam } from '../../lib/params';
 import { addMonths, formatMonth, localMonthKey } from '../../lib/time';
 import { chartBars, chartLayout, chartMaxValue } from '../../spending/chart';
 import {
@@ -59,10 +60,11 @@ export default function Spending() {
   // to its month once, so the user can still change months afterwards, and
   // tapping the same month in History again comes back to it.
   const link = useLocalSearchParams();
+  const linkAt = oneParam(link.at);
   const [openedAt, setOpenedAt] = useState(null);
-  if (link.at != null && link.at !== openedAt) {
-    setOpenedAt(link.at);
-    const opened = requestedMonth(link.month, currentMonth);
+  if (linkAt != null && linkAt !== openedAt) {
+    setOpenedAt(linkAt);
+    const opened = requestedMonth(oneParam(link.month), currentMonth);
     if (opened) select(opened);
   }
 
@@ -103,7 +105,11 @@ export default function Spending() {
   // surface, for the other months, and accent, not primary (2.5:1 on the light
   // card), for the selected one.
   const barColours = { selected: colours.accent, other: colours.muted };
-  const openSessions = (params) => router.push({ pathname: '/sessions', params: { month, ...params } });
+  // gifted-charts grows each bar to its height once, when it mounts, and keeps
+  // its bars by position: new totals for the same months (a session ended or
+  // deleted, a pull) draw a new chart, or the bars would keep their old heights.
+  const barsKey = totals.map((m) => m.totalSen).join(',');
+  const openSessions = (params) => router.navigate({ pathname: '/sessions', params: { month, ...params } });
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -131,6 +137,7 @@ export default function Spending() {
         <View style={styles.chartCard} accessible accessibilityLabel={chartSummaryText(totals)}>
           <View importantForAccessibility="no-hide-descendants">
             <BarChart
+              key={barsKey}
               data={chartBars(totals, month, barColours, styles.chartLabelSelected)}
               width={plotWidth}
               height={CHART_HEIGHT}

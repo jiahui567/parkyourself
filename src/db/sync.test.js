@@ -3,7 +3,7 @@ import { onSyncedChange } from './core';
 import { holidays } from './holidays';
 import { placeRates, places } from './places';
 import { sessions } from './sessions';
-import { accountMatch, SYNCED_TABLES, syncRows, syncState, toServerRow } from './sync';
+import { accountMatch, onSyncStateChange, SYNCED_TABLES, syncRows, syncState, toServerRow } from './sync';
 import { vehicles } from './vehicles';
 
 const at = (t) => new Date(t).getTime();
@@ -93,6 +93,19 @@ describe('onSyncedChange', () => {
     stop();
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  // useSync syncs only for the app's own database, not Database check's throwaway one.
+  it('says which database was written, also inside a transaction', async () => {
+    db.databasePath = '/data/SQLite/park-yourself.db';
+    const listener = jest.fn();
+    const stop = onSyncedChange(listener);
+
+    const id = await vehicles.add(db, { name: 'My Myvi' });
+    await vehicles.rename(db, id, 'Our Myvi');
+    stop();
+
+    expect(listener.mock.calls).toEqual([['/data/SQLite/park-yourself.db'], ['/data/SQLite/park-yourself.db']]);
   });
 });
 
@@ -308,5 +321,21 @@ describe('syncState', () => {
     await syncState.afterAccountDeleted(db);
 
     expect(await syncState.get(db)).toMatchObject({ account: null, owner, pending: 0 });
+  });
+});
+
+describe('onSyncStateChange', () => {
+  it('tells when the account changes and when a sync ends or fails, until stopped', async () => {
+    const listener = jest.fn();
+    const stop = onSyncStateChange(listener);
+
+    await syncState.setAccount(db, { id: 'user-a', email: 'a@example.test' });
+    await syncState.finished(db, at('2026-10-30T10:00'), []);
+    await syncState.failed(db, 'Could not reach the server.');
+    expect(listener).toHaveBeenCalledTimes(3);
+
+    stop();
+    await syncState.finished(db, at('2026-10-30T10:05'), []);
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 });

@@ -12,6 +12,7 @@ import { radius, space } from '../components/theme';
 import { useThemedStyles } from '../components/ThemeProvider';
 import { holidays, useDatabase } from '../db';
 import { useFocusedLoad } from '../hooks/useFocusedLoad';
+import { MAX_LENGTH } from '../lib/textLimits';
 import { formatDateKey, localDateKey } from '../lib/time';
 
 // Public holidays: the user's own list of dates (no internet calendar), typed
@@ -31,7 +32,7 @@ export default function Holidays() {
     setAdding(true);
     setActionError(null);
     try {
-      await holidays.add(db, { holiday_date: date, name });
+      await holidays.addInTransaction(db, { holiday_date: date, name });
       setDate('');
       setName('');
       reload();
@@ -102,6 +103,7 @@ export default function Holidays() {
           value={name}
           onChangeText={setName}
           placeholder="e.g. Christmas"
+          maxLength={MAX_LENGTH.public_holiday.name}
           editable={!adding}
         />
         <Button

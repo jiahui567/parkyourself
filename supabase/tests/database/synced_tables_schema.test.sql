@@ -1,5 +1,5 @@
 begin;
-select plan(34);
+select plan(36);
 
 select hasnt_table('public', 'connection_check', 'C0''s connection_check is gone');
 
@@ -60,6 +60,15 @@ select ok(
 -- up to two accounts (PLAN.md, "How the sync works", step 9).
 select col_is_pk('public', t, array['id', 'owner_id']::name[], t || ' is keyed by id and owner')
 from unnest(array['vehicle', 'place', 'place_rate', 'public_holiday', 'parking_session']) as t;
+
+-- One index on (id, owner_id), the primary key, which the foreign keys use
+-- (20261030115747).
+select is(
+  (select count(*)::int from pg_catalog.pg_constraint where conrelid = format('public.%I', t)::regclass and contype = 'u'),
+  0,
+  t || ' has no second key on (id, owner_id)'
+)
+from unnest(array['vehicle', 'place']) as t;
 
 -- Without it a table's updates keep their old stamp and the pull misses them;
 -- the column default alone hides that on insert.

@@ -38,7 +38,7 @@ export function parkPlaceHint({ hasPlace, fromLocation, isNew, isListed, finding
 // so it says so.
 export function locationSwitchHint(permission) {
   if (permission && !permission.granted && permission.canAskAgain === false) {
-    return `${LOCATION_PURPOSE} Turning it on opens Android settings, where you allow the location.`;
+    return `${LOCATION_PURPOSE} Turning it on opens Android settings: allow the location there, then turn this on.`;
   }
   return LOCATION_PURPOSE;
 }

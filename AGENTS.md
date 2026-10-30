@@ -21,6 +21,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 npx expo install <package>  # always use instead of npm install: resolves SDK-compatible versions
 npx expo start              # start the dev server
 npx expo run:android        # build and install the development build on the phone
+npx expo prebuild --clean --platform android  # regenerate android/ after a change to app.json or plugins/ (run:android keeps the android/ it finds)
 npm run release             # build and install the release build (runs without the laptop)
 npm run lint                # lint src/ and test/ (add -- --no-cache if a result looks stale)
 npm test                    # Jest tests (time zone pinned to Asia/Kuala_Lumpur in jest.config.js)
@@ -49,7 +50,8 @@ npm run carparks:sql        # write a Supabase migration from src/carparks/carPa
 ## Data
 
 - Only `src/db/` runs SQL. Screens import functions from `src/db/index.js`. Components take their data as props; the two exceptions, `AppThemeProvider` (the theme setting) and `PlacePicker` (live place search), also call `src/db/index.js`.
-- Synced tables (`vehicle`, `place`, `place_rate`, `public_holiday`, `parking_session`): ids come from `newId()`, writes go through the helpers in `src/db/core.js`, rows are soft-deleted (`deleted_at`) and never `DELETE`d, and every read skips deleted rows. The one exception is display only: a session keeps showing its place's name after the place is deleted. Every write sets `dirty = 1` (the `core.js` helpers do; an `UPDATE` written by hand must too), so the sync pushes it; only the sync (`src/db/sync.js`, `src/db/pull.js`) reads deleted rows, since a deletion syncs like any change. Only `src/db/pull.js` writes rows the pull brought, with `dirty = 0`. `dirty` and `parking_session.parked_here` (only the phone that parked shows notifications) are phone-only columns, never sent (`PHONE_ONLY_COLUMNS`); `merged_into` on `place` and `vehicle` syncs. Two cars in use never share a name: the sync merges them (PLAN.md, "How the sync works", step 8).
+- Synced tables (`vehicle`, `place`, `place_rate`, `public_holiday`, `parking_session`): ids come from `newId()`, writes go through the helpers in `src/db/core.js`, rows are soft-deleted (`deleted_at`) and never `DELETE`d, and every read skips deleted rows. The one exception is display only: a session keeps showing its place's name after the place is deleted. Every write sets `dirty = 1` and stamps `updated_at = MAX(?, updated_at + 1)` (the `core.js` helpers do; an `UPDATE` written by hand must too), so the sync pushes it and the server keeps it even when this phone's clock is behind; only the sync (`src/db/sync.js`, `src/db/pull.js`) reads deleted rows, since a deletion syncs like any change. Only `src/db/pull.js` writes rows the pull brought, with `dirty = 0`. `dirty` and `parking_session.parked_here` (only the phone that parked shows notifications) are phone-only columns, never sent (`PHONE_ONLY_COLUMNS`); `merged_into` on `place` and `vehicle` syncs. Two cars in use never share a name: the sync merges them (PLAN.md, "How the sync works", step 8).
+- Text in synced columns has a longest length (`MAX_LENGTH` in `src/lib/textLimits.js`, decided by the user on 2026-10-30: names 100, notes 500, level and bay 20): `src/db/core.js` refuses longer text, the fields that type it set `maxLength`, and the server checks the same lengths (`supabase/migrations/*_synced_text_limits.sql`). Change a limit on both sides in one change; `test/serverLimits.test.js` fails otherwise. Lowering one also cuts the text already saved, on both sides, as SQLite step v8 and `synced_text_limits` do (the same expressions, a name kept distinct, `updated_at + 1` once, `dirty = 1`, deleted rows too), with the server migration pushed before any phone runs the step. Limits count characters (`characterCount`), as SQLite and PostgreSQL do.
 - `photo`, `setting`, `car_park`, `car_park_rate` and `car_park_report` are local-only and never sync. The car park tables are a copy of reference data, replaced whole by `carParks.refresh` from a download (which always wins) or the built-in copy; `car_park_report` (rate reports waiting for review) is replaced whole by `carParks.replaceReports` after each download.
 - A schema change is a new step at the end of `MIGRATIONS` in `src/db/migrations.js`. Never edit a step that has already run on a phone. Add a `src/db/selfTest.js` check for every new data rule.
 - Multi-step writes use `inTransaction(db, async (txn) => ...)`, and every query inside uses `txn`, not `db`. It runs on a second connection as `BEGIN IMMEDIATE`, and every connection waits up to `BUSY_TIMEOUT_MS` (`src/db/migrate.js`) for the write lock, so two writes at once wait for each other instead of failing with "database is locked". Never call `withExclusiveTransactionAsync` directly, and never nest `inTransaction` (the inner one waits for the outer one's lock, then fails); a helper called inside one takes `txn` and opens none. After an expo-sqlite upgrade, run Database check on the phone: its self-test checks the transaction swap.
@@ -77,7 +79,8 @@ npm run carparks:sql        # write a Supabase migration from src/carparks/carPa
 - `android/` and `ios/` are generated (Continuous Native Generation). Never create or edit them by hand; configure native behaviour in `app.json` or a config plugin in `plugins/`.
 - Keep `plugins/withCmakeVersion.js`: Windows builds need it for long paths.
 - Keep `plugins/withImageColorsJvmTarget.js` until `react-native-image-colors` sets its own JVM target: without it the Android build stops with "Inconsistent JVM-target compatibility" (Java 17, Kotlin 21).
-- Expo Go is not supported. After adding a library with native code or changing `app.json` plugins, say that `npx expo run:android` is needed.
+- Keep `plugins/withNoDeviceTransfer.js`: `"allowBackup": false` alone does not stop Android's phone-to-phone transfer on some phones (the user's decision, 2026-10-30).
+- Expo Go is not supported. After adding a library with native code, say that `npx expo run:android` is needed; after changing `app.json` or `plugins/`, that `npx expo prebuild --clean --platform android` must run first (once `android/` exists, `run:android` does not apply them).
 - Ask before adding a dependency, and say why it is needed. Prefer Expo modules over third-party libraries.
 
 ## Code style
@@ -105,7 +108,7 @@ npm run carparks:sql        # write a Supabase migration from src/carparks/carPa
 
 - Skills in `.claude/skills/`, loaded before that kind of work: `add-screen` (steps and the design standard), `add-migration`, `next-milestone`, `capture-lesson`.
 - Subagents in `.claude/agents/`: `reviewer` (read-only review of uncommitted changes) and `test-writer` (writes and runs Jest tests).
-- Hooks in `.claude/settings.json`: edits to `android/`, `ios/`, `db-snapshot/` and `node_modules/` are blocked; a reminder appears when the user's message looks like a correction; lint and tests run before Claude finishes if code changed since the last passing check.
+- Hooks in `.claude/settings.json`: edits to `android/`, `ios/`, `db-snapshot/` and `node_modules/` are blocked, and so are shell commands that clearly write there (a redirect, `sed -i`, `Set-Content`); a reminder appears when the user's message looks like a correction; lint and tests run before Claude finishes if code changed since the last passing check.
 
 ## Corrections become lessons
 
@@ -115,4 +118,4 @@ When the user corrects your work or states a lasting rule for this project, run 
 
 Added by `capture-lesson`, newest last: one or two lines each, the rule then the reason, with the date.
 
-(none yet)
+- 2026-10-30: Keep Android's backup and phone-to-phone transfer off (`"allowBackup": false` in `app.json`, and `plugins/withNoDeviceTransfer.js` for the phones where that alone still allows a transfer): signed out, nothing the app keeps leaves the phone beyond what the privacy policy lists, and a backup or a transfer would add a copy the policy does not mention.

@@ -102,12 +102,12 @@ export const places = {
     );
   },
 
-  // The Places edit screen's save: renames the place and, for each day type
-  // in rates, saves a rate or removes it (null). Day types left out keep
-  // their rate. All or nothing.
+  // The Places edit screen's save: renames the place (name left out keeps
+  // its name) and, for each day type in rates, saves a rate or removes it
+  // (null). Day types left out keep their rate. All or nothing.
   async saveDetails(db, id, { name, rates = {} }) {
-    const trimmed = String(name ?? '').trim();
-    if (!trimmed) throw new Error('Give the place a name.');
+    const trimmed = name === undefined ? undefined : String(name ?? '').trim();
+    if (trimmed === '') throw new Error('Give the place a name.');
     const changes = Object.entries(rates);
     for (const [dayType, rate] of changes) {
       if (rate) assertPlaceRate(dayType, rate);
@@ -116,9 +116,11 @@ export const places = {
     await inTransaction(db, async (txn) => {
       const place = await base.get(txn, id);
       if (!place) throw new Error('This place no longer exists.');
-      const other = await findByName(txn, trimmed);
-      if (other && other.id !== id) throw new Error(`You already have a place called ${other.name}.`);
-      if (trimmed !== place.name) await base.update(txn, id, { name: trimmed });
+      if (trimmed !== undefined) {
+        const other = await findByName(txn, trimmed);
+        if (other && other.id !== id) throw new Error(`You already have a place called ${other.name}.`);
+        if (trimmed !== place.name) await base.update(txn, id, { name: trimmed });
+      }
       for (const [dayType, rate] of changes) {
         if (rate) await saveRate(txn, id, dayType, rate);
         else await removeRate(txn, id, dayType);
@@ -132,7 +134,7 @@ export const places = {
     await inTransaction(db, async (txn) => {
       const t = now();
       await txn.runAsync(
-        'UPDATE place_rate SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE place_id = ? AND deleted_at IS NULL',
+        'UPDATE place_rate SET deleted_at = ?, updated_at = MAX(?, updated_at + 1), dirty = 1 WHERE place_id = ? AND deleted_at IS NULL',
         [t, t, id]
       );
       changed = await softDeleteRow(txn, 'place', id);

@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { myReports, sendSignInCode, signInWithCode } from '../cloud/supabase';
@@ -58,12 +58,30 @@ export default function AccountScreen() {
   // The load asks the server for the reports, so only the user's own actions reload it, not a pull.
   const { data, error, loading, reload } = useFocusedLoad(load, { reloadOnPull: false });
 
+  // Back may close this screen while the code is checked (a weak signal can
+  // take long), and what follows a sign-in must not then act on the screen in
+  // front.
+  const closed = useRef(false);
+  useEffect(() => {
+    // Set again on every run: Fast Refresh runs the cleanup, then this again.
+    closed.current = false;
+    return () => {
+      closed.current = true;
+    };
+  }, []);
+
   // The first push starts at once (a second phone on the same account needs
   // nothing more than the code); this screen shows how it went once it ends.
   // Another person's account is asked first whether to take this phone's data.
   const signedIn = async (account) => {
     await syncState.setAccount(db, account);
     const sync = await syncState.get(db);
+    // Closed meanwhile: signed in all the same. Account offers to add this
+    // phone's data on its Back up and sync card when it opens next.
+    if (closed.current) {
+      if (!sync.otherAccount) syncNow(db);
+      return;
+    }
     if (sync.otherAccount) {
       await reload();
       askToAddPhoneData(sync);
@@ -101,7 +119,8 @@ export default function AccountScreen() {
       await reload();
       setBusy(null);
     }
-    if (added && from === 'report' && router.canGoBack()) router.back();
+    // Not when Back closed this screen meanwhile: the screen in front is then the report.
+    if (added && !closed.current && from === 'report' && router.canGoBack()) router.back();
   };
 
   // Not now leaves the backup paused; the Back up and sync card asks again.
@@ -312,7 +331,7 @@ function SignIn({ onSignedIn }) {
         ) : (
           <>
             <Text style={styles.intro}>
-              {resent ? 'We sent a new code' : 'We emailed a code'} to {sentTo}. It works for an hour.
+              {resent ? 'We sent a new code' : 'We emailed a code'} to {sentTo}. It works for 10 minutes.
             </Text>
             <View style={styles.row}>
               <Button

@@ -24,7 +24,9 @@ export function useSync() {
   useOnAppActive(sync);
   useEffect(() => {
     let timer = null;
-    const stopListening = onSyncedChange(() => {
+    const stopListening = onSyncedChange((databasePath) => {
+      // Only this database: Database check's self-test writes a throwaway one.
+      if (databasePath !== db.databasePath) return;
       clearTimeout(timer);
       timer = setTimeout(sync, AFTER_SAVE_MS);
     });
@@ -32,5 +34,5 @@ export function useSync() {
       stopListening();
       clearTimeout(timer);
     };
-  }, [sync]);
+  }, [db, sync]);
 }

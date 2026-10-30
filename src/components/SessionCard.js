@@ -22,7 +22,7 @@ export function SessionCard({ session, showVehicle = true }) {
     <Pressable
       accessibilityRole="button"
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={() => router.push(`/session/${session.id}`)}
+      onPress={() => router.navigate(`/session/${session.id}`)}
     >
       <View style={styles.details}>
         <Text style={session.place_name ? styles.title : styles.titleMuted} numberOfLines={2}>

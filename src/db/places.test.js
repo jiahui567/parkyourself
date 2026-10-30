@@ -148,6 +148,25 @@ describe('places.saveDetails', () => {
 
     expect((await places.get(db, id)).name).toBe('Pavilion');
   });
+
+  // The form leaves out a name it did not change, so one another phone gave
+  // the place while it was open is kept.
+  it('keeps the name when it is left out, and still saves the rates', async () => {
+    const id = await places.create(db, { name: 'Pavilion' });
+    await places.update(db, id, { name: 'Pavilion KL' });
+
+    await places.saveDetails(db, id, { rates: { weekday: WEEKDAY } });
+
+    expect((await places.get(db, id)).name).toBe('Pavilion KL');
+    expect((await places.getRates(db, id)).weekday).toMatchObject(WEEKDAY);
+  });
+
+  it('refuses an empty name', async () => {
+    const id = await places.create(db, { name: 'Pavilion' });
+
+    await expect(places.saveDetails(db, id, { name: '  ' })).rejects.toThrow('Give the place a name.');
+    await expect(places.saveDetails(db, id, { name: null })).rejects.toThrow('Give the place a name.');
+  });
 });
 
 describe('places.listLocated', () => {

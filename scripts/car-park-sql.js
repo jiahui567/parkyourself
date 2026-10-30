@@ -40,6 +40,10 @@ function literal(value) {
 
 // The migration's SQL for list. The same list always gives the same text.
 function carParkListSql(list) {
+  // The version goes into a comment line, where a line break would start SQL.
+  if (typeof list.version !== 'string' || !/^[\w.-]+$/.test(list.version)) {
+    throw new Error(`The list's version must be letters, digits, dots and dashes, such as 2026-10-24: ${list.version}`);
+  }
   const carParkRows = list.carParks.map((c) =>
     [c.id, c.name, c.area, c.lat, c.lng, c.source_url, c.checked_on, c.notes].map(literal).join(', ')
   );
